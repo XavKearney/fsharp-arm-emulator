@@ -1,0 +1,11 @@
+language: csharp
+dotnet: 2.0.0
+script:
+ - git clone https://github.com/fsprojects/Paket.git
+ - cd Paket
+ - ./build.sh
+ - sudo ./install.sh
+ - cd ..
+ - paket init
+ - paket update
+ - dotnet run --project ArmEmulator/ArmEmulator.fsproj
