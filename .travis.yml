@@ -1,12 +1,11 @@
 language: csharp
 dotnet: 2.0.0
 mono: latest
-cache:
-  directories:
-  - Paket
-before_script:
-- git clone https://github.com/fsprojects/Paket.git
+cache: 
+ - mono
+ - dotnet
 script:
+ - git clone https://github.com/fsprojects/Paket.git
  - cd Paket
  - sudo ./install.sh
  - cd ..
