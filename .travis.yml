@@ -5,11 +5,10 @@ cache:
   directories:
   - Paket
 script:
- - git clone https://github.com/fsprojects/Paket.git
+  allow_failures:
+  - git clone https://github.com/fsprojects/Paket.git
  - cd Paket
- - ./build.sh
  - sudo ./install.sh
  - cd ..
- - paket init
  - paket update
  - dotnet run --project ArmEmulator/ArmEmulator.fsproj
