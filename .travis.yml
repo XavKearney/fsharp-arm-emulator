@@ -4,9 +4,9 @@ mono: latest
 cache:
   directories:
   - Paket
+before_script:
+- git clone https://github.com/fsprojects/Paket.git
 script:
-  allow_failures:
-  - git clone https://github.com/fsprojects/Paket.git
  - cd Paket
  - sudo ./install.sh
  - cd ..
