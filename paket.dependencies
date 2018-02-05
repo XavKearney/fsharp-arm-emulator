@@ -1,0 +1,10 @@
+source https://www.nuget.org/api/v2
+
+framework: >= net461
+nuget Expecto
+nuget FSharp.Core
+
+group Build
+source https://www.nuget.org/api/v2
+
+nuget FAKE
