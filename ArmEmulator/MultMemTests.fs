@@ -3,22 +3,42 @@ module MultMemTests
     open CommonLex
     open MultMem
     open Expecto
-    open FsCheck
 
     [<Tests>]
     let testParse =
-        testCase "Test Parse" <| fun () ->
-        let ls = {
-            LoadAddr = WA 100u; 
-            Label = None; 
-            SymTab = None;
-            OpCode = "LDM";
-            Operands = "R4, {R5,R7,R12}";
-        }
-        let expected = Some (Ok {
-                    PInstr =  { InsType = Some(LDM); Direction = Some(FD);
-                    Target = R4; WriteBack = false; RegList = [R5;R7;R12]} ;
-                    PLabel = None; PSize = 4u; PCond = Cal;
-                })
-        let res = parse ls
-        Expect.equal res expected "parse1"
+        let makeLineData wa opcode suffix target wb rLst = 
+            let opCodeStr = 
+                match opcode with
+                | LDM -> "LDM"
+                | STM -> "STM"
+            // NB: This doesn't test suffix aliases or ""
+            let suffixStr = 
+                match suffix with
+                | FD -> "FD"
+                | FA -> "FA"
+                | ED -> "ED"
+                | EA -> "EA"
+            let reglstStr =  String.concat "," (List.map (fun r-> regStrings.[r]) rLst)
+            if wb then regStrings.[target] + "!," + "{" + reglstStr + "}"
+            else regStrings.[target] + "," + "{" + reglstStr + "}"
+            |> fun operandStr ->
+            {
+                LoadAddr = wa; 
+                Label = None; 
+                SymTab = None;
+                OpCode = opCodeStr + suffixStr;
+                Operands = operandStr;
+            }
+
+        testProperty "Test Parse" <| fun wa opcode suffix target wb rLst ->
+            let ls = makeLineData wa opcode suffix target wb rLst
+            let expected = 
+                match rLst with
+                | [] -> Some (Error "Invalid list of registers.")
+                | _ -> Some (Ok {
+                        PInstr =  { InsType = Some(opcode); Direction = Some(suffix);
+                                    Target = target; WriteBack = wb; RegList = rLst} ;
+                        PLabel = None; PSize = 4u; PCond = Cal;
+                    })
+            let res = parse ls
+            Expect.equal res expected "parse1"
