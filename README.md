@@ -2,7 +2,9 @@
 # fsharp-arm-emulator
 The goal of this project is to create a fully functional ARM Assembly Language Emulator in F#.
 
-To run from a fresh clone, `cd` to the root directory and run:
+If you don't have `paket` installed, run `.paket/paket.bootstrapper.exe` and then `.paket/paket.exe install`. `paket` should now be installed.
+
+To run from a fresh clone, if you have `paket` installed then from the root directory run:
 `paket update`
 
 This will install the necessary packages.
