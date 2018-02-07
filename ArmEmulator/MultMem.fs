@@ -10,15 +10,15 @@ module MultMem
     // change these types as required
 
     type multIns = LDM | STM
-    type multDirection = FD | FA | ED | EA
+    type multDirection = FD | FA | ED | EA 
     
     /// multiple memory access instruction type
     type multMemInstr = 
         {
             // load or store
-            InsType: multIns;
+            InsType: multIns option;
             // stack direction
-            Direction: multDirection;
+            Direction: multDirection option;
             // target register: source/destination
             Target: RName;
             // optional writeback suffix '!'
@@ -47,8 +47,70 @@ module MultMem
     /// map of all possible opcodes recognised
     let opCodes = opCodeExpand multMemSpec
 
-    let makeLDM suf cond =
+    /// take a string of all operands and parse
+    /// into target reg, writeback and list of reg
+    /// to load/store
+    /// returns error if anything is incorrect
+    let parseOps (ops: string) =
+        let sLst = ops.Split(',') |> Array.map (fun s-> s.Trim())
+        let targetStr = sLst.[0]
+        let reglstStr = String.concat "," sLst.[1..]
+        let wb = targetStr.[String.length targetStr - 1] = '!'
+        let target = 
+            regNames.TryFind 
+            <| targetStr.[..String.length targetStr - 1 - System.Convert.ToInt32(wb)]
+        let matchRegLst wb targ =
+            match reglstStr.[0] = '{' && reglstStr.[String.length reglstStr - 1] = '}' with
+            | true ->
+                let reglst = 
+                    reglstStr.[1..String.length reglstStr - 2].Split(",")
+                    |> Array.toList
+                    |> List.map regNames.TryFind
+                if List.contains None reglst
+                then Error ("Invalid list of registers.")
+                else 
+                List.map (fun r -> 
+                            match r with
+                            | Some x -> x
+                            | _ -> failwithf "Should never happen.") reglst
+                |> fun rlst -> Ok (targ, wb, rlst)
+            | false -> Error ("Incorrect brackets around list.")
+        match target with
+        | Some t -> matchRegLst wb t
+        | None -> Error ("Target register not found.")
 
+
+
+    let makeMemIns root suf operands =
+        // try to parse operands from string
+        match parseOps operands with
+        | Ok (target, wb, reglst) ->
+            // create template result
+            let defaultIns = {
+                InsType = None; Direction = None;
+                Target = target; WriteBack = wb; RegList = reglst}
+            match root, suf with
+            // LDM instructions, including synonyms
+            | "LDM", ("" | "FD" | "IA") ->
+                Ok { defaultIns with InsType = Some(LDM); Direction = Some(FD); } 
+            | "LDM", ("EA" | "DB") ->
+                Ok { defaultIns with InsType = Some(LDM); Direction = Some(EA); } 
+            | "LDM", "FA" ->
+                Ok { defaultIns with InsType = Some(LDM); Direction = Some(FA); } 
+            | "LDM", "ED" ->
+                Ok { defaultIns with InsType = Some(LDM); Direction = Some(ED)  ; } 
+            // STM instructions, including synonyms
+            | "STM", ("" | "EA" | "IA") ->
+                Ok { defaultIns with InsType = Some(STM); Direction = Some(EA); } 
+            | "STM", ("FD" | "DB") ->
+                Ok { defaultIns with InsType = Some(STM); Direction = Some(FD); } 
+            | "STM", "FA" ->
+                Ok { defaultIns with InsType = Some(STM); Direction = Some(FA); } 
+            | "STM", "ED" ->
+                Ok { defaultIns with InsType = Some(STM); Direction = Some(ED); } 
+            // unsupported instruction
+            | _ -> Error ("Opcode not supported.")
+        | Error s -> Error s
 
 
     /// main function to parse a line of assembler
@@ -56,42 +118,24 @@ module MultMem
     /// and other state needed to generate output
     /// the result is None if the opcode does not match
     /// otherwise it is Ok Parse or Error (parse error string)
-    let parse (ls: LineData) : Result<Parse<Instr>,string> option =
+    let parse ls: Result<Parse<multMemInstr>,string> option =
         let parse' (instrC, (root,suffix,pCond)) =
-            match instrC, root with
-            | MEM, LDM -> makeLDM suffix pCond
-            | MEM, STM -> makeSTM suffic pCond
-            | _ -> Error ("%s, %s not supported" instrC, root)
+            let (WA la) = ls.LoadAddr
+            match instrC with
+            | MEM -> 
+                match makeMemIns root suffix ls.Operands with
+                | Ok pinstr -> Ok {
+                        // make the memory instruction
+                        PInstr = pinstr;
+                        // TODO: check this is correct
+                        PLabel = ls.Label |> Option.map (fun lab -> lab, la); 
+                        PSize = 4u; 
+                        PCond = pCond;
+                    }
+                | Error s -> Error s
+            | _ -> Error ("Instruction class not supported.")
         Map.tryFind ls.OpCode opCodes
         |> Option.map parse'
-
-    // Ok { 
-    //     // Normal (non-error) return from result monad
-    //     // This is the instruction determined from opcode, suffix and parsing
-    //     // the operands. Not done in the sample.
-    //     // Note the record type returned must be written by the module author.
-    //     PInstr={DPDummy=()}; 
-
-
-    //     // This is normally the line label as contained in
-    //     // ls together with the label's value which is normally
-    //     // ls.LoadAddr. Some type conversion is needed since the
-    //     // label value is a number and not necessarily a word address
-    //     // it does not have to be div by 4, though it usually is
-    //     PLabel = ls.Label |> Option.map (fun lab -> lab, la) ; 
-
-
-    //     // this is the number of bytes taken by the instruction
-    //     // word loaded into memory. For arm instructions it is always 4 bytes. 
-    //     // For data definition DCD etc it is variable.
-    //     //  For EQU (which does not affect memory) it is 0
-    //     PSize = 4u; 
-
-    //     // the instruction condition is detected in the opcode and opCodeExpand                 
-    //     // has already calculated condition already in the opcode map.
-    //     // this part never changes
-    //     PCond = pCond 
-    //     }
 
     /// Parse Active Pattern used by top-level code
     let (|IMatch|_|)  = parse
