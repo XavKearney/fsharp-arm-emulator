@@ -5,20 +5,16 @@ module MultMem
     open CommonLex
     open CommonData
 
-    /// sample specification for set of instructions
-
-    // change these types as required
-
-    type MultInstr = LDM | STM
-    type MultDirection = FD | FA | ED | EA 
+    type MultMemInstrType = LDM | STM
+    type MultMemDirection = FD | FA | ED | EA 
     
     /// multiple memory access instruction type
     type MultMemInstr = 
         {
             // load or store
-            InsType: MultInstr option;
+            InsType: MultMemInstrType option;
             // stack direction
-            Direction: MultDirection option;
+            Direction: MultMemDirection option;
             // target register: source/destination
             Target: RName;
             // optional writeback suffix '!'
@@ -52,10 +48,15 @@ module MultMem
     /// to load/store
     /// returns error if anything is incorrect
     let parseOps (ops: string) =
+        // split the operands by ',' e.g. "R10!, {R1,R2,R3}"
         let sLst = ops.Split(',') |> Array.map (fun s-> s.Trim())
+        // get the target register as a string, e.g. "R10!"
         let targetStr = sLst.[0]
+        // recombine the list of registers
         let reglstStr = String.concat "," sLst.[1..]
+        // check for writeback suffix '!'
         let wb = targetStr.EndsWith('!')
+        // get the target register's RName from string without '!' suffix
         let target = regNames.TryFind (targetStr.Trim('!'))
         let matchRegLst wb targ =
             match reglstStr.StartsWith('{') && reglstStr.EndsWith('}') with
@@ -120,7 +121,6 @@ module MultMem
                 match makeMultMemInstr root suffix ls.Operands with
                 | Ok pinstr -> Ok {
                         PInstr = pinstr;
-                        // TODO: check this is correct
                         PLabel = ls.Label |> Option.map (fun lab -> lab, la); 
                         PSize = 4u; 
                         PCond = pCond;
