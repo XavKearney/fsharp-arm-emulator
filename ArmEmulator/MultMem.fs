@@ -65,10 +65,13 @@ module MultMem
                     reglstStr.[1..String.length reglstStr - 2].Split(",")
                     |> Array.toList
                     |> List.map regNames.TryFind
-                if List.contains None reglst then Error ("Invalid list of registers.")
-                else 
-                List.choose id reglst
-                |> fun rlst -> Ok (targ, wb, rlst)
+                match List.contains None reglst with
+                // if any registers not found, return error
+                | true -> Error ("Invalid list of registers.")
+                | false -> // if all registers found, transform Some x -> x and return
+                    List.choose id reglst
+                    |> fun rlst -> Ok (targ, wb, rlst)
+
             | false -> Error ("Incorrect brackets around list.")
         match target with
         | Some t -> matchRegLst wb t
