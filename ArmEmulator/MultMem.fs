@@ -9,16 +9,16 @@ module MultMem
 
     // change these types as required
 
-    type multIns = LDM | STM
-    type multDirection = FD | FA | ED | EA 
+    type MultInstr = LDM | STM
+    type MultDirection = FD | FA | ED | EA 
     
     /// multiple memory access instruction type
-    type multMemInstr = 
+    type MultMemInstr = 
         {
             // load or store
-            InsType: multIns option;
+            InsType: MultInstr option;
             // stack direction
-            Direction: multDirection option;
+            Direction: MultDirection option;
             // target register: source/destination
             Target: RName;
             // optional writeback suffix '!'
@@ -55,41 +55,35 @@ module MultMem
         let sLst = ops.Split(',') |> Array.map (fun s-> s.Trim())
         let targetStr = sLst.[0]
         let reglstStr = String.concat "," sLst.[1..]
-        let wb = targetStr.[String.length targetStr - 1] = '!'
-        let target = 
-            regNames.TryFind 
-            <| targetStr.[..String.length targetStr - 1 - System.Convert.ToInt32(wb)]
+        let wb = targetStr.EndsWith('!')
+        let target = regNames.TryFind (targetStr.Trim('!'))
         let matchRegLst wb targ =
-            match reglstStr.[0] = '{' && reglstStr.[String.length reglstStr - 1] = '}' with
+            match reglstStr.StartsWith('{') && reglstStr.EndsWith('}') with
             | true ->
                 let reglst = 
                     reglstStr.[1..String.length reglstStr - 2].Split(",")
                     |> Array.toList
                     |> List.map regNames.TryFind
-                if List.contains None reglst
-                then Error ("Invalid list of registers.")
+                if List.contains None reglst then Error ("Invalid list of registers.")
                 else 
-                List.map (fun r -> 
-                            match r with
-                            | Some x -> x
-                            | _ -> failwithf "Should never happen.") reglst
+                List.choose id reglst
                 |> fun rlst -> Ok (targ, wb, rlst)
             | false -> Error ("Incorrect brackets around list.")
         match target with
         | Some t -> matchRegLst wb t
         | None -> Error ("Target register not found.")
 
-
-
-    let makeMemIns root suf operands =
-        // try to parse operands from string
+    /// take opcode root, suffix and string of operands
+    /// if the operands parse, return instruction
+    /// if not, return an error
+    let makeMultMemInstr root suffix operands =
         match parseOps operands with
-        | Ok (target, wb, reglst) ->
-            // create template result
+        | Ok (target, wb, regLst) ->
+            // create template result with empty InsType & Direction
             let defaultIns = {
                 InsType = None; Direction = None;
-                Target = target; WriteBack = wb; RegList = reglst}
-            match root, suf with
+                Target = target; WriteBack = wb; RegList = regLst}
+            match root, suffix with
             // LDM instructions, including synonyms
             | "LDM", ("" | "FD" | "IA") ->
                 Ok { defaultIns with InsType = Some(LDM); Direction = Some(FD); } 
@@ -98,7 +92,7 @@ module MultMem
             | "LDM", "FA" ->
                 Ok { defaultIns with InsType = Some(LDM); Direction = Some(FA); } 
             | "LDM", "ED" ->
-                Ok { defaultIns with InsType = Some(LDM); Direction = Some(ED)  ; } 
+                Ok { defaultIns with InsType = Some(LDM); Direction = Some(ED); } 
             // STM instructions, including synonyms
             | "STM", ("" | "EA" | "IA") ->
                 Ok { defaultIns with InsType = Some(STM); Direction = Some(EA); } 
@@ -108,7 +102,7 @@ module MultMem
                 Ok { defaultIns with InsType = Some(STM); Direction = Some(FA); } 
             | "STM", "ED" ->
                 Ok { defaultIns with InsType = Some(STM); Direction = Some(ED); } 
-            // unsupported instruction
+            // error if unsupported instruction
             | _ -> Error ("Opcode not supported.")
         | Error s -> Error s
 
@@ -118,14 +112,13 @@ module MultMem
     /// and other state needed to generate output
     /// the result is None if the opcode does not match
     /// otherwise it is Ok Parse or Error (parse error string)
-    let parse ls: Result<Parse<multMemInstr>,string> option =
+    let parse ls =
         let parse' (instrC, (root,suffix,pCond)) =
             let (WA la) = ls.LoadAddr
             match instrC with
             | MEM -> 
-                match makeMemIns root suffix ls.Operands with
+                match makeMultMemInstr root suffix ls.Operands with
                 | Ok pinstr -> Ok {
-                        // make the memory instruction
                         PInstr = pinstr;
                         // TODO: check this is correct
                         PLabel = ls.Label |> Option.map (fun lab -> lab, la); 
