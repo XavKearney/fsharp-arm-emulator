@@ -4,6 +4,26 @@ module MultMemTests
     open MultMem
     open Expecto
 
+    let makeUnitTestList f name inOutLst=
+        let makeTest inp outp =
+            let testName = (sprintf "%s: %A" name inp)
+            testCase testName <| fun () ->
+                Expect.equal (f inp) outp testName
+        List.map (fun (i, o) -> makeTest i o) inOutLst
+        |> testList (sprintf "%s Test List" name) 
+
+    [<Tests>]
+    let testParseOps = 
+        makeUnitTestList parseOps "parseOps Unit" 
+            [
+                ("R7, {R3,R9,R1}", Ok (R7, false, [R3;R9;R1]));
+                ("R0!, {R2,R12,R1,R3}", Ok (R0, true, [R2;R12;R1;R3]));
+                ("R, {R3,R9,R1}", Error "Target register not found.");
+                ("R7,, {R3,R9,R1}", Error "Incorrectly formatted operands.");
+                ("R7, {R3,R9,R1", Error "Incorrectly formatted operands.");
+                ("R7 {R3,R9,R1}", Error "Target register not found.");
+            ]
+
     [<Tests>]
     let testParse =
         let makeLineData wa opcode suffix target wb rLst = 
@@ -30,7 +50,7 @@ module MultMemTests
                 Operands = operandStr;
             }
 
-        testProperty "Test Parse" <| fun wa opcode suffix target wb rLst ->
+        testProperty "Property Test Parse" <| fun wa opcode suffix target wb rLst ->
             let ls = makeLineData wa opcode suffix target wb rLst
             let expected = 
                 match rLst with
@@ -42,3 +62,4 @@ module MultMemTests
                     })
             let res = parse ls
             Expect.equal res expected "parse1"
+    
