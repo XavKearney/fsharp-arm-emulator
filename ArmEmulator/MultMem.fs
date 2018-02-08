@@ -69,6 +69,7 @@ module MultMem
                     |> List.map regNames.TryFind
                 match List.contains None reglst with
                 // if any registers not found, return error
+                // NB: doesn't check for duplicate registers
                 | true -> Error ("Invalid list of registers.")
                 | false -> // if all registers found, transform Some x -> x and return
                     List.choose id reglst
@@ -151,3 +152,38 @@ module MultMem
 
     /// Parse Active Pattern used by top-level code
     let (|IMatch|_|)  = parse
+
+    let execMultMem parsed cpuData =
+        let exec mode dir targ wb rlst =
+            let dirOp, initialN, orderedRegList =
+                match mode, dir with
+                | LDM, Some(FD) -> (+), 0u, List.rev rlst
+                | LDM, Some(FA) -> (-), 0u, rlst
+                | LDM, Some(EA) -> (-), 1u, List.rev rlst
+                | LDM, Some(ED) -> (+), 1u, rlst
+                | STM, Some(FD) -> (-), 1u, List.rev rlst
+                | STM, Some(FA) -> (+), 1u, rlst
+                | STM, Some(EA) -> (+), 0u, rlst
+                | STM, Some(ED) -> (-), 0u, List.rev rlst
+            let rec exec' regs addr cpu n =
+                let newAddr = dirOp addr 4u*n
+                match mode, regs with
+                | _, [] -> cpu, addr // done
+                | LDM, reg :: rest -> 
+                    match cpu.MM.[WA newAddr] with
+                    | DataLoc data -> 
+                        { cpu with Regs = cpu.Regs.Add (reg, data); }
+                        |> fun newCpu -> exec' rest newAddr newCpu (n+1u)
+                    | _ -> failwithf "Invalid memory address." //TODO: make this an error?
+                | STM, reg :: rest -> 
+                    cpu.Regs.[reg]
+                    |> fun data -> { cpu with MM = cpu.MM.Add (WA newAddr, DataLoc data); }
+                    |> fun newCpu -> exec' rest newAddr newCpu (n+1u)
+
+            exec' orderedRegList (cpuData.Regs.[targ]) cpuData initialN
+        let instr = parsed.PInstr
+        let dir, targ, wb, rlst = instr.Direction, instr.Target, instr.WriteBack, instr.RegList
+        match instr.InsType with
+        | Some(LDM) -> exec LDM dir targ wb rlst
+        | Some(STM) -> exec STM dir targ wb rlst
+        | None -> failwithf "No instruction type given."
