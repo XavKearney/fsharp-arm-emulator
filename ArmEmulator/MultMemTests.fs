@@ -53,8 +53,19 @@ module MultMemTests
         testProperty "Property Test Parse" <| fun wa opcode suffix target wb rLst ->
             let ls = makeLineData wa opcode suffix target wb rLst
             let expected = 
-                match rLst with
-                | [] -> Some (Error "Invalid list of registers.")
+                match opcode, target, wb, rLst with
+                | _, t, _, _ when t = R15 -> 
+                    Some(Error "Target register cannot be PC (R15).")
+                | _, _, _, rlst when List.contains R13 rlst ->
+                    Some(Error "Register list cannot contain SP (R13).")
+                | STM, _, _, rlst when List.contains R15 rlst ->
+                    Some(Error "Register list cannot contain PC (R15) for STM instructions.")
+                | LDM, _, _, rlst when List.contains R14 rlst && List.contains R15 rlst ->
+                    Some(Error "Register list cannot contain PC(R15) if it contains LR for LDM.")
+                | _, t, wb, rlst when wb && List.contains t rlst ->
+                    Some(Error "Register list cannot contain target reg if writeback is enabled.")
+                | _, _, _, [] -> 
+                    Some (Error "Invalid list of registers.")
                 | _ -> Some (Ok {
                         PInstr =  { InsType = Some(opcode); Direction = Some(suffix);
                                     Target = target; WriteBack = wb; RegList = rLst} ;
