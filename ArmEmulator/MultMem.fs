@@ -153,6 +153,10 @@ module MultMem
     /// Parse Active Pattern used by top-level code
     let (|IMatch|_|)  = parse
 
+    /// Execute a MultMem Instruction
+    /// given cpuData, transform based on instruction
+    /// returns a Result with new cpuData
+    /// or errors if instruction is incorrect
     let execMultMem parsed cpuData =
         let exec mode dir targ wb rlst =
             let dirOp, initialN, orderedRegList =
@@ -165,22 +169,35 @@ module MultMem
                 | STM, Some(FA) -> (+), 1u, rlst
                 | STM, Some(EA) -> (+), 0u, rlst
                 | STM, Some(ED) -> (-), 0u, List.rev rlst
+                | _, None -> failwithf "Should never happen."
             let rec exec' regs addr cpu n =
                 let newAddr = dirOp addr 4u*n
                 match mode, regs with
-                | _, [] -> cpu, addr // done
+                // list of registers empty, return
+                | _, [] -> Ok (cpu, addr)
+                // otherwise, load/store with next register
                 | LDM, reg :: rest -> 
                     match cpu.MM.[WA newAddr] with
                     | DataLoc data -> 
                         { cpu with Regs = cpu.Regs.Add (reg, data); }
                         |> fun newCpu -> exec' rest newAddr newCpu (n+1u)
-                    | _ -> failwithf "Invalid memory address." //TODO: make this an error?
+                    | _ -> Error "Invalid memory address."
                 | STM, reg :: rest -> 
                     cpu.Regs.[reg]
                     |> fun data -> { cpu with MM = cpu.MM.Add (WA newAddr, DataLoc data); }
                     |> fun newCpu -> exec' rest newAddr newCpu (n+1u)
+            match wb with
+            | true ->
+                exec' orderedRegList (cpuData.Regs.[targ]) cpuData initialN
+                |> function
+                    | Ok(cpu, addr) -> Ok ({cpu with Regs = cpu.Regs.Add (targ, addr)};)
+                    | Error s -> Error s
+            | false -> 
+                exec' orderedRegList (cpuData.Regs.[targ]) cpuData initialN
+                |> function
+                    | Ok(cpu, _) -> Ok(cpu)
+                    | Error s -> Error s
 
-            exec' orderedRegList (cpuData.Regs.[targ]) cpuData initialN
         let instr = parsed.PInstr
         let dir, targ, wb, rlst = instr.Direction, instr.Target, instr.WriteBack, instr.RegList
         match instr.InsType with
