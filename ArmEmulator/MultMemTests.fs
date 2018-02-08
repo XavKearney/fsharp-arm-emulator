@@ -4,6 +4,10 @@ module MultMemTests
     open MultMem
     open Expecto
 
+    /// take a function f, test name
+    /// and list of (input, output) tuples
+    /// create an Expecto testList
+    /// with unit tests, testing each case
     let makeUnitTestList f name inOutLst=
         let makeTest inp outp =
             let testName = (sprintf "%s: %A" name inp)
@@ -24,6 +28,7 @@ module MultMemTests
                 ("R7 {R3,R9,R1}", Error "Target register not found.");
             ]
 
+    let config = { FsCheckConfig.defaultConfig with maxTest = 10000 }
     [<Tests>]
     let testParse =
         let makeLineData wa opcode suffix target wb rLst = 
@@ -50,10 +55,13 @@ module MultMemTests
                 Operands = operandStr;
             }
 
-        testProperty "Property Test Parse" <| fun wa opcode suffix target wb rLst ->
+        testPropertyWithConfig config "Property Test Parse" <| 
+        fun wa opcode suffix target wb rLst ->
             let ls = makeLineData wa opcode suffix target wb rLst
             let expected = 
                 match opcode, target, wb, rLst with
+                | _, _, _, [] -> 
+                    Some (Error "Invalid list of registers.")
                 | _, t, _, _ when t = R15 -> 
                     Some(Error "Target register cannot be PC (R15).")
                 | _, _, _, rlst when List.contains R13 rlst ->
@@ -64,8 +72,6 @@ module MultMemTests
                     Some(Error "Register list cannot contain PC(R15) if it contains LR for LDM.")
                 | _, t, wb, rlst when wb && List.contains t rlst ->
                     Some(Error "Register list cannot contain target reg if writeback is enabled.")
-                | _, _, _, [] -> 
-                    Some (Error "Invalid list of registers.")
                 | _ -> Some (Ok {
                         PInstr =  { InsType = Some(opcode); Direction = Some(suffix);
                                     Target = target; WriteBack = wb; RegList = rLst} ;
