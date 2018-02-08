@@ -3,6 +3,12 @@ module MultMemTests
     open CommonLex
     open MultMem
     open Expecto
+    open FsCheck
+
+    /// choose an item from list at random
+    let chooseFromList lst = 
+        let randomItems = Gen.elements lst |> Gen.sample 0 1
+        randomItems.[0]
 
     /// take a function f, test name
     /// and list of (input, output) tuples
@@ -31,18 +37,13 @@ module MultMemTests
     let config = { FsCheckConfig.defaultConfig with maxTest = 10000 }
     [<Tests>]
     let testParse =
-        let makeLineData wa opcode suffix target wb rLst = 
+        let makeLineData wa opcode suffixStr target wb rLst = 
             let opCodeStr = 
                 match opcode with
                 | LDM -> "LDM"
                 | STM -> "STM"
-            // NB: This doesn't test suffix aliases or ""
-            let suffixStr = 
-                match suffix with
-                | FD -> "FD"
-                | FA -> "FA"
-                | ED -> "ED"
-                | EA -> "EA"
+            // handle suffixes with aliases
+
             let reglstStr =  String.concat "," (List.map (fun r-> regStrings.[r]) rLst)
             if wb then regStrings.[target] + "!," + "{" + reglstStr + "}"
             else regStrings.[target] + "," + "{" + reglstStr + "}"
@@ -56,8 +57,22 @@ module MultMemTests
             }
 
         testPropertyWithConfig config "Property Test Parse" <| 
-        fun wa opcode suffix target wb rLst ->
-            let ls = makeLineData wa opcode suffix target wb rLst
+        fun wa opcode target wb rLst ->
+            // choose a random suffix string, including aliases
+            let suffixStr = chooseFromList ["";"FD";"FA";"ED";"EA";"IA";"DB"]
+            // get the correct direction from the suffix string
+            let direction = 
+                match opcode, suffixStr with
+                | LDM, ("" | "FD" | "IA") -> FD
+                | LDM, ("EA" | "DB") -> EA
+                | STM, ("" | "EA" | "IA") -> EA
+                | STM, ("FD" | "DB") -> FD
+                | _, "FA" -> FA
+                | _, "ED" -> ED
+                | _ -> failwithf "Should never happen"
+            // make the correct input data from random params
+            let ls = makeLineData wa opcode suffixStr target wb rLst
+            // determine correct output based on params
             let expected = 
                 match opcode, target, wb, rLst with
                 | _, _, _, [] -> 
@@ -72,11 +87,17 @@ module MultMemTests
                     Some(Error "Register list cannot contain PC(R15) if it contains LR for LDM.")
                 | _, t, wb, rlst when wb && List.contains t rlst ->
                     Some(Error "Register list cannot contain target reg if writeback is enabled.")
-                | _ -> Some (Ok {
-                        PInstr =  { InsType = Some(opcode); Direction = Some(suffix);
-                                    Target = target; WriteBack = wb; RegList = rLst} ;
-                        PLabel = None; PSize = 4u; PCond = Cal;
+                | _ -> Some (
+                        Ok {
+                            PInstr =  { 
+                                        InsType = Some(opcode); 
+                                        Direction = Some(direction);
+                                        Target = target; 
+                                        WriteBack = wb; 
+                                        RegList = rLst
+                                    };
+                            PLabel = None; PSize = 4u; PCond = Cal;
                     })
             let res = parse ls
-            Expect.equal res expected "parse1"
+            Expect.equal res expected "test parse"
     
