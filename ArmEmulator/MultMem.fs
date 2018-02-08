@@ -61,6 +61,7 @@ module MultMem
 
         let matchRegLst wb targ =
             match reglstStr.StartsWith('{') && reglstStr.EndsWith('}') with
+            | false -> Error ("Incorrectly formatted operands.")
             | true ->
                 let reglst = 
                     reglstStr.[1..String.length reglstStr - 2].Split(",")
@@ -73,7 +74,6 @@ module MultMem
                     List.choose id reglst
                     |> fun rlst -> Ok (targ, wb, rlst)
 
-            | false -> Error ("Incorrectly formatted operands.")
         match target with
         | Some t -> matchRegLst wb t
         | None -> Error ("Target register not found.")
