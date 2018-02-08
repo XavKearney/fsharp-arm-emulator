@@ -72,7 +72,7 @@ module MultMem
                     List.choose id reglst
                     |> fun rlst -> Ok (targ, wb, rlst)
 
-            | false -> Error ("Incorrect brackets around list.")
+            | false -> Error ("Incorrectly formatted operands.")
         match target with
         | Some t -> matchRegLst wb t
         | None -> Error ("Target register not found.")
