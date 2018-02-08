@@ -58,6 +58,7 @@ module MultMem
         let wb = targetStr.EndsWith('!')
         // get the target register's RName from string without '!' suffix
         let target = regNames.TryFind (targetStr.Trim('!'))
+
         let matchRegLst wb targ =
             match reglstStr.StartsWith('{') && reglstStr.EndsWith('}') with
             | true ->
@@ -81,6 +82,21 @@ module MultMem
     /// if the operands parse, return instruction
     /// if not, return an error
     let makeMultMemInstr root suffix operands =
+        // check that the result after parsing conforms to ARM spec
+        let checkValid ins =
+            match ins.InsType, ins.Target, ins.RegList, ins.WriteBack with
+            | _, t, _, _ when t = R15 -> 
+                Error "Target register cannot be PC (R15)."
+            | _, _, rlst, _ when List.contains R13 rlst -> 
+                Error "Register list cannot contain SP (R13)."
+            | Some(STM), _, rlst, _ when List.contains R15 rlst ->
+                Error "Register list cannot contain PC (R15) for STM instructions."
+            | Some(LDM), _, rlst, _ when List.contains R14 rlst && List.contains R15 rlst ->
+                Error "Register list cannot contain PC(R15) if it contains LR for LDM."
+            | _, t, rlst, wb when wb && List.contains t rlst ->
+                Error "Register list cannot contain target reg if writeback is enabled."
+            | _ -> Ok (ins)
+
         match parseOps operands with
         | Ok (target, wb, regLst) ->
             // create template result with empty InsType & Direction
@@ -90,22 +106,22 @@ module MultMem
             match root, suffix with
             // LDM instructions, including synonyms
             | "LDM", ("" | "FD" | "IA") ->
-                Ok { defaultIns with InsType = Some(LDM); Direction = Some(FD); } 
+                checkValid { defaultIns with InsType = Some(LDM); Direction = Some(FD); } 
             | "LDM", ("EA" | "DB") ->
-                Ok { defaultIns with InsType = Some(LDM); Direction = Some(EA); } 
+                checkValid { defaultIns with InsType = Some(LDM); Direction = Some(EA); } 
             | "LDM", "FA" ->
-                Ok { defaultIns with InsType = Some(LDM); Direction = Some(FA); } 
+                checkValid { defaultIns with InsType = Some(LDM); Direction = Some(FA); } 
             | "LDM", "ED" ->
-                Ok { defaultIns with InsType = Some(LDM); Direction = Some(ED); } 
+                checkValid { defaultIns with InsType = Some(LDM); Direction = Some(ED); } 
             // STM instructions, including synonyms
             | "STM", ("" | "EA" | "IA") ->
-                Ok { defaultIns with InsType = Some(STM); Direction = Some(EA); } 
+                checkValid { defaultIns with InsType = Some(STM); Direction = Some(EA); } 
             | "STM", ("FD" | "DB") ->
-                Ok { defaultIns with InsType = Some(STM); Direction = Some(FD); } 
+                checkValid { defaultIns with InsType = Some(STM); Direction = Some(FD); } 
             | "STM", "FA" ->
-                Ok { defaultIns with InsType = Some(STM); Direction = Some(FA); } 
+                checkValid { defaultIns with InsType = Some(STM); Direction = Some(FA); } 
             | "STM", "ED" ->
-                Ok { defaultIns with InsType = Some(STM); Direction = Some(ED); } 
+                checkValid { defaultIns with InsType = Some(STM); Direction = Some(ED); } 
             // error if unsupported instruction
             | _ -> Error ("Opcode not supported.")
         | Error s -> Error s
