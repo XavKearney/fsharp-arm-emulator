@@ -7,8 +7,9 @@ module MultMemTests
 
     /// choose an item from list at random
     let chooseFromList lst = 
-        let randomItems = Gen.elements lst |> Gen.sample 0 1
-        randomItems.[0]
+        Gen.elements lst
+        |> Gen.sample 0 1
+        |> List.head
 
     /// take a function f, test name
     /// and list of (input, output) tuples
