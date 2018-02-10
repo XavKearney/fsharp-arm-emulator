@@ -286,3 +286,10 @@ __pycache__/
 *.btm.cs
 *.odx.cs
 *.xsd.cs
+
+# Paket
+packages/**
+.paket/Paket.Restore.targets
+
+# Custom
+initProjectLexer.fs
