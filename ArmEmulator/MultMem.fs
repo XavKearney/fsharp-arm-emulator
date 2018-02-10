@@ -150,8 +150,6 @@ module MultMem
         Map.tryFind ls.OpCode opCodes
         |> Option.map parse'
 
-    /// Parse Active Pattern used by top-level code
-    let (|IMatch|_|)  = parse
 
     /// Execute a MultMem Instruction
     /// given cpuData, transform based on instruction
@@ -204,3 +202,6 @@ module MultMem
         | Some(LDM) -> exec LDM dir targ wb rlst
         | Some(STM) -> exec STM dir targ wb rlst
         | None -> failwithf "No instruction type given."
+
+    /// Parse Active Pattern used by top-level code
+    let (|IMatch|_|)  = parse
