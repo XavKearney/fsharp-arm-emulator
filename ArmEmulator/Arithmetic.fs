@@ -27,6 +27,11 @@ module Arithmetic
 
     let opCodes = opCodeExpand ArithSpec
 
+    let makeArithInstr root suffix operands =
+        let checkValid ins = 
+            match  
+
+
 
 
     /// main function to parse a line of assembler
@@ -35,6 +40,22 @@ module Arithmetic
     /// the result is None if the opcode does not match
     /// otherwise it is Ok Parse or Error (parse error string)
     let parse (ls: LineData) : Result<Parse<Instr>,string> option =
+        let parse' (instrC, (root,suffix,pCond)) =
+            let (WA la) = ls.LoadAddr
+            match instrC with
+            | ARITH -> 
+                match makeMultMemInstr root suffix ls.Operands with
+                | Ok pinstr -> Ok {
+                        PInstr = pinstr;
+                        PLabel = ls.Label |> Option.map (fun lab -> lab, la); 
+                        PSize = 4u; 
+                        PCond = pCond;
+                    }
+                | Error s -> Error s
+            | _ -> Error ("Instruction class not supported.")
+        Map.tryFind ls.OpCode opCodes
+        |> Option.map parse'
+        
         let parse' (instrC, (root,suffix,pCond)) =
 
             let (WA la) = ls.LoadAddr // address this instruction is loaded into memory
