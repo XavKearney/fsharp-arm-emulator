@@ -12,9 +12,9 @@ module Arithmetic
             InstrType: ArithInstrType;
             // Destination register
             Target: RName;
-            // First operation
-            Op1: OpCode;
-            // Second Operation
+            // First operation -> must be a register
+            Op1: RName;
+            // Second Operation -> Can be both register or value
             Op2: OpCode;
         }
 
@@ -27,9 +27,40 @@ module Arithmetic
 
     let opCodes = opCodeExpand ArithSpec
 
+
+    let parseOpsLine (line:string) = 
+        // Get list of operands/destination register
+        let operandsList = line.Split(",")
+                           |> Array.map (fun str -> str.Trim())
+        // Destination register string
+        let destinationStr = operandsList.[0]
+        // Op1 string
+        let op1Str = operandsList.[1]
+        // Op2 string
+        let op2Str = operandsList.[2]
+
+        let (|Prefix|_|) (p:string) (s:string) =
+            if s.StartsWith(p) then
+                Some(s.Substring(1))
+            else
+                None
+       
+        match regNames.TryFind destinationStr with
+        | Some dest -> match regNames.TryFind op1Str with
+                       | Some op1 -> match op2Str with
+                                     | Prefix "#" op2 -> Ok (dest, op1, Value (uint32 op2))
+                                     | _ -> match regNames.TryFind op2Str with
+                                            | Some op2 -> Ok (dest, op1, Target op2)
+                                            | None -> Error ("Op2 is not a valid register")                                 
+                       | None -> Error ("Op1 is not a valid register")
+        | None -> Error ("Destination register not valid")
+
+        
+        
+
     let makeArithInstr root suffix operands =
-        let checkValid ins = 
-            match  
+        match parseOpsLine operands with
+        |
 
 
 
