@@ -3,9 +3,7 @@ module ArmEmulator
 open Expecto
 open Expecto.ExpectoFsCheck
 open System
-open System.Xml.Linq
-open System.Xml.Linq
-// open memInstructions
+open memInstructions
 
 [<EntryPoint>]
 let main argv =
