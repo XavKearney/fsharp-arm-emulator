@@ -9,7 +9,9 @@ module Arithmetic
     type ArithInstr = 
         {
             // Arithmetic type
-            InstrType: ArithInstrType;
+            InstrType: ArithInstrType option;
+            // Whether S suffix is set
+            SuffixSet: bool option
             // Destination register
             Target: RName;
             // First operation -> must be a register
@@ -18,7 +20,6 @@ module Arithmetic
             Op2: OpCode;
         }
 
-    
     let ArithSpec = {
         InstrC = ARITH
         Roots = ["ADD";"ADC";"SUB";"SBC";"RSB";"RSC"]
@@ -59,8 +60,36 @@ module Arithmetic
         
 
     let makeArithInstr root suffix operands =
+        // Makes final instruction from baseInstr
+        let makeInstr ins = 
+            Ok(ins)
+        
         match parseOpsLine operands with
-        |
+        | Ok (dest, op1, op2) -> 
+            // Converts suffix string into bool option
+            let suffType = match suffix with
+                           | "S" -> Some(true)
+                           | "" -> Some(false)
+                           | _ -> None
+
+            // Creates basic ArithInstr type
+            let baseInstr = {
+                InstrType = None;
+                SuffixSet = suffType;
+                Target = dest;
+                Op1 = op1;
+                Op2 = op2;
+            }
+
+            match root with
+            | "ADD" -> makeInstr {baseInstr with InstrType = Some(ADD);}
+            | "ADC" -> makeInstr {baseInstr with InstrType = Some(ADC);}
+            | "SUB" -> makeInstr {baseInstr with InstrType = Some(SUB);}
+            | "SBC" -> makeInstr {baseInstr with InstrType = Some(SBC);}
+            | "RSB" -> makeInstr {baseInstr with InstrType = Some(RSB);}
+            | "RSC" -> makeInstr {baseInstr with InstrType = Some(RSC);}
+            | _ -> Error ("Opcode is invalid or not supported in this module")
+        | Error err -> Error err
 
 
 
@@ -70,12 +99,12 @@ module Arithmetic
     /// and other state needed to generate output
     /// the result is None if the opcode does not match
     /// otherwise it is Ok Parse or Error (parse error string)
-    let parse (ls: LineData) : Result<Parse<Instr>,string> option =
+    let parse ls=
         let parse' (instrC, (root,suffix,pCond)) =
             let (WA la) = ls.LoadAddr
             match instrC with
             | ARITH -> 
-                match makeMultMemInstr root suffix ls.Operands with
+                match makeArithInstr root suffix ls.Operands with
                 | Ok pinstr -> Ok {
                         PInstr = pinstr;
                         PLabel = ls.Label |> Option.map (fun lab -> lab, la); 
@@ -86,44 +115,7 @@ module Arithmetic
             | _ -> Error ("Instruction class not supported.")
         Map.tryFind ls.OpCode opCodes
         |> Option.map parse'
-        
-        let parse' (instrC, (root,suffix,pCond)) =
-
-            let (WA la) = ls.LoadAddr // address this instruction is loaded into memory
-            // this does the real work of parsing
-            // dummy return for now
-            Ok { 
-                // Normal (non-error) return from result monad
-                // This is the instruction determined from opcode, suffix and parsing
-                // the operands. Not done in the sample.
-                // Note the record type returned must be written by the module author.
-                PInstr={DPDummy=()}; 
-
-
-                // This is normally the line label as contained in
-                // ls together with the label's value which is normally
-                // ls.LoadAddr. Some type conversion is needed since the
-                // label value is a number and not necessarily a word address
-                // it does not have to be div by 4, though it usually is
-                PLabel = ls.Label |> Option.map (fun lab -> lab, la) ; 
-
-
-                // this is the number of bytes taken by the instruction
-                // word loaded into memory. For arm instructions it is always 4 bytes. 
-                // For data definition DCD etc it is variable.
-                //  For EQU (which does not affect memory) it is 0
-                PSize = 4u; 
-
-                // the instruction condition is detected in the opcode and opCodeExpand                 
-                // has already calculated condition already in the opcode map.
-                // this part never changes
-                PCond = pCond 
-                }
-        Map.tryFind ls.OpCode opCodes // lookup opcode to see if it is known
-        |> Option.map parse' // if unknown keep none, if known parse it.
-
-
-    /// Parse Active Pattern used by top-level code
+   
     let (|IMatch|_|) = parse
 
 
