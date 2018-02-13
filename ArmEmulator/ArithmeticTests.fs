@@ -39,3 +39,32 @@ module MultMemTests
                 ("R7,R3,#1111111111111", Error ("Invalid 32 bit number"));
                 ("R7,R3,#abc", Error ("Invalid 32 bit number"));
             ]
+    
+    let config = { FsCheckConfig.defaultConfig with maxTest = 10000 }
+    let testParse = 
+        let makeTestLineData wa opcode suffixStr operands = 
+            let opcodeStr = 
+                match opcode with
+                | ADD -> "ADD"
+                | ADC -> "ADC"
+                | SUB -> "SUB"
+                | SBC -> "SBC"
+                | RSB -> "RSB"
+                | RSC -> "RSC"
+
+            let opList = 
+                
+            
+            {
+                LoadAddr = wa;
+                Label = None;
+                SymTab = None;
+                OpCode = opcodeStr + suffixStr;
+                Operands = opList
+            }
+          
+
+
+        testPropertyWithConfig config "Test Parse" <| 
+        fun opcode ->
+
