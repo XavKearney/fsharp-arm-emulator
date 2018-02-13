@@ -27,4 +27,15 @@ module MultMemTests
                 ("R,R3,R9", Error "Destination register not valid");
                 ("R7, R20, R9", Error "Op1 is not a valid register");
                 ("R7, R3, R20", Error "Op2 is not a valid register");
+                ("R7,R3,#-2", Ok (R7, R3, Value (uint32 -2)));
+                ("R0, R12, #0b11", Ok (R0, R12, Value (uint32 3)));
+                ("R0, R12, #0x11", Ok (R0, R12, Value (uint32 17)));
+                ("R7,R3", Error "Operand list is invalid");
+                ("R7,R3,R5,R9,R1", Error "Operand list is invalid");
+                ("R7,,R3", Error "Op1 is not a valid register");
+                ("R7,R3,", Error "Op2 is not a valid register");
+                (",R7,R3", Error "Destination register not valid");
+                ("R7,R3,#0b12", Error ("Invalid 32 bit number"));
+                ("R7,R3,#1111111111111", Error ("Invalid 32 bit number"));
+                ("R7,R3,#abc", Error ("Invalid 32 bit number"));
             ]

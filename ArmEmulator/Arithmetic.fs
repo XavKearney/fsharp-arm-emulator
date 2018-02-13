@@ -33,28 +33,40 @@ module Arithmetic
         // Get list of operands/destination register
         let operandsList = line.Split(",")
                            |> Array.map (fun str -> str.Trim())
-        // Destination register string
-        let destinationStr = operandsList.[0]
-        // Op1 string
-        let op1Str = operandsList.[1]
-        // Op2 string
-        let op2Str = operandsList.[2]
 
-        let (|Prefix|_|) (p:string) (s:string) =
-            if s.StartsWith(p) then
-                Some(s.Substring(1))
-            else
-                None
-       
-        match regNames.TryFind destinationStr with
-        | Some dest -> match regNames.TryFind op1Str with
-                       | Some op1 -> match op2Str with
-                                     | Prefix "#" op2 -> Ok (dest, op1, Value (uint32 op2))
-                                     | _ -> match regNames.TryFind op2Str with
-                                            | Some op2 -> Ok (dest, op1, Target op2)
-                                            | None -> Error ("Op2 is not a valid register")                                 
-                       | None -> Error ("Op1 is not a valid register")
-        | None -> Error ("Destination register not valid")
+        match operandsList.Length with
+        | 3 ->
+            // Destination register string
+            let destinationStr = operandsList.[0]
+            // Op1 string
+            let op1Str = operandsList.[1]
+            // Op2 string
+            let op2Str = operandsList.[2]
+
+            // Partial active pattern match to see flex op 2 type - pattern match of '#'
+            let (|Prefix|_|) (p:string) (s:string) =
+                if s.StartsWith(p) then
+                    // Return string after #
+                    Some(s.Substring(1))
+                else
+                    None
+           
+            match regNames.TryFind destinationStr with
+            | Some dest -> match regNames.TryFind op1Str with
+                           | Some op1 -> match op2Str with
+                                         | Prefix "#" op2 ->
+                                            // Convert string to int for negative numbers and then force uint type
+                                            // Fail if the input number is not valid
+                                            try Ok (dest, op1, Value (uint32 (int32 op2))) with
+                                            | _ -> Error ("Invalid 32 bit number")
+                 
+                                         | _ -> match regNames.TryFind op2Str with
+                                                | Some op2 -> Ok (dest, op1, Target op2)
+                                                | None -> Error ("Op2 is not a valid register")                                 
+                           | None -> Error ("Op1 is not a valid register")
+            | None -> Error ("Destination register not valid")
+        
+        | _ -> Error ("Operand list is invalid")
 
         
         
