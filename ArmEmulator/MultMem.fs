@@ -2,8 +2,8 @@
 /// author: Xav Kearney
 module MultMem
     
-    open CommonLex
     open CommonData
+    open CommonLex
 
     type MultMemInstrType = LDM | STM
     type MultMemDirection = FD | FA | ED | EA 
@@ -41,7 +41,7 @@ module MultMem
     }
 
     /// map of all possible opcodes recognised
-    let opCodes = opCodeExpand multMemSpec
+    let multMemOpCodes = opCodeExpand multMemSpec
 
     /// take a string of all operands and parse
     /// into target reg, writeback and list of reg
@@ -147,7 +147,7 @@ module MultMem
                     }
                 | Error s -> Error s
             | _ -> Error ("Instruction class not supported.")
-        Map.tryFind ls.OpCode opCodes
+        Map.tryFind ls.OpCode multMemOpCodes
         |> Option.map parse'
 
 
@@ -168,30 +168,31 @@ module MultMem
                 | STM, Some(EA) -> (+), 0u, rlst
                 | STM, Some(ED) -> (-), 0u, List.rev rlst
                 | _, None -> failwithf "Should never happen."
-            let rec exec' regs addr cpu n =
-                let newAddr = dirOp addr 4u*n
+            let rec exec' regs addr cpu =
+               
+                let newAddr = dirOp addr 1u
                 match mode, regs with
                 // list of registers empty, return
                 | _, [] -> Ok (cpu, addr)
                 // otherwise, load/store with next register
                 | LDM, reg :: rest -> 
-                    match cpu.MM.[WA newAddr] with
+                    match cpu.MM.[WA addr] with
                     | DataLoc data -> 
                         { cpu with Regs = cpu.Regs.Add (reg, data); }
-                        |> fun newCpu -> exec' rest newAddr newCpu (n+1u)
+                        |> fun newCpu -> exec' rest newAddr newCpu
                     | _ -> Error "Invalid memory address."
                 | STM, reg :: rest -> 
                     cpu.Regs.[reg]
-                    |> fun data -> { cpu with MM = cpu.MM.Add (WA newAddr, DataLoc data); }
-                    |> fun newCpu -> exec' rest newAddr newCpu (n+1u)
+                    |> fun data -> { cpu with MM = cpu.MM.Add (WA addr, DataLoc data); }
+                    |> fun newCpu -> exec' rest newAddr newCpu
             match wb with
             | true ->
-                exec' orderedRegList (cpuData.Regs.[targ]) cpuData initialN
+                exec' orderedRegList (dirOp cpuData.Regs.[targ] initialN) cpuData
                 |> function
                     | Ok(cpu, addr) -> Ok ({cpu with Regs = cpu.Regs.Add (targ, addr)};)
                     | Error s -> Error s
             | false -> 
-                exec' orderedRegList (cpuData.Regs.[targ]) cpuData initialN
+                exec' orderedRegList (dirOp cpuData.Regs.[targ] initialN) cpuData
                 |> function
                     | Ok(cpu, _) -> Ok(cpu)
                     | Error s -> Error s

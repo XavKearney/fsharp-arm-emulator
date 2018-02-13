@@ -4,6 +4,7 @@ module MultMemTests
     open MultMem
     open Expecto
     open FsCheck
+    open VisualTest
 
     /// choose an item from list at random
     let chooseFromList lst = 
@@ -102,3 +103,96 @@ module MultMemTests
             let res = parse ls
             Expect.equal res expected "test parse"
     
+    [<Tests>]
+    let testExecMultMem = 
+        let makeParsed opcode direction target wb rLst =
+            {
+                PInstr = {
+                            InsType = Some(opcode); 
+                            Direction = Some(direction);
+                            Target = target; 
+                            WriteBack = wb; 
+                            RegList = rLst
+                };
+                PLabel = None; 
+                PSize = 4u; 
+                PCond = Cal;
+            }
+
+        let regs =    
+            Gen.choose (0, 0xFFFF) |> Gen.sample 0 16
+            |> List.mapi (fun i x -> (inverseRegNums.[i], uint32 x))
+            |> Map.ofList
+        let makeMem startAddr dirOp initialN len = 
+            Gen.choose (0, 0xFFFF) |> Gen.sample 0 len
+            |> List.mapi (fun i n -> 
+                (WA (dirOp startAddr (((uint32 i)+initialN)) )), DataLoc (uint32 n))
+            |> Map.ofList
+        testPropertyWithConfig config "Property Test ExecMultMem" <| 
+        fun opcode direction target wb rLst flags->
+            let parsed = makeParsed opcode direction target wb rLst
+            let dirOp, initialN, reverse =
+                match opcode, direction with
+                | LDM, FD -> (+), 0u, true
+                | LDM, FA -> (-), 0u, false
+                | LDM, EA -> (-), 1u, true
+                | LDM, ED -> (+), 1u, false
+                | STM, FD -> (-), 1u, true
+                | STM, FA -> (+), 1u, false
+                | STM, EA -> (+), 0u, false
+                | STM, ED -> (-), 0u, true
+            let mem = makeMem regs.[target] dirOp initialN rLst.Length
+            let cpuData = {
+                Fl = flags;
+                Regs = regs;
+                MM = mem;
+            }
+            let res = execMultMem parsed cpuData
+            let expected =
+                match opcode with
+                | STM -> 
+                    let regData = 
+                        rLst
+                        |> List.map (fun r-> regs.[r])
+                    let newMem = 
+                        mem 
+                        |> Map.toList
+                        |> List.mapi (fun i (a, _) -> (a, DataLoc regData.[i]))
+                        |> if reverse then List.rev else id
+                        |> Map.ofList
+                    Ok {
+                        cpuData with 
+                            MM = newMem;
+                            Regs = if wb then 
+                                    cpuData.Regs.Add (target, dirOp regs.[target] (uint32 rLst.Length + initialN))
+                                    else cpuData.Regs;
+                    }
+                | LDM ->
+                    let memData = 
+                        mem
+                        |> Map.toList
+                        |> List.map (
+                            function
+                            | (_, DataLoc x) -> x
+                            | _ -> failwithf "Should never happen")
+                    let rec setReg (curRegs: Map<RName,uint32>) regList n inc =
+                        let next = if inc then n + 1 else n - 1
+                        match regList with
+                        | r :: rest -> setReg (curRegs.Add (r, memData.[n])) rest next inc
+                        | [] -> curRegs
+                    let orderedRLst = if reverse then List.rev rLst else rLst
+                    let newRegs = 
+                        match initialN, reverse with
+                        | 0u, false | 1u, true -> setReg regs orderedRLst (memData.Length-1) false
+                        | _ -> setReg regs orderedRLst 0 true
+                        
+                    Ok {
+                        cpuData with 
+                            Regs = if wb then 
+                                    newRegs.Add (target, dirOp regs.[target] (uint32 rLst.Length + initialN))
+                                   else newRegs
+                    }
+            match opcode with
+            | LDM -> Expect.equal res expected "test exec"
+            | _ -> ()
+            
