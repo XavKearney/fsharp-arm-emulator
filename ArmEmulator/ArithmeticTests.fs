@@ -41,8 +41,10 @@ module MultMemTests
             ]
     
     let config = { FsCheckConfig.defaultConfig with maxTest = 10000 }
+    
+    [<Tests>]
     let testParse = 
-        let makeTestLineData wa opcode suffixStr operands = 
+        let makeTestLineData wa opcode suffix target op1 op2 = 
             let opcodeStr = 
                 match opcode with
                 | ADD -> "ADD"
@@ -52,19 +54,43 @@ module MultMemTests
                 | RSB -> "RSB"
                 | RSC -> "RSC"
 
-            let opList = 
-                
+            let suffixStr = if suffix then "S" else "" 
+
+            let targetStr = regStrings.[target]
+            let op1Str = regStrings.[op1]
+            let op2Str = match op2 with
+                         | Value num -> "#" + string num
+                         | Target reg -> regStrings.[reg]
             
+            let operandStr = targetStr + "," + op1Str + "," + op2Str
+  
             {
                 LoadAddr = wa;
                 Label = None;
                 SymTab = None;
                 OpCode = opcodeStr + suffixStr;
-                Operands = opList
+                Operands = operandStr
             }
-          
-
 
         testPropertyWithConfig config "Test Parse" <| 
-        fun opcode ->
+        fun wa opcode suffix target op1 op2 ->
+            let ls = makeTestLineData wa opcode suffix target op1 op2
 
+            let expected = match opcode with
+                           | _ -> Some (Ok {
+                                        PInstr = 
+                                            {
+                                            InstrType = Some opcode;
+                                            SuffixSet = Some suffix;
+                                            Target = target;
+                                            Op1 = op1;
+                                            Op2 = op2;
+                                            } 
+                                        PLabel = None;
+                                        PSize = 4u;
+                                        PCond = Cal;
+                                     })
+
+            
+            let result = parse ls
+            Expect.equal result expected "Parse Test"
