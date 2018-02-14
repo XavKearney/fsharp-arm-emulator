@@ -4,7 +4,11 @@ module MultMemTests
     open MultMem
     open Expecto
     open FsCheck
-    open VisualTest
+    open VisualTest.Visual
+    open VisualTest.VTest
+    open VisualTest.VCommon
+
+
 
     /// choose an item from list at random
     let chooseFromList lst = 
@@ -44,7 +48,6 @@ module MultMemTests
                 match opcode with
                 | LDM -> "LDM"
                 | STM -> "STM"
-            // handle suffixes with aliases
 
             let reglstStr =  String.concat "," (List.map (fun r-> regStrings.[r]) rLst)
             if wb then regStrings.[target] + "!," + "{" + reglstStr + "}"
@@ -105,94 +108,112 @@ module MultMemTests
     
     [<Tests>]
     let testExecMultMem = 
-        let makeParsed opcode direction target wb rLst =
-            {
-                PInstr = {
-                            InsType = Some(opcode); 
-                            Direction = Some(direction);
-                            Target = target; 
-                            WriteBack = wb; 
-                            RegList = rLst
-                };
-                PLabel = None; 
-                PSize = 4u; 
-                PCond = Cal;
-            }
-
-        let regs =    
-            Gen.choose (0, 0xFFFF) |> Gen.sample 0 16
-            |> List.mapi (fun i x -> (inverseRegNums.[i], uint32 x))
-            |> Map.ofList
-        let makeMem startAddr dirOp initialN len = 
-            Gen.choose (0, 0xFFFF) |> Gen.sample 0 len
-            |> List.mapi (fun i n -> 
-                (WA (dirOp startAddr (((uint32 i)+initialN)) )), DataLoc (uint32 n))
-            |> Map.ofList
-        testPropertyWithConfig config "Property Test ExecMultMem" <| 
-        fun opcode direction target wb rLst flags->
-            let parsed = makeParsed opcode direction target wb rLst
-            let dirOp, initialN, reverse =
-                match opcode, direction with
-                | LDM, FD -> (+), 0u, true
-                | LDM, FA -> (-), 0u, false
-                | LDM, EA -> (-), 1u, true
-                | LDM, ED -> (+), 1u, false
-                | STM, FD -> (-), 1u, true
-                | STM, FA -> (+), 1u, false
-                | STM, EA -> (+), 0u, false
-                | STM, ED -> (-), 0u, true
-            let mem = makeMem regs.[target] dirOp initialN rLst.Length
-            let cpuData = {
-                Fl = flags;
-                Regs = regs;
-                MM = mem;
-            }
-            let res = execMultMem parsed cpuData
-            let expected =
+        let makeInstrString opcode direction target wb rLst =
+            let sortedRLst = List.sortByDescending (fun (x:RName) -> x.RegNum) rLst
+            let opCodeStr = 
                 match opcode with
-                | STM -> 
-                    let regData = 
-                        rLst
-                        |> List.map (fun r-> regs.[r])
-                    let newMem = 
-                        mem 
-                        |> Map.toList
-                        |> List.mapi (fun i (a, _) -> (a, DataLoc regData.[i]))
-                        |> if reverse then List.rev else id
-                        |> Map.ofList
-                    Ok {
-                        cpuData with 
-                            MM = newMem;
-                            Regs = if wb then 
-                                    cpuData.Regs.Add (target, dirOp regs.[target] (uint32 rLst.Length + initialN))
-                                    else cpuData.Regs;
-                    }
-                | LDM ->
-                    let memData = 
-                        mem
-                        |> Map.toList
-                        |> List.map (
-                            function
-                            | (_, DataLoc x) -> x
-                            | _ -> failwithf "Should never happen")
-                    let rec setReg (curRegs: Map<RName,uint32>) regList n inc =
-                        let next = if inc then n + 1 else n - 1
-                        match regList with
-                        | r :: rest -> setReg (curRegs.Add (r, memData.[n])) rest next inc
-                        | [] -> curRegs
-                    let orderedRLst = if reverse then List.rev rLst else rLst
-                    let newRegs = 
-                        match initialN, reverse with
-                        | 0u, false | 1u, true -> setReg regs orderedRLst (memData.Length-1) false
-                        | _ -> setReg regs orderedRLst 0 true
-                        
-                    Ok {
-                        cpuData with 
-                            Regs = if wb then 
-                                    newRegs.Add (target, dirOp regs.[target] (uint32 rLst.Length + initialN))
-                                   else newRegs
-                    }
-            match opcode with
-            | LDM -> Expect.equal res expected "test exec"
-            | _ -> ()
+                | LDM -> "LDM"
+                | STM -> "STM"
+            let suffixStr, dirOp, initialN = 
+                match opcode, direction with
+                // VisUAL doesn't support ""
+                | LDM, FD -> chooseFromList ["FD"; "IA"], (+), 0u
+                | LDM, FA -> "FA", (-), 0u
+                | LDM, EA -> chooseFromList ["EA"; "DB"], (-), 1u
+                | LDM, ED -> "ED", (+), 1u
+                | STM, FD -> chooseFromList ["FD"; "DB"], (-), 1u
+                | STM, FA -> "FA", (+), 1u
+                // VisUAL doesn't support ""
+                | STM, EA -> chooseFromList ["EA"; "IA"], (+), 0u
+                | STM, ED -> "ED", (-), 0u
+            let reglstStr =  String.concat "," (List.map (fun r-> regStrings.[r]) rLst)
+
+            if wb then regStrings.[target] + "!," + "{" + reglstStr + "}"
+            else regStrings.[target] + "," + "{" + reglstStr + "}"
+            |> sprintf "%s%s %s" opCodeStr suffixStr
+            |> fun s -> (s, dirOp, initialN)
             
+
+        testPropertyWithConfig config "Property Test ExecMultMem" <| 
+        fun opcode direction (target: RName) wb (rLst: RName list) flags->
+            let regVals = 
+                Gen.choose (0, 0xFFFF) |> Gen.sample 0 12 |> List.map uint32
+                |> fun lst -> List.concat [lst; [0u; 0u; 0u;]]
+            
+            let instrString, dirOp, initialN = 
+                makeInstrString opcode direction target wb rLst
+            let valid =  
+                match opcode, target, wb, rLst with
+                | _, _, _, [] -> false
+                | _, t, _, _ when t = R15 -> false
+                | _, _, _, rlst when List.contains R13 rlst -> false
+                | STM, _, _, rlst when List.contains R15 rlst -> false
+                // visual complains about the below
+                | _, _, _, rlst when List.contains target rlst -> false
+                | LDM, _, _, rlst when List.contains R14 rlst && List.contains R15 rlst -> false
+                | _, t, wb, rlst when wb && List.contains t rlst -> false
+                // VisUAL memory addresses are > 0x1000
+                | _, t, _, _ when regVals.[t.RegNum] < 0x1000u -> false
+                // VisUAL requires mem addresses to be divisible by 4
+                | _, t, _, _ when (dirOp regVals.[t.RegNum] (initialN*4u)) % 4u <> 0u -> false
+                | _, _, _, rlst when List.contains R15 rlst -> false
+                | _ -> true
+            
+            match valid with
+            | false -> ()
+            | true ->
+                let targetAddr = regVals.[target.RegNum]
+                printfn "%A" instrString
+                let memVals = Gen.choose (0, 0xFFFF) |> Gen.sample 0 rLst.Length |> List.map uint32
+                let memMap =
+                    memVals
+                    |> List.mapi (fun i x -> 
+                        (WA (dirOp targetAddr ((uint32 i + initialN)*4u))), (DataLoc x))
+                    |> Map.ofList;
+                let visMemMap =
+                    memVals
+                    |> List.mapi (fun i x -> 
+                        ((dirOp targetAddr ((uint32 i + initialN)*4u))), x)
+                    |> Map.ofList;
+                let testParas = {
+                        defaultParas with
+                            InitRegs = regVals;
+                            //initialise memory locations 
+                            InitMem = visMemMap;
+                            //Read memBase..memBase+13 
+                            MemReadBase = regVals.[target.RegNum];
+                    }
+
+                let parsed = {
+                        PInstr =  { 
+                                    InsType = Some(opcode); 
+                                    Direction = Some(direction);
+                                    Target = target; 
+                                    WriteBack = wb; 
+                                    RegList = rLst
+                                };
+                        PLabel = None; PSize = 4u; PCond = Cal;
+                    }
+
+                let flagsExp, outExp, memExp = RunVisualWithFlagsOut testParas instrString
+                printfn "%A" memExp
+                let regsExp = 
+                    outExp.Regs
+                    |> List.sortBy (fun (r, x) -> r)
+                    |> List.map (fun (out, i) -> uint32 i)
+               
+
+                let cpuData = {
+                    Fl = flags;
+                    Regs = List.mapi (fun i x -> (inverseRegNums.[i], x)) regVals |> Map.ofList;
+                    MM = memMap;
+                }
+                let resCpu = execMultMem parsed cpuData
+                match resCpu with
+                | Ok cpu ->
+                    let regsActual =
+                        cpu.Regs
+                        |> Map.toList
+                        |> List.map (fun (_, x) -> x)
+                    Expect.equal regsActual regsExp.[..regsExp.Length - 2]  "test mem"
+                | Error _ -> ()

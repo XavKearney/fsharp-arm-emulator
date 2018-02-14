@@ -4,6 +4,7 @@ module MultMem
     
     open CommonData
     open CommonLex
+    open System.Runtime.InteropServices.ComTypes
 
     type MultMemInstrType = LDM | STM
     type MultMemDirection = FD | FA | ED | EA 
@@ -79,25 +80,25 @@ module MultMem
         | Some t -> matchRegLst wb t
         | None -> Error ("Target register not found.")
 
+    // check that the result after parsing conforms to ARM spec
+    let checkValid ins =
+        match ins.InsType, ins.Target, ins.RegList, ins.WriteBack with
+        | _, t, _, _ when t = R15 -> 
+            Error "Target register cannot be PC (R15)."
+        | _, _, rlst, _ when List.contains R13 rlst -> 
+            Error "Register list cannot contain SP (R13)."
+        | Some(STM), _, rlst, _ when List.contains R15 rlst ->
+            Error "Register list cannot contain PC (R15) for STM instructions."
+        | Some(LDM), _, rlst, _ when List.contains R14 rlst && List.contains R15 rlst ->
+            Error "Register list cannot contain PC(R15) if it contains LR for LDM."
+        | _, t, rlst, wb when wb && List.contains t rlst ->
+            Error "Register list cannot contain target reg if writeback is enabled."
+        | _ -> Ok (ins)
+
     /// take opcode root, suffix and string of operands
     /// if the operands parse, return instruction
     /// if not, return an error
     let makeMultMemInstr root suffix operands =
-        // check that the result after parsing conforms to ARM spec
-        let checkValid ins =
-            match ins.InsType, ins.Target, ins.RegList, ins.WriteBack with
-            | _, t, _, _ when t = R15 -> 
-                Error "Target register cannot be PC (R15)."
-            | _, _, rlst, _ when List.contains R13 rlst -> 
-                Error "Register list cannot contain SP (R13)."
-            | Some(STM), _, rlst, _ when List.contains R15 rlst ->
-                Error "Register list cannot contain PC (R15) for STM instructions."
-            | Some(LDM), _, rlst, _ when List.contains R14 rlst && List.contains R15 rlst ->
-                Error "Register list cannot contain PC(R15) if it contains LR for LDM."
-            | _, t, rlst, wb when wb && List.contains t rlst ->
-                Error "Register list cannot contain target reg if writeback is enabled."
-            | _ -> Ok (ins)
-
         match parseOps operands with
         | Ok (target, wb, regLst) ->
             // create template result with empty InsType & Direction
@@ -134,6 +135,7 @@ module MultMem
     /// the result is None if the opcode does not match
     /// otherwise it is Ok Parse or Error (parse error string)
     let parse ls =
+    //TODO: Support dashed reg list e.g. {R0-R4}
         let parse' (instrC, (root,suffix,pCond)) =
             let (WA la) = ls.LoadAddr
             match instrC with
@@ -157,52 +159,86 @@ module MultMem
     /// or errors if instruction is incorrect
     let execMultMem parsed cpuData =
         let exec mode dir targ wb rlst =
-            let dirOp, initialN, orderedRegList =
+            let sortedRLst = List.sortByDescending (fun (x:RName) -> x.RegNum) rlst
+            let dirOp, initialN, orderedRLst =
                 match mode, dir with
-                | LDM, Some(FD) -> (+), 0u, List.rev rlst
-                | LDM, Some(FA) -> (-), 0u, rlst
-                | LDM, Some(EA) -> (-), 1u, List.rev rlst
-                | LDM, Some(ED) -> (+), 1u, rlst
-                | STM, Some(FD) -> (-), 1u, List.rev rlst
-                | STM, Some(FA) -> (+), 1u, rlst
-                | STM, Some(EA) -> (+), 0u, rlst
-                | STM, Some(ED) -> (-), 0u, List.rev rlst
+                | LDM, Some(FD) -> (+), 0u, List.rev sortedRLst
+                | LDM, Some(FA) -> (-), 0u, sortedRLst
+                | LDM, Some(EA) -> (-), 1u, sortedRLst
+                | LDM, Some(ED) -> (+), 1u, List.rev sortedRLst
+                | STM, Some(FD) -> (-), 1u, sortedRLst
+                | STM, Some(FA) -> (+), 1u, List.rev sortedRLst
+                | STM, Some(EA) -> (+), 0u, List.rev sortedRLst
+                | STM, Some(ED) -> (-), 0u, sortedRLst
                 | _, None -> failwithf "Should never happen."
+
             let rec exec' regs addr cpu =
-               
-                let newAddr = dirOp addr 1u
+                let newAddr = dirOp addr 4u
                 match mode, regs with
                 // list of registers empty, return
-                | _, [] -> Ok (cpu, addr)
+                | STM, [] -> 
+                    match dir with
+                    | Some(FA) -> 
+                        let wbAddr = addr - initialN*4u
+                        Ok (cpu, wbAddr)
+                    | Some(FD) -> 
+                        let wbAddr = addr + initialN*4u
+                        Ok (cpu, wbAddr)
+                    | Some(EA) -> 
+                        let wbAddr = addr - initialN*4u
+                        Ok (cpu, wbAddr)
+                    | Some(ED) -> 
+                        let wbAddr = addr - initialN*4u
+                        Ok (cpu, wbAddr)
+                | LDM, [] -> 
+                    match dir with
+                    | Some(FA) -> 
+                        let wbAddr = addr - initialN*4u
+                        Ok (cpu, wbAddr)
+                    | Some(FD) -> 
+                        let wbAddr = addr - initialN*4u
+                        Ok (cpu, wbAddr)
+                    | Some(EA) -> 
+                        let wbAddr = addr + initialN*4u
+                        Ok (cpu, wbAddr)
+                    | Some(ED) -> 
+                        let wbAddr = addr - initialN*4u
+                        Ok (cpu, wbAddr)
                 // otherwise, load/store with next register
                 | LDM, reg :: rest -> 
+                    (printfn"%A %A" cpu.MM addr)
                     match cpu.MM.[WA addr] with
                     | DataLoc data -> 
                         { cpu with Regs = cpu.Regs.Add (reg, data); }
                         |> fun newCpu -> exec' rest newAddr newCpu
-                    | _ -> Error "Invalid memory address."
+                    | _ -> Error "Invalid memory address (code)."
                 | STM, reg :: rest -> 
                     cpu.Regs.[reg]
                     |> fun data -> { cpu with MM = cpu.MM.Add (WA addr, DataLoc data); }
                     |> fun newCpu -> exec' rest newAddr newCpu
+            printfn "%A" cpuData.Regs.[targ]
             match wb with
             | true ->
-                exec' orderedRegList (dirOp cpuData.Regs.[targ] initialN) cpuData
+                exec' orderedRLst (dirOp cpuData.Regs.[targ] (initialN*4u)) cpuData
                 |> function
                     | Ok(cpu, addr) -> Ok ({cpu with Regs = cpu.Regs.Add (targ, addr)};)
                     | Error s -> Error s
             | false -> 
-                exec' orderedRegList (dirOp cpuData.Regs.[targ] initialN) cpuData
+                exec' orderedRLst (dirOp cpuData.Regs.[targ] (initialN*4u)) cpuData
                 |> function
                     | Ok(cpu, _) -> Ok(cpu)
                     | Error s -> Error s
 
         let instr = parsed.PInstr
         let dir, targ, wb, rlst = instr.Direction, instr.Target, instr.WriteBack, instr.RegList
-        match instr.InsType with
-        | Some(LDM) -> exec LDM dir targ wb rlst
-        | Some(STM) -> exec STM dir targ wb rlst
-        | None -> failwithf "No instruction type given."
+        match checkValid instr with
+        | Ok _ ->
+            match instr.InsType with
+            | Some(LDM) -> exec LDM dir targ wb rlst
+            | Some(STM) -> exec STM dir targ wb rlst
+            | None -> failwithf "No instruction type given."
+        | Error s -> Error s
+        
 
     /// Parse Active Pattern used by top-level code
     let (|IMatch|_|)  = parse
