@@ -128,6 +128,31 @@ module Arithmetic
         Map.tryFind ls.OpCode opCodes
         |> Option.map parse'
    
+
+    /// Execute an arithmetic instruction
+    /// Performs arithmetic on given cpuData
+    let doArithmetic input cpuData = 
+        let arithLogic opcode target op1 op2 = 
+            match opcode with
+            | ADD -> 
+            | ADC ->
+            | SUB -> 
+            | SBC ->
+            | RSB ->
+            | RSC -> 
+
+        let instr = input.PInstr
+        let arithInstr = instr.InstrType
+        let suffix = instr.SuffixSet
+        let target = instr.Target
+        let op1 = instr.Op1
+        let op2 = instr.Op2
+
+        match arithInstr with
+        | Some(ins) -> arithLogic ins target op1 op2
+        | None -> failwithf "No instruction specified"
+
+
     let (|IMatch|_|) = parse
 
 
