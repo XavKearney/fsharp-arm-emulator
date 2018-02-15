@@ -109,12 +109,13 @@ module MultMemTests
     [<Tests>]
     let testExecMultMem = 
         let makeInstrString opcode direction target wb rLst =
-            let sortedRLst = List.sortByDescending (fun (x:RName) -> x.RegNum) rLst
             let opCodeStr = 
                 match opcode with
                 | LDM -> "LDM"
                 | STM -> "STM"
             let suffixStr, dirOp, initialN = 
+                //TODO get memReadOffset correct, and get resulting memory list in a checkable form
+                // some resulting memActual lists need to be reversed, or have initialN corrected
                 match opcode, direction with
                 // VisUAL doesn't support ""
                 | LDM, FD -> chooseFromList ["FD"; "IA"], (+), 0u
@@ -131,7 +132,7 @@ module MultMemTests
             if wb then regStrings.[target] + "!," + "{" + reglstStr + "}"
             else regStrings.[target] + "," + "{" + reglstStr + "}"
             |> sprintf "%s%s %s" opCodeStr suffixStr
-            |> fun s -> (s, dirOp, initialN)
+            |> fun s -> (s, dirOp, initialN, suffixStr)
             
 
         testPropertyWithConfig config "Property Test ExecMultMem" <| 
@@ -140,7 +141,7 @@ module MultMemTests
                 Gen.choose (0, 0xFFFF) |> Gen.sample 0 12 |> List.map uint32
                 |> fun lst -> List.concat [lst; [0u; 0u; 0u;]]
             
-            let instrString, dirOp, initialN = 
+            let instrString, dirOp, initialN, suffixStr = 
                 makeInstrString opcode direction target wb rLst
             let valid =  
                 match opcode, target, wb, rLst with
@@ -157,33 +158,56 @@ module MultMemTests
                 // VisUAL requires mem addresses to be divisible by 4
                 | _, t, _, _ when (dirOp regVals.[t.RegNum] (initialN*4u)) % 4u <> 0u -> false
                 | _, _, _, rlst when List.contains R15 rlst -> false
+                // need to be able to read the registers in the list
+                // VTest only allows reading up to 12
+                | _, _, _, rlst when rlst.Length > 12 -> false
                 | _ -> true
             
             match valid with
             | false -> ()
             | true ->
+                // get the address stored in the target register
                 let targetAddr = regVals.[target.RegNum]
-                printfn "%A" instrString
+                let wbAddr = 
+                    match opcode, direction with
+                    | STM, ED -> targetAddr - (4u* uint32 rLst.Length) //works
+                    | STM, FA -> targetAddr + (4u* uint32 rLst.Length)
+                    | STM, EA -> targetAddr + (4u* uint32 rLst.Length)
+                    | STM, FD -> targetAddr - (4u* uint32 rLst.Length) 
+                    | _ -> targetAddr 
+                // generate random register values
                 let memVals = Gen.choose (0, 0xFFFF) |> Gen.sample 0 rLst.Length |> List.map uint32
+                // put random register values in a map with correct addresses
                 let memMap =
                     memVals
                     |> List.mapi (fun i x -> 
                         (WA (dirOp targetAddr ((uint32 i + initialN)*4u))), (DataLoc x))
                     |> Map.ofList;
+                // create a register map in the VTest format
                 let visMemMap =
                     memVals
                     |> List.mapi (fun i x -> 
                         ((dirOp targetAddr ((uint32 i + initialN)*4u))), x)
                     |> Map.ofList;
+                let loadSuffix = 
+                    match opcode, direction with
+                    | STM, EA -> "EA"
+                    | STM, FD -> "FD"
+                    | _ -> suffixStr
+                // set the test parameters, used by VTest
                 let testParas = {
                         defaultParas with
                             InitRegs = regVals;
                             //initialise memory locations 
                             InitMem = visMemMap;
                             //Read memBase..memBase+13 
-                            MemReadBase = regVals.[target.RegNum];
+                            MemReadBase = wbAddr;// regVals.[target.RegNum] ;//+ (initialN*4u);
+                            // STMFA requires + initialN
+                            // STMFD doesn't require + initialN
+                            // STMED doesn't require + initialN
+                            MemReadDirection = loadSuffix;
                     }
-
+                // create the parsed MultMemInstr
                 let parsed = {
                         PInstr =  { 
                                     InsType = Some(opcode); 
@@ -194,26 +218,56 @@ module MultMemTests
                                 };
                         PLabel = None; PSize = 4u; PCond = Cal;
                     }
-
+                // run VisUAL with the instruction and parameters above
                 let flagsExp, outExp, memExp = RunVisualWithFlagsOut testParas instrString
                 printfn "%A" memExp
+                // get the values of the registers in ascending order
                 let regsExp = 
                     outExp.Regs
                     |> List.sortBy (fun (r, x) -> r)
-                    |> List.map (fun (out, i) -> uint32 i)
+                    |> List.map (fun (_, i) -> uint32 i)
+                let memRec = 
+                    match opcode, direction with
+                    | STM, ED  -> List.rev memExp |> List.tail |> List.take rLst.Length
+                    | STM, EA  -> List.take rLst.Length memExp |> List.rev
+                    | STM, FD -> List.rev memExp |> List.take (rLst.Length+1) |> List.tail
+                    | STM, FA ->  memExp.[..rLst.Length - 1] |> List.rev
+                    | LDM,  FD -> List.rev memExp |> List.tail |> List.take rLst.Length
+                    | LDM,  ED -> List.rev memExp |> List.tail |> List.take rLst.Length
+                    | LDM, (EA | FA)->  memExp.[..rLst.Length - 1] |> List.rev
                
-
+               // create a DataPath with the correct initial register and mem contents
                 let cpuData = {
                     Fl = flags;
                     Regs = List.mapi (fun i x -> (inverseRegNums.[i], x)) regVals |> Map.ofList;
                     MM = memMap;
                 }
+                // run execMultMem to produce the resulting DataPath after instruction execution
                 let resCpu = execMultMem parsed cpuData
                 match resCpu with
                 | Ok cpu ->
+                    printfn "%A" cpu.MM
+                    printfn "%s" instrString
+                    // get the register contents after instruction execution
                     let regsActual =
                         cpu.Regs
                         |> Map.toList
                         |> List.map (fun (_, x) -> x)
-                    Expect.equal regsActual regsExp.[..regsExp.Length - 2]  "test mem"
+                    // get memory contents
+                    let memActual =
+                        cpu.MM
+                        |> Map.toList
+                        |> List.map 
+                            (function
+                            | _, DataLoc x -> x
+                            | _ -> failwithf "Should never happen")
+                    // check that the registers in VisUAL = registers after execution
+                    Expect.equal regsActual regsExp.[..regsExp.Length - 2]  "test mem regs"
+                    // check that the memory in VisUAL = memory after execution
+                    Expect.equal memActual memRec  "test mem memory"
                 | Error _ -> ()
+
+// EA needs re-indexing
+// FD is fine
+// FA needs re-indexing
+// ED is fine

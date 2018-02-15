@@ -4,7 +4,6 @@ module MultMem
     
     open CommonData
     open CommonLex
-    open System.Runtime.InteropServices.ComTypes
 
     type MultMemInstrType = LDM | STM
     type MultMemDirection = FD | FA | ED | EA 
@@ -176,6 +175,7 @@ module MultMem
                 let newAddr = dirOp addr 4u
                 match mode, regs with
                 // list of registers empty, return
+                // this can be refactored, but it works
                 | STM, [] -> 
                     match dir with
                     | Some(FA) -> 
