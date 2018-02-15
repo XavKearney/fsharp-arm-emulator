@@ -146,19 +146,21 @@ module MultMemTests
                 makeInstrString opcode direction target wb rLst
             let valid =  
                 match opcode, target, wb, rLst with
+                // the following are ARM restrictions
+                // NB: not all restrictions listed, as some VisUAL restrictions overlap
                 | _, _, _, [] -> false
                 | _, t, _, _ when t = R15 -> false
                 | _, _, _, rlst when List.contains R13 rlst -> false
                 | STM, _, _, rlst when List.contains R15 rlst -> false
-                // VisUAL complains about the below
-                | _, _, _, rlst when List.contains target rlst -> false
                 | LDM, _, _, rlst when List.contains R14 rlst && List.contains R15 rlst -> false
-                | _, t, wb, rlst when wb && List.contains t rlst -> false
-                // VisUAL memory addresses are > 0x1000
-                | _, t, _, _ when regVals.[t.RegNum] < 0x1000u -> false
+                // the following are VisUAL restrictions
+                // VisUAL doesn't allow target register within reg list
+                | _, _, _, rlst when List.contains target rlst -> false
+                // VisUAL memory addresses are > 0x1000 (extra 0x30 to allow for descending instructions)
+                | _, t, _, _ when regVals.[t.RegNum] < 0x1030u -> false
                 // VisUAL requires mem addresses to be divisible by 4
                 | _, t, _, _ when (dirOp regVals.[t.RegNum] (initialN*4u)) % 4u <> 0u -> false
-                // VisUAL doesn't allow R15 in any rlst, even LDM instructions
+                // Can't test if R15 is in rlst because it will branch
                 | _, _, _, rlst when List.contains R15 rlst -> false
                 // need to be able to read the registers in the list
                 // VTest only allows reading up to 12
@@ -191,7 +193,7 @@ module MultMemTests
                     |> List.mapi (fun i x -> 
                         ((dirOp targetAddr ((uint32 i + initialN)*4u))), x)
                     |> Map.ofList;
-                // need to determine the suffix to load with when checking memory
+                // determine the suffix to load with when checking memory
                 // aliases of EA/FD are not the same for LDM
                 let loadSuffix = 
                     match opcode, direction with
@@ -231,10 +233,10 @@ module MultMemTests
                 // get the relevant memory contents from VisUAL
                 let memCheck = 
                     match opcode, direction with
-                    | STM, (ED | FD)  -> List.rev memExp |> List.tail |> List.take rLst.Length
-                    | STM, (EA | FA)  -> List.take rLst.Length memExp |> List.rev
-                    | LDM, (FD | ED) -> List.rev memExp |> List.tail |> List.take rLst.Length
-                    | LDM, (EA | FA)->  memExp |> List.take rLst.Length |> List.rev
+                    | STM, (ED | FD) | LDM, (FD | ED) -> 
+                        memExp |> List.rev |> List.tail |> List.take rLst.Length
+                    | STM, (EA | FA) | LDM, (EA | FA)->
+                        memExp |> List.take rLst.Length |> List.rev
                
                // create a DataPath with the correct initial register and mem contents
                 let cpuData = {

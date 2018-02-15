@@ -174,36 +174,20 @@ module MultMem
             let rec exec' regs addr cpu =
                 let newAddr = dirOp addr 4u
                 match mode, regs with
-                // list of registers empty, return
-                // this can be refactored, but it works
-                | STM, [] -> 
-                    match dir with
-                    | Some(FA) -> 
-                        let wbAddr = addr - initialN*4u
-                        Ok (cpu, wbAddr)
-                    | Some(FD) -> 
-                        let wbAddr = addr + initialN*4u
-                        Ok (cpu, wbAddr)
-                    | Some(EA) -> 
-                        let wbAddr = addr - initialN*4u
-                        Ok (cpu, wbAddr)
-                    | Some(ED) -> 
-                        let wbAddr = addr - initialN*4u
-                        Ok (cpu, wbAddr)
+                // if list of registers empty, return with correct writeback addr
                 | LDM, [] -> 
                     match dir with
-                    | Some(FA) -> 
-                        let wbAddr = addr - initialN*4u
-                        Ok (cpu, wbAddr)
-                    | Some(FD) -> 
-                        let wbAddr = addr - initialN*4u
-                        Ok (cpu, wbAddr)
-                    | Some(EA) -> 
-                        let wbAddr = addr + initialN*4u
-                        Ok (cpu, wbAddr)
-                    | Some(ED) -> 
-                        let wbAddr = addr - initialN*4u
-                        Ok (cpu, wbAddr)
+                    | Some(FD | FA) -> Ok (cpu, addr)
+                    | Some(EA) -> Ok (cpu, addr + 4u)
+                    | Some(ED) -> Ok (cpu, addr - 4u)
+                    | None -> failwithf "Should never happen"
+                | STM, [] -> 
+                    match dir with
+                    | Some(FD) -> Ok (cpu, addr + 4u)
+                    | Some(FA) -> Ok (cpu, addr - 4u)
+                    | Some(EA | ED) -> Ok (cpu, addr)
+                    | None -> failwithf "Should never happen"
+                
                 // otherwise, load/store with next register
                 | LDM, reg :: rest -> 
                     (printfn"%A %A" cpu.MM addr)
@@ -216,7 +200,7 @@ module MultMem
                     cpu.Regs.[reg]
                     |> fun data -> { cpu with MM = cpu.MM.Add (WA addr, DataLoc data); }
                     |> fun newCpu -> exec' rest newAddr newCpu
-            printfn "%A" cpuData.Regs.[targ]
+
             match wb with
             | true ->
                 exec' orderedRLst (dirOp cpuData.Regs.[targ] (initialN*4u)) cpuData
