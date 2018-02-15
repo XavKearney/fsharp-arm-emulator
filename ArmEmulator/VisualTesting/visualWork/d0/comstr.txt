@@ -1,1 +1,0 @@
-/C ".\ArmEmulator\VisualTesting\visualapp\visual\jre\bin\java -jar .\ArmEmulator\VisualTesting\visualapp\visual\content\visual_headless.jar --headless .\ArmEmulator\VisualTesting\visualWork\d0/source.s .\ArmEmulator\VisualTesting\visualWork\d0/visoutput.log --cycles --regs --syntax --runtime --mode:all  --meminstsize:0x1000 "

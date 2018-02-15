@@ -293,3 +293,6 @@ packages/**
 
 # Custom
 initProjectLexer.fs
+
+# VisualTest
+**/VisualTesting/visualWork

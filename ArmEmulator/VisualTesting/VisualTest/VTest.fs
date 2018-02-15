@@ -166,7 +166,7 @@ module VData =
     /// Construct postlude assembly code
     /// memBase: base addr of memory locs read by postlude
     let POSTLUDE memBase memDir =
-        READMEMORY memBase memDir //+ READFLAGSINTOR0
+        READMEMORY memBase memDir + READFLAGSINTOR0
 
 
     /// Construct wrapper code for simulation
