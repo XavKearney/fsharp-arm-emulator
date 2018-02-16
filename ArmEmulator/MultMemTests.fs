@@ -8,6 +8,10 @@ module MultMemTests
     open VisualTest.VTest
     open VisualTest.VCommon
 
+    let genRandomUint32List (min,max) count =
+        let rnd = System.Random()
+        List.init count (fun _ -> rnd.Next (min, max))
+        |> List.map uint32
 
     /// choose an item from list at random
     let chooseFromList lst = 
@@ -71,7 +75,7 @@ module MultMemTests
                 ({ls with OpCode = "ADD"; Operands = "R15, R15, #5";}, 
                     None);
             ]
-    let config = { FsCheckConfig.defaultConfig with maxTest = 100 }
+    let config = { FsCheckConfig.defaultConfig with maxTest = 10000 }
     [<Tests>]
     let testParse =
         let makeLineData wa opcode suffixStr target wb rLst = 
@@ -164,13 +168,12 @@ module MultMemTests
             |> sprintf "%s%s %s" opCodeStr suffixStr
             // return all necessary params
             |> fun s -> (s, dirOp, initialN, suffixStr)
-            
 
         testPropertyWithConfig config "Property Test ExecMultMem" <| 
         fun opcode direction (target: RName) wb (rLst: RName list) flags->
             // generate random values for registers R0-R11, set R12-R14 to 0
             let regVals = 
-                Gen.choose (0, 0xFFFF) |> Gen.sample 0 12 |> List.map uint32
+                genRandomUint32List (-0x7FFFFFFF, 0xFFFFFFFF) 12
                 |> fun lst -> List.concat [lst; [0u; 0u; 0u;]]
             // create the instruction as a string, and get other necessary params
             let instrString, dirOp, initialN, suffixStr = 
@@ -211,7 +214,7 @@ module MultMemTests
                     // LDM instructions can use the same
                     | _ -> targetAddr 
                 // generate random register values
-                let memVals = Gen.choose (0, 0xFFFF) |> Gen.sample 0 rLst.Length |> List.map uint32
+                let memVals = genRandomUint32List (-0x7FFFFFFF, 0x7FFFFFFF) rLst.Length
                 // put random register values in a map with correct addresses
                 let memMap =
                     memVals

@@ -105,7 +105,7 @@ module MultMem
         | Some t -> matchRegLst wb t
         | None -> Error ("Target register not found.")
 
-    // check that the result after parsing conforms to ARM spec
+    /// check that the result after parsing MultMemInstr conforms to ARM spec
     let checkValid ins =
         match ins.InsType, ins.Target, ins.RegList, ins.WriteBack with
         | _, t, _, _ when t = R15 -> 
@@ -215,7 +215,6 @@ module MultMem
                 
                 // otherwise, load/store with next register
                 | LDM, reg :: rest -> 
-                    (printfn"%A %A" cpu.MM addr)
                     match cpu.MM.[WA addr] with
                     | DataLoc data -> 
                         { cpu with Regs = cpu.Regs.Add (reg, data); }
