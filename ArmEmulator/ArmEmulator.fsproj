@@ -11,6 +11,7 @@
     <Compile Include="MultMem.fs" />
     <Compile Include="MultMemTests.fs" />
     <Compile Include="memInstructions.fs" />
+    <Compile Include="memInstructionsTests.fs" />
     <Compile Include="Tests.fs" />
     <Compile Include="Main.fs" />
     <None Include="App.config" />

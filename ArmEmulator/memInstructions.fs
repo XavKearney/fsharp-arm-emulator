@@ -3,6 +3,8 @@ module memInstructions
 
     open CommonData
     open CommonLex
+    open System.Reflection.Emit
+    open System
 
 
 
@@ -10,7 +12,7 @@ module memInstructions
 
 //----------MEMORY INSTRUCTION DEFINITION AND PARSING-------------------------------------------------
 
-    type MemInstrType = LDR | STR | ADR 
+    type MemInstrType = LDR | STR 
     type FlexOp2Mem = | Label | Addr | AddrPlus | PreIndexed | PostIndexed | AddrPlusAddr | AddrShftOp
     type LabelM = string option
 
@@ -35,11 +37,11 @@ module memInstructions
     }
 
     /// map of all possible opcodes recognised
-    let opCodesMem = opCodeExpand memSpec
+    // let opCodesMem = opCodeExpand memSpec
 
 
     /// Parse Active Pattern used by top-level code
-    let (|IMatch|_|) = parse
+    // let (|IMatch|_|) = parse
 
 
 
@@ -55,7 +57,7 @@ module memInstructions
 
 //----------ADR INSTRUCTION DEFINITION AND PARSING-------------------------------------------------
 
-    type ADRInstrType = ADR 
+    type ADRInstrType = ADRm 
     type LabelADR = string option
 
 
@@ -78,11 +80,11 @@ module memInstructions
     }
 
     /// map of all possible opcodes recognised
-    let opCodesMem = opCodeExpand ADRSpec
+    // let opCodesADR = opCodeExpand ADRSpec
 
 
     /// Parse Active Pattern used by top-level code
-    let (|IMatch|_|) = parse
+    // let (|IMatch|_|) = parse
 
 
 
@@ -94,15 +96,25 @@ module memInstructions
 
 //----------MEMORY INSTRUCTION DEFINITION AND PARSING-------------------------------------------------
 
-    type LabelInstrType = EQU | Fill
-    type ValueOrExpression = | Value | Expression
+    type LabelInstrType = EQU | Fill | DCD
+                                   //EquExpr is either:
+                                   //a register relative address
+                                   //a PC relative address
+                                   //an absolute address
+                                   //or a 32 bit integer
+    type EquExpr = Num of uint32 option | Exp of string 
+    type ValueList = string list
+    type LabelL = StrLabel of string option 
 
 
     /// instruction (dummy: must change)
     type labelInstr =
         {
-            InstructionType: LabelInstrType option;
-            SecondOp: ValueOrExpression;
+            InstructionType: LabelInstrType;
+            Name: LabelL;
+            EQUExpr: EquExpr option;
+            DCDValueList: ValueList option;            //What to fill the memory with
+            FillN: uint32 option;
         }
 
     /// parse error (dummy, but will do)
@@ -111,7 +123,7 @@ module memInstructions
     /// very incomplete!
     let labelSpec = {
         InstrC = LABEL
-        Roots = ["EQU";"Fill"]
+        Roots = ["EQU";"Fill";"DCD"]
         Suffixes = [""]
     }
 
@@ -119,118 +131,131 @@ module memInstructions
 
 
     /// Parse Active Pattern used by top-level code
-    let (|IMatch|_|) = parse
+    // let (|IMatch|_|) = parse
 
 
+    type labelMemOrADR = LabelInstrType | ADRInstrType | MemInstrType
 
-
-
-
-
-
-
-
-//----------DCD INSTRUCTION DEFINITION AND PARSING-------------------------------------------------
-
-    type DCDInstrType = DCD 
-    type LabelDCD = string option
-    type ValueList = string list option
-
-
-    /// instruction (dummy: must change)
-    type DCDInstr =
-        {
-            InstructionType: DCDInstrType option;
-            Label: LabelDCD;
-            UnAligned: bool;
-            Value: ValueList;
-        }
-
-    /// parse error (dummy, but will do)
-
-    /// sample specification for set of instructions
-    /// very incomplete!
-    let DCDSpec = {
-        InstrC = DCD
-        Roots = ["DCD"]
-        Suffixes = ["";"U"]
-    }
 
     /// map of all possible opcodes recognised
-    let opCodesDCD = opCodeExpand DCDSpec
     let opCodesADR = opCodeExpand ADRSpec
     let opCodesMem = opCodeExpand memSpec
     let opCodesLabel = opCodeExpand labelSpec
 
 
+    let evalExpression (exp0: string) =
+        let rec evalExpression' (exp: string) = 
+            if String.exists (fun c -> (c ='*')) exp then
+                exp.Split('*') 
+                |> Seq.toList
+                |> List.map (fun x -> evalExpression' x)
+                |> List.reduce (fun a b -> a*b)
+            elif String.exists (fun c -> (c ='+')) exp then
+                exp.Split('+') 
+                |> Seq.toList
+                |> List.map (fun x -> evalExpression' x)
+                |> List.reduce (fun a b -> a+b)
+            elif String.exists (fun c -> (c ='-')) exp then
+                exp.Split('-') 
+                |> Seq.toList
+                |> List.map (fun x -> evalExpression' x)
+                |> List.reduce (fun a b -> a-b)
+            else 
+                exp |> uint32
+        evalExpression' exp0
+
+
+///Parse function for 
+    let parseLabelIns root ls =
+        let InstTypeTmp = 
+            match root with
+            | "EQU"  -> EQU 
+            | "Fill" -> Fill
+            | "DCD"  -> DCD
+        let (fillN, valList, equExp) =
+            match InstTypeTmp with
+            | EQU ->    let equExp1 = evalExpression ls.Operands
+                        (None, None, Some (Num (Some equExp1)))  
+            | Fill ->   let fillN1 = ls.Operands |> uint32
+                        (Some fillN1, None, Some (Num None))
+            | DCD ->    let valList1 = (ls.Operands).Split(',') 
+                                        |> Array.map (fun s-> s.Trim()) 
+                                        |> Seq.toList
+                        (None, Some valList1, Some (Num None))
+        let nameOut = StrLabel ls.Label
+        {InstructionType = InstTypeTmp; Name = nameOut; 
+            EQUExpr = equExp; DCDValueList = valList; 
+            FillN = fillN}
 
     /// main function to parse a line of assembler
     /// ls contains the line input
     /// and other state needed to generate output
     /// the result is None if the opcode does not match
     /// otherwise it is Ok Parse or Error (parse error string)
-    let parse (ls: LineData) : Result<Parse<Instr>,string> option =
-        let parse' (instrC, (root,suffix,pCond)) =
+    // let parse (ls: LineData) : Result<Parse<Instr>,string> option =
+    //     let parse' (instrC, (root,suffix,pCond)) =
 
-            let (WA la) = ls.LoadAddr // address this instruction is loaded into memory
-            // this does the real work of parsing
-            // dummy return for now
+    //         let (WA la) = ls.LoadAddr // address this instruction is loaded into memory
+    //         // this does the real work of parsing
+    //         // dummy return for now
             
-            
-            match instrC with
-            | DCD -> Ok.PInstr = parseDCD suffix ls
-            | MEM -> Ok.PInstr = parseMEM root suffix ls
-            | ADR -> Ok.PInstr = parseADR suffix ls
-            | LABEL -> Ok.PInstr = parseLabelIns root suffix ls
-            
-            Ok { 
-                // Normal (non-error) return from result monad
-                // This is the instruction determined from opcode, suffix and parsing
-                // the operands. Not done in the sample.
-                // Note the record type returned must be written by the module author.
-                // PInstr={InstructionType= (); DestSourceReg= (); SecondOp= ();}; 
+
+    //         // match instrC with
+    //         // | DCD -> PInstrTmp = parseDCD suffix ls
+    //         // | MEM -> PInstrTmp = parseMEM root suffix ls
+    //         // | ADR -> PInstrTmp = parseADR suffix ls
+    //         // | LABEL -> PInstrTmp = parseLabelIns root suffix ls
+                        
+    //         Ok { 
+    //             // Normal (non-error) return from result monad
+    //             // This is the instruction determined from opcode, suffix and parsing
+    //             // the operands. Not done in the sample.
+    //             // Note the record type returned must be written by the module author.
+    //             // PInstr={InstructionType= (); DestSourceReg= (); SecondOp= ();}; 
+    //             PInstr = 
+    //                 match instrC with
+    //                 | LABEL -> parseLabelIns root suffix ls
+    //                 | MEM   -> parseMEM root suffix ls
+    //                 | ADR   -> parseADR suffix ls
 
 
-                // This is normally the line label as contained in
-                // ls together with the label's value which is normally
-                // ls.LoadAddr. Some type conversion is needed since the
-                // label value is a number and not necessarily a word address
-                // it does not have to be div by 4, though it usually is
-                PLabel = ls.Label |> Option.map (fun lab -> lab, la) ; 
+    //             // This is normally the line label as contained in
+    //             // ls together with the label's value which is normally
+    //             // ls.LoadAddr. Some type conversion is needed since the
+    //             // label value is a number and not necessarily a word address
+    //             // it does not have to be div by 4, though it usually is
+    //             PLabel = ls.Label |> Option.map (fun lab -> lab, la) ; 
 
 
-                // this is the number of bytes taken by the instruction
-                // word loaded into memory. For arm instructions it is always 4 bytes. 
-                // For data definition DCD etc it is variable.
-                //  For EQU (which does not affect memory) it is 0
-                PSize = 4u; 
+    //             // this is the number of bytes taken by the instruction
+    //             // word loaded into memory. For arm instructions it is always 4 bytes. 
+    //             // For data definition DCD etc it is variable.
+    //             //  For EQU (which does not affect memory) it is 0
+    //             PSize = 4u; 
 
-                // the instruction condition is detected in the opcode and opCodeExpand                 
-                // has already calculated condition already in the opcode map.
-                // this part never changes
-                PCond = pCond 
-                }
-        Map.tryFind ls.OpCode opCodesDCD // lookup opcode to see if it is known
-        |> Option.map parse' // if unknown keep none, if known parse it.
-        if (Map.tryFind ls.OpCode opCodesDCD |> Option.map parse') <> None then
-            Map.tryFind ls.OpCode opCodesDCD |> Option.map parse'
-            else 
+    //             // the instruction condition is detected in the opcode and opCodeExpand                 
+    //             // has already calculated condition already in the opcode map.
+    //             // this part never changes
+    //             PCond = pCond 
+    //             }
+    //     // Map.tryFind ls.OpCode opCodesDCD // lookup opcode to see if it is known
+    //     // |> Option.map parse' // if unknown keep none, if known parse it.
+    //     if (Map.tryFind ls.OpCode opCodesLabel |> Option.map parse') <> None then
+    //         Map.tryFind ls.OpCode opCodesLabel |> Option.map parse'
+    //     elif (Map.tryFind ls.OpCode opCodesADR |> Option.map parse') <> None then
+    //         Map.tryFind ls.OpCode opCodesADR |> Option.map parse'
+    //     elif (Map.tryFind ls.OpCode opCodesMem |> Option.map parse') <> None then
+    //         Map.tryFind ls.OpCode opCodesMem |> Option.map parse'
+    //     else 
+    //         None
 
 
     /// Parse Active Pattern used by top-level code
-    let (|IMatch|_|) = parse
+    // let (|IMatch|_|) = parse
 
 
-    let parseDCD suffix (ls: LineData) = 
-        let valList = ls.Operands |> ops.Split(',') |> Array.map (fun s-> s.Trim())
-        let unalign =
-            match suffix.Trim with 
-            | "" -> false
-            | "U" -> true
-        {InstructionType = DCD; Label = ls.Label; UnAligned = unalign; ValueList = valList}
 
 
-    let parseMEM root suffix (ls: LineData) = 
         
 
 
@@ -238,7 +263,6 @@ module memInstructions
 
 
 
-    let executeDCD 
 
 
 
@@ -249,7 +273,7 @@ module memInstructions
 
 
 
-    let LDR = 
+    let LDRexec = 
         //insert psuedo code here
         //Eg: LDR r8, [r10]     //Loads r8 with the value 
                                 // from the address in r10
@@ -270,11 +294,11 @@ module memInstructions
         // for branching.
         0
 
-    let STR = 
+    let STRexec = 
         //insert psuedo code here
         0
 
-    let ADR (Rdest: RName) (Lab: Label) = 
+    let ADRexec (Rdest: RName) (Lab: Label) = 
         //Takes the address of a label and puts it into the 
         // register. 
         //Eg: ADR		R0, BUFFIN1
@@ -285,7 +309,7 @@ module memInstructions
         
         0
 
-    let DCD = 
+    let DCDexec = 
         //Takes a label and a list of values, it then stores 
         // the values in memory, they can be accessed using
         // the label.
@@ -298,7 +322,7 @@ module memInstructions
         //NOTE: this line will not run in visual but it should
         0
 
-    let EQU = 
+    let EQUexec = 
         //insert psuedo code here
         //Assigns a value to a label
         //Eg: abc EQU 2 
@@ -308,7 +332,7 @@ module memInstructions
 
         0
 
-    let FILL = 
+    let FILLexec = 
         //insert psuedo code here
         //Eg:   data4	Fill		12
         // fills 12 data slots with 0. It basically initialises
