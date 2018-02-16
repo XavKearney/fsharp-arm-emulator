@@ -6,6 +6,7 @@
     <DebugType>portable</DebugType>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="VisualTesting/VisualTest/VTest.fs" />
     <Compile Include="CommonData.fs" />
     <Compile Include="CommonLex.fs" />
     <Compile Include="Arithmetic.fs" />
