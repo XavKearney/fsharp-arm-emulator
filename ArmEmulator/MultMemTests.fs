@@ -9,7 +9,6 @@ module MultMemTests
     open VisualTest.VCommon
 
 
-
     /// choose an item from list at random
     let chooseFromList lst = 
         Gen.elements lst
@@ -34,6 +33,8 @@ module MultMemTests
             [
                 ("R7, {R3,R9,R1}", Ok (R7, false, [R3;R9;R1]));
                 ("R0!, {R2,R12,R1,R3}", Ok (R0, true, [R2;R12;R1;R3]));
+                ("R7, {R1-R3}", Ok (R7, false, [R1;R2;R3]));
+                ("R7, {R3-R1}", Error "Invalid register list range.");
                 ("R4, {}", Error "Invalid list of registers.");
                 ("R4, {E3}", Error "Invalid list of registers.");
                 ("R4 {R1,R2}", Error "Target register not found.");
@@ -70,7 +71,7 @@ module MultMemTests
                 ({ls with OpCode = "ADD"; Operands = "R15, R15, #5";}, 
                     None);
             ]
-    let config = { FsCheckConfig.defaultConfig with maxTest = 10000 }
+    let config = { FsCheckConfig.defaultConfig with maxTest = 100 }
     [<Tests>]
     let testParse =
         let makeLineData wa opcode suffixStr target wb rLst = 

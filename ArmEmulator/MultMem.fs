@@ -63,17 +63,43 @@ module MultMem
             match reglstStr.StartsWith('{') && reglstStr.EndsWith('}') with
             | false -> Error ("Incorrectly formatted operands.")
             | true ->
-                let reglst = 
-                    reglstStr.[1..String.length reglstStr - 2].Split(",")
-                    |> Array.toList
-                    |> List.map regNames.TryFind
-                match List.contains None reglst with
-                // if any registers not found, return error
-                // NB: doesn't check for duplicate registers
-                | true -> Error ("Invalid list of registers.")
-                | false -> // if all registers found, transform Some x -> x and return
-                    List.choose id reglst
-                    |> fun rlst -> Ok (targ, wb, rlst)
+                // check for a register range (e.g. {R0-R5})
+                match reglstStr.Contains "-" with
+                // if not a range, must be a list (e.g. {R1,R3,R5})
+                | false ->
+                        // remove curly braces and split
+                        reglstStr.[1..String.length reglstStr - 2].Split(",")
+                        |> Array.toList
+                        |> List.map regNames.TryFind
+                        |> Ok
+                // if it does contain "-", must be a range
+                | true ->
+                        // remove curly braces and split
+                        reglstStr.[1..String.length reglstStr - 2].Split("-")
+                        |> Array.toList
+                        |> List.map regNames.TryFind
+                        |> fun lst ->
+                            // make sure there's only 2 registers and they are valid
+                            match lst.Length, List.contains None lst with
+                            | 2, false -> 
+                                // convert Some x -> x
+                                List.choose id lst
+                                |> (fun x -> [x.[0].RegNum..x.[1].RegNum])
+                                |> List.map inverseRegNums.TryFind
+                                // an empty list here means the registers were the wrong way round
+                                // e.g. {R3-R0} -> []
+                                |> fun lst -> 
+                                    if lst <> [] then Ok lst else
+                                        Error "Invalid register list range."
+                            // anything else must be invalid
+                            | _ -> Error "Invalid list of registers"
+                |> Result.bind (fun rlst ->
+                    match List.contains None rlst with
+                    // if any registers not found, return error
+                    | true -> Error ("Invalid list of registers.")
+                    | false -> // if all registers found, transform Some x -> x and return
+                        List.choose id rlst
+                        |> fun rlst -> Ok (targ, wb, rlst))
 
         match target with
         | Some t -> matchRegLst wb t
@@ -98,8 +124,8 @@ module MultMem
     /// if the operands parse, return instruction
     /// if not, return an error
     let makeMultMemInstr root suffix operands =
-        match parseOps operands with
-        | Ok (target, wb, regLst) ->
+        parseOps operands
+        |> Result.bind (fun (target, wb, regLst) ->
             // create template result with empty InsType & Direction
             let defaultIns = {
                 InsType = None; Direction = None;
@@ -125,7 +151,7 @@ module MultMem
                 checkValid { defaultIns with InsType = Some(STM); Direction = Some(ED); } 
             // error if unsupported instruction
             | _ -> Error ("Opcode not supported.")
-        | Error s -> Error s
+        )
 
 
     /// main function to parse a line of assembler
@@ -134,7 +160,6 @@ module MultMem
     /// the result is None if the opcode does not match
     /// otherwise it is Ok Parse or Error (parse error string)
     let parse ls =
-    //TODO: Support dashed reg list e.g. {R0-R4}
         let parse' (instrC, (root,suffix,pCond)) =
             let (WA la) = ls.LoadAddr
             match instrC with

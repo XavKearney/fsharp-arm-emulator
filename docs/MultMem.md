@@ -97,8 +97,9 @@ In testing, a number of differences from VisUAL were discovered:
     - This is not a restriction used by the `MultMem` module, but the module does incremement addresses by 4 so that the addresses can be considered as referring to bytes, to maximise compatibility with VisUAL. This memory model may change during the group phase if it allows for better error checking.
 4. It is not possible to test with register lists larger than 12 registers as a result of the `VisualTesting` framework. This is because the memory addresses are loaded into registers.
 5. It is not possible to test when `R15` is within the register list against VisUAL because it causes the code to branch to an unwanted instruction location.
+6. VisUAL instructions are case-insensitive. This module assumes upper-case instructions, and the intention is that the top-level code in the group phase of the project will convert instructions to upper-case to allow case insensitivity.
+7. VisUAL throws a Java exception if a reverse-ordered register list is given, e.g. `LDM R0, {R5-R1}`. The `MultMem` module handles this case, returning an Error within a Result monad.
 
 
 ## TODO
-- [ ] Add support for `{R0-R5}` in the register list
 - [ ] Add support for `B/BL/END` instructions
