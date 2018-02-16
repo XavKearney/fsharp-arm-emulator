@@ -11,7 +11,7 @@ module Arithmetic
             // Arithmetic type
             InstrType: ArithInstrType option;
             // Whether S suffix is set
-            SuffixSet: bool option
+            SuffixSet: bool
             // Destination register
             Target: RName;
             // First operation -> must be a register
@@ -71,7 +71,7 @@ module Arithmetic
         
         
 
-    let makeArithInstr root suffix operands =
+    let makeArithInstr root (suffix:string) operands =
         // Makes final instruction from baseInstr
         let makeInstr ins = 
             Ok(ins)
@@ -79,10 +79,7 @@ module Arithmetic
         match parseOpsLine operands with
         | Ok (dest, op1, op2) -> 
             // Converts suffix string into bool option
-            let suffType = match suffix with
-                           | "S" -> Some(true)
-                           | "" -> Some(false)
-                           | _ -> None
+            let suffType = suffix.EndsWith('S') 
 
             // Creates basic ArithInstr type
             let baseInstr = {
@@ -111,7 +108,7 @@ module Arithmetic
     /// and other state needed to generate output
     /// the result is None if the opcode does not match
     /// otherwise it is Ok Parse or Error (parse error string)
-    let parse ls=
+    let parse ls =
         let parse' (instrC, (root,suffix,pCond)) =
             let (WA la) = ls.LoadAddr
             match instrC with

@@ -81,7 +81,7 @@ module MultMemTests
                                         PInstr = 
                                             {
                                             InstrType = Some opcode;
-                                            SuffixSet = Some suffix;
+                                            SuffixSet = suffix;
                                             Target = target;
                                             Op1 = op1;
                                             Op2 = op2;
