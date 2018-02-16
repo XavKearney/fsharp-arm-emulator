@@ -29,17 +29,47 @@ module MultMemTests
         |> testList (sprintf "%s Test List" name) 
 
     [<Tests>]
-    let testParseOps = 
+    let testParseOpsUnit = 
         makeUnitTestList parseOps "parseOps Unit" 
             [
                 ("R7, {R3,R9,R1}", Ok (R7, false, [R3;R9;R1]));
                 ("R0!, {R2,R12,R1,R3}", Ok (R0, true, [R2;R12;R1;R3]));
+                ("R4, {}", Error "Invalid list of registers.");
+                ("R4, {E3}", Error "Invalid list of registers.");
+                ("R4 {R1,R2}", Error "Target register not found.");
                 ("R, {R3,R9,R1}", Error "Target register not found.");
                 ("R7,, {R3,R9,R1}", Error "Incorrectly formatted operands.");
                 ("R7, {R3,R9,R1", Error "Incorrectly formatted operands.");
+                ("R7, R3,R9,R1", Error "Incorrectly formatted operands.");
+                ("R7, R3,R9,R1}", Error "Incorrectly formatted operands.");
                 ("R7 {R3,R9,R1}", Error "Target register not found.");
             ]
 
+    [<Tests>]
+    let testParseUnit = 
+        let ls = { LoadAddr = WA 0u; Label = None; SymTab = None;
+                OpCode = ""; Operands = ""; }
+        makeUnitTestList parse "parse Unit" 
+            [
+                ({ls with OpCode = "STM"; Operands = "R15, {R1,R3}";}, 
+                    Some(Error "Target register cannot be PC (R15)."));
+                ({ls with OpCode = "LDM"; Operands = "R15, {R1,R3}";}, 
+                    Some(Error "Target register cannot be PC (R15)."));
+                ({ls with OpCode = "LDM"; Operands = "R7, {R1,R13}";}, 
+                    Some(Error "Register list cannot contain SP (R13)."));
+                ({ls with OpCode = "STM"; Operands = "R4, {R15,R3}";}, 
+                    Some(Error "Register list cannot contain PC (R15) for STM instructions."));
+                ({ls with OpCode = "LDM"; Operands = "R4, {R15,R14,R5}";}, 
+                    Some(Error "Register list cannot contain PC(R15) if it contains LR for LDM."));
+                ({ls with OpCode = "LDM"; Operands = "R4!, {R4,R7,R9}";}, 
+                    Some(Error "Register list cannot contain target reg if writeback is enabled."));
+                ({ls with OpCode = "STM"; Operands = "R9!, {R4,R1,R9}";}, 
+                    Some(Error "Register list cannot contain target reg if writeback is enabled."));
+                ({ls with OpCode = "STMEF"; Operands = "R15, {R1,R3}";}, 
+                    None);
+                ({ls with OpCode = "ADD"; Operands = "R15, R15, #5";}, 
+                    None);
+            ]
     let config = { FsCheckConfig.defaultConfig with maxTest = 10000 }
     [<Tests>]
     let testParse =
