@@ -132,14 +132,36 @@ module Arithmetic
     /// Execute an arithmetic instruction
     /// Performs arithmetic on given cpuData
     let doArithmetic input cpuData = 
+        // Register map
+        let regMap = cpuData.Regs
+
+        // Actual logic that performs the instruction
         let arithLogic opcode target op1 op2 = 
-            match opcode with
-            | ADD -> 
-            | ADC ->
-            | SUB -> 
-            | SBC ->
-            | RSB ->
-            | RSC -> 
+            // Register target
+            let targetVal = regMap.TryFind target
+            let op1Val = regMap.TryFind op1
+            let op2Val = match op2 with
+                         | Target reg -> regMap.TryFind reg
+                         | Value num -> Some num
+            let carryVal = match cpuData.Fl.C with
+                           | true -> 1u
+                           | false -> 0u
+
+            let logicOp = 
+                match targetVal, op1Val, op2Val with
+                    | Some _, Some op1Num, Some op2Num -> 
+                        match opcode with
+                        | ADD -> Ok (op1Num + op2Num)
+                        | ADC -> Ok (op1Num + op2Num + carryVal)
+                        | SUB -> Ok (op1Num - op2Num)
+                        | SBC -> Ok (op1Num - op2Num + (carryVal - 1u))
+                        | RSB -> Ok (op2Num - op1Num)
+                        | RSC -> Ok (op2Num - op1Num + (carryVal - 1u))
+                    | _ -> Error ("The instruction is invalid")
+
+            match logicOp with
+            | Ok regVal -> Map.add target regVal regMap
+            | Error _ -> failwithf "The instruction is invalid"
 
         let instr = input.PInstr
         let arithInstr = instr.InstrType
