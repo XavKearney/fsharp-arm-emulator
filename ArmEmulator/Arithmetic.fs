@@ -14,6 +14,12 @@ module Arithmetic
             "LSL",LSL; "ASR",ASR; "LSR",LSR; "ROR",ROR; "RRX",RRX
         ]
 
+    let operationStrings = 
+        operationNames
+        |> Map.toList
+        |> List.map (fun (s,rn)-> (rn,s)) 
+        |> Map.ofList
+
     type Op2Types = Literal of uint32 | Register of RName | RegisterShift of RName * Operations * int32 | RegisterRegisterShift of RName * Operations * RName
 
 
@@ -140,38 +146,44 @@ module Arithmetic
 
         match line with
         // Regex match captures target, op1 and then everything following the last comma
-        | FlexParse "(R[0-9]+),\s*(R[0-9]+),\s*(.*)" [target; op1; op2] -> 
-            let op2List = op2.Split(",")
-            match op2List.Length with
-            | 1 -> 
-                match op2 with
-                | FlexParse "(R[0-9]+|#0b[0-1]+|#0x[0-9A-F]+|#[0-9]+)" [op2Val] -> 
-                    match op2Val with
-                    | Prefix "#" op2Num -> Ok (target, op1, Literal (uint32 (int32 op2Num)))
-                    | _ -> 
-                        match regNames.TryFind op2Val with
-                        | Some op2Reg -> Ok (target, op1, Register op2Reg)
-                        | None -> Error ("Op2 is not a valid register")
-
-                | _ -> Error ("Flex op 2 has invalid format")
-            | 2 ->
-                match op2 with
-                | FlexParse "(R[0-9]+),\s*([A-Z]+)\s+(R[0-9]+|#0b[0-1]+|#0x[0-9A-F]+|#[0-9]+)" [op2Val; shift; shiftVal] ->
-                    match regNames.TryFind op2Val with
-                    | Some op2Reg -> 
-                        match operationNames.TryFind shift with
-                        | Some shiftOp -> 
-                            match shiftVal with
-                            | Prefix "#" shiftNum -> Ok (target, op1, RegisterShift(op2Reg, shiftOp, int32 shiftNum))
+        | FlexParse "(R[0-9]+),\s*(R[0-9]+),\s*(.*)" [targetStr; op1Str; op2] ->
+            match regNames.TryFind targetStr with
+            | Some target -> 
+                match regNames.TryFind op1Str with
+                | Some op1 -> 
+                    let op2List = op2.Split(",")
+                    match op2List.Length with
+                    | 1 -> 
+                        match op2 with
+                        | FlexParse "(R[0-9]+|#-?0b[0-1]+|#-?0x[0-9A-F]+|#-?[0-9]+)$" [op2Val] -> 
+                            match op2Val with
+                            | Prefix "#" op2Num -> Ok (target, op1, Literal (uint32 (int32 op2Num)))
                             | _ -> 
-                                match regNames.TryFind shiftVal with
-                                | Some shiftReg -> Ok (target, op1, RegisterRegisterShift(op2Reg, shiftOp, shiftReg))
-                                | None -> Error ("Shift op register is invalid")
+                                match regNames.TryFind op2Val with
+                                | Some op2Reg -> Ok (target, op1, Register op2Reg)
+                                | None -> Error ("Op2 is not a valid register")
 
-                        | None -> Error ("Shift operation is invalid")
-                    | None -> Error ("Op2 is not a valid register")
-                | _ -> Error ("Flex op 2 has invalid format")
-            | _ -> Error ("Flex op 2 has invalid format")
+                        | _ -> Error ("Flex op 2 has invalid format")
+                    | 2 ->
+                        match op2 with
+                        | FlexParse "(R[0-9]+),\s*([A-Z]+)\s+(R[0-9]+|#-?0b[0-1]+|#-?0x[0-9A-F]+|#-?[0-9]+)$" [op2Val; shift; shiftVal] ->
+                            match regNames.TryFind op2Val with
+                            | Some op2Reg -> 
+                                match operationNames.TryFind shift with
+                                | Some shiftOp -> 
+                                    match shiftVal with
+                                    | Prefix "#" shiftNum -> Ok (target, op1, RegisterShift(op2Reg, shiftOp, int32 shiftNum))
+                                    | _ -> 
+                                        match regNames.TryFind shiftVal with
+                                        | Some shiftReg -> Ok (target, op1, RegisterRegisterShift(op2Reg, shiftOp, shiftReg))
+                                        | None -> Error ("Shift op register is invalid")
+
+                                | None -> Error ("Shift operation is invalid")
+                            | None -> Error ("Op2 is not a valid register")
+                        | _ -> Error ("Flex op 2 has invalid format")
+                    | _ -> Error ("Flex op 2 has invalid format")
+                | _ -> Error ("Op1 register is invalid")
+            | _ -> Error ("Target register is invalid") 
         | _ -> Error ("The instruction is invalid")
 
         
@@ -243,9 +255,12 @@ module Arithmetic
             // Register target
             let targetVal = regMap.TryFind target
             let op1Val = regMap.TryFind op1
-            let op2Val = match op2 with
-                         | Target reg -> regMap.TryFind reg
-                         | Value num -> Some num
+            let op2Val = 
+                match op2 with
+                    | Literal num -> Some num
+                    | Register reg -> regMap.TryFind reg
+                    | RegisterShift (op2, shift, num) -> Some (flexOp2 (RegisterShift (op2, shift, num)) cpuData)
+                    | RegisterRegisterShift (op2, shift, num) -> Some (flexOp2 (RegisterRegisterShift(op2, shift, num)) cpuData)
             let carryVal = match cpuData.Fl.C with
                            | true -> 1u
                            | false -> 0u
