@@ -75,7 +75,7 @@ module MultMemTests
                 ({ls with OpCode = "ADD"; Operands = "R15, R15, #5";}, 
                     None);
             ]
-    let config = { FsCheckConfig.defaultConfig with maxTest = 10000 }
+    let config = { FsCheckConfig.defaultConfig with maxTest = 1 }
     [<Tests>]
     let testParse =
         let makeLineData wa opcode suffixStr target wb rLst = 

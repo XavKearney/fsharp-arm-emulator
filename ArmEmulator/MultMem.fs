@@ -4,6 +4,7 @@ module MultMem
     
     open CommonData
     open CommonLex
+    open System.Text.RegularExpressions
 
     type MultMemInstrType = LDM | STM
     type MultMemDirection = FD | FA | ED | EA 
@@ -43,6 +44,38 @@ module MultMem
     /// map of all possible opcodes recognised
     let multMemOpCodes = opCodeExpand multMemSpec
 
+    /// ----------- ACTIVE PATTERNS ---------------
+
+    /// takes a string and ensures it starts and ends with
+    /// a given prefix and suffix
+    /// if so, returns the string inside
+    let (|GetInside|) (prefix:string) (suffix: string) (str:string) =
+        if (str.StartsWith(prefix) && str.EndsWith(suffix))
+        then Some (str.[1..String.length str - 2])
+        else None
+
+    /// matches a string with regex pattern
+    /// returns a list of the matches
+    let (|Matches|_|) (pat:string) (inp:string) =
+        let m = Regex.Matches(inp, pat) in
+        if m.Count > 0
+        then Some ([ for g in m -> g.Value ])
+        else None
+
+    /// matches a string with regex pattern
+    /// returns list of the matched groups (excluding the whole match)
+    let (|MatchGroups|_|) (pat:string) (inp:string) =
+        let m = Regex.Matches(inp, pat) in
+        if m.Count > 0
+        then 
+            [ for x in m -> x.Groups ]
+            |> List.collect (fun x -> [for y in x -> y.Value])
+            |> List.tail // remove the whole matched string
+            |> Some 
+        else None
+    
+    /// ----------- END ACTIVE PATTERNS ---------------
+
     /// take a string of all operands and parse
     /// into target reg, writeback and list of reg
     /// to load/store
@@ -60,47 +93,31 @@ module MultMem
         let target = regNames.TryFind (targetStr.Trim('!'))
 
         let matchRegLst wb targ =
-            match reglstStr.StartsWith('{') && reglstStr.EndsWith('}') with
-            | false -> Error ("Incorrectly formatted operands.")
-            | true ->
-                // check for a register range (e.g. {R0-R5})
-                match reglstStr.Contains "-" with
-                // if not a range, must be a list (e.g. {R1,R3,R5})
-                | false ->
-                        // remove curly braces and split
-                        reglstStr.[1..String.length reglstStr - 2].Split(",")
-                        |> Array.toList
-                        |> List.map regNames.TryFind
+            // if string starts and ends with curly braces, get string inside
+            match (|GetInside|) "{" "}" reglstStr with
+            | Some(regStr) ->
+                // check for a register range (e.g. {R0-R5}), returns start and end registers
+                match (|MatchGroups|_|) @"^([A-Z]{1,2}\d{1,2})(?:-)([A-Z]{1,2}\d{1,2})$" regStr with
+                // if active pattern matches, get start and end registers
+                | Some (rStart :: [rEnd]) ->
+                    // convert start-end to range
+                    [regNames.[rStart].RegNum..regNames.[rEnd].RegNum]
+                    |> fun x -> 
+                        if List.isEmpty x then Error "Invalid register list range." else Ok x
+                    |> Result.map (List.map inverseRegNums.TryFind)
+                | _ ->
+                    match (|Matches|_|) @"([A-Z]{1,2}\d{1,2})+" regStr with
+                    | Some (regNameLst) ->
+                        List.map regNames.TryFind regNameLst
                         |> Ok
-                // if it does contain "-", must be a range
-                | true ->
-                        // remove curly braces and split
-                        reglstStr.[1..String.length reglstStr - 2].Split("-")
-                        |> Array.toList
-                        |> List.map regNames.TryFind
-                        |> fun lst ->
-                            // make sure there's only 2 registers and they are valid
-                            match lst.Length, List.contains None lst with
-                            | 2, false -> 
-                                // convert Some x -> x
-                                List.choose id lst
-                                |> (fun x -> [x.[0].RegNum..x.[1].RegNum])
-                                |> List.map inverseRegNums.TryFind
-                                // an empty list here means the registers were the wrong way round
-                                // e.g. {R3-R0} -> []
-                                |> fun lst -> 
-                                    if lst <> [] then Ok lst else
-                                        Error "Invalid register list range."
-                            // anything else must be invalid
-                            | _ -> Error "Invalid list of registers"
-                |> Result.bind (fun rlst ->
-                    match List.contains None rlst with
-                    // if any registers not found, return error
-                    | true -> Error ("Invalid list of registers.")
-                    | false -> // if all registers found, transform Some x -> x and return
-                        List.choose id rlst
-                        |> fun rlst -> Ok (targ, wb, rlst))
-
+                    | _ -> Error "Invalid list of registers."
+                |> Result.bind (
+                    fun lst -> if List.contains None lst then 
+                                Error "Invalid list of registers."
+                                else Ok(targ, wb, List.choose id lst)
+                )
+            | None -> Error ("Incorrectly formatted operands.")
+            
         match target with
         | Some t -> matchRegLst wb t
         | None -> Error ("Target register not found.")
