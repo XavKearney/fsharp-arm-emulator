@@ -41,15 +41,47 @@ module MultMem
         Suffixes = [""; "EA"; "ED"; "IA"; "FA"; "FD"; "DB"]
     }
 
-    /// map of all possible opcodes recognised
+    /// --------- MISC INSTRUCTIONS -----------
+    let branchSpec = {
+        InstrC = MISC
+        Roots = ["B"]
+        // for LDM: "", "IA" and "FD" are synonyms
+        // for LDM: "EA" and "DB" are synonyms
+        // for STM: "", "EA" and "IA" are synonyms
+        // for STM: "FD" and "DB" are synonyms
+        Suffixes = [""; "L";]
+    }
+    /// multiple memory access instruction type
+    type BranchInstr = 
+        {   
+            // label string to branch to
+            Label: string;
+            // optional link "L" suffix
+            Link: bool;
+        }
+    
+    type ReturnInstr = X of MultMemInstr | Y of BranchInstr
+
+    let makeBranchInstr suffix (operands: string) =
+        let label = operands.Trim()
+        match label.Contains(" ") with
+        | true -> Error "Branch label cannot contain whitespace."
+        | false ->
+            Ok {
+                Label = label;
+                Link = (suffix = "L");
+            }
+
+    /// maps of all possible opcodes recognised
     let multMemOpCodes = opCodeExpand multMemSpec
+    let branchOpCodes = opCodeExpand branchSpec
 
     /// ----------- ACTIVE PATTERNS ---------------
 
     /// takes a string and ensures it starts and ends with
     /// a given prefix and suffix
     /// if so, returns the string inside
-    let (|GetInside|) (prefix:string) (suffix: string) (str:string) =
+    let (|GetInside|_|) (prefix:string) (suffix: string) (str:string) =
         if (str.StartsWith(prefix) && str.EndsWith(suffix))
         then Some (str.[1..String.length str - 2])
         else None
@@ -94,13 +126,12 @@ module MultMem
 
         let matchRegLst =
             // if string starts and ends with curly braces, get string inside
-            match (|GetInside|) "{" "}" reglstStr with
-            | None -> Error ("Incorrectly formatted operands.")
-            | Some(regStr) ->
+            match reglstStr with
+            | GetInside "{" "}" regStr ->
                 // check for a register range (e.g. {R0-R5}), returns start and end registers
-                match (|MatchGroups|_|) @"^([A-Z0-9]{2,3})(?:-)([A-Z0-9]{2,3})$" regStr with
+                match regStr with
                 // if active pattern matches, get start and end registers
-                | Some (rStart :: [rEnd]) ->
+                | MatchGroups @"^([A-Z0-9]{2,3})(?:-)([A-Z0-9]{2,3})$" (rStart :: [rEnd]) ->
                     // check the start and end registers are valid
                     List.map regNames.TryFind [rStart; rEnd]
                     |> fun lst -> 
@@ -118,20 +149,20 @@ module MultMem
                         match List.isEmpty lst with
                         | true -> Error "Invalid register list range." 
                         | false ->  Ok (List.map inverseRegNums.TryFind lst))
-                | _ ->
-                    // if not a range, check for register list (e.g. {R1,R3,R5})
-                    match (|Matches|_|) @"([A-Z0-9]{2,3})+" regStr with
-                    | Some (regNameLst) ->
-                        List.map regNames.TryFind regNameLst
-                        |> Ok
-                    | _ -> Error "Invalid list of registers."
+                // if not a range, check for register list (e.g. {R1,R3,R5})
+                | Matches @"([A-Z0-9]{2,3})+" (regNameLst)  ->
+                    List.map regNames.TryFind regNameLst
+                    |> Ok
+                | _ -> Error "Invalid list of registers."
                 // check the final list is valid and return
-                |> Result.bind (
-                    fun lst -> 
-                    match List.contains None lst with
-                    | true -> Error "Invalid list of registers."
-                    | false -> Ok(List.choose id lst)
-                )
+            | _ -> Error ("Incorrectly formatted operands.")
+            |> Result.bind (
+                fun lst -> 
+                match List.contains None lst with
+                | true -> Error "Invalid list of registers."
+                | false -> Ok(List.choose id lst)
+            )
+            
             
         match target with
         | Some t -> 
@@ -184,7 +215,7 @@ module MultMem
             | "STM", "ED" ->
                 checkValid { defaultIns with InsType = Some(STM); Direction = Some(ED); } 
             // error if unsupported instruction
-            | _ -> Error ("Opcode not supported.")
+            | _ -> Error "Opcode not supported."
         )
 
 
@@ -206,7 +237,19 @@ module MultMem
                         PCond = pCond;
                     }
                 | Error s -> Error s
-            | _ -> Error ("Instruction class not supported.")
+            // | MISC -> 
+            //     match root with
+            //     | "B" -> 
+            //         match makeBranchInstr suffix ls.Operands with
+            //         | Ok pinstr -> Ok {
+            //                 PInstr = pinstr;
+            //                 PLabel = ls.Label |> Option.map (fun lab -> lab, la); 
+            //                 PSize = 4u; 
+            //                 PCond = pCond;
+            //             }
+            //         | Error s -> Error s
+            //     | _ -> Error "Invalid instruction root."
+            | _ -> Error "Instruction class not supported."
         Map.tryFind ls.OpCode multMemOpCodes
         |> Option.map parse'
 
@@ -284,3 +327,5 @@ module MultMem
 
     /// Parse Active Pattern used by top-level code
     let (|IMatch|_|)  = parse
+
+
