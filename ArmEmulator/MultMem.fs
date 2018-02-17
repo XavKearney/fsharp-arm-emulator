@@ -95,39 +95,43 @@ module MultMem
         let matchRegLst =
             // if string starts and ends with curly braces, get string inside
             match (|GetInside|) "{" "}" reglstStr with
+            | None -> Error ("Incorrectly formatted operands.")
             | Some(regStr) ->
                 // check for a register range (e.g. {R0-R5}), returns start and end registers
                 match (|MatchGroups|_|) @"^([A-Z0-9]{2,3})(?:-)([A-Z0-9]{2,3})$" regStr with
                 // if active pattern matches, get start and end registers
                 | Some (rStart :: [rEnd]) ->
-                    // convert start-end to range
+                    // check the start and end registers are valid
                     List.map regNames.TryFind [rStart; rEnd]
                     |> fun lst -> 
                         match List.contains None lst with
                         | true -> Error "Invalid register list range." 
                         | false ->  Ok (List.choose id lst)
+                    // get the range as an integer
                     |> Result.bind (
                         function
                         | rNameStart :: [rNameEnd] -> Ok [rNameStart.RegNum..rNameEnd.RegNum]
                         | _ -> Error "Invalid register list range.")
+                    // if list is empty, rNameStart must be a higher reg than rNameEnd
+                    // so throw an error
                     |> Result.bind (fun lst -> 
                         match List.isEmpty lst with
                         | true -> Error "Invalid register list range." 
                         | false ->  Ok (List.map inverseRegNums.TryFind lst))
                 | _ ->
-                    // if not a range, check for register list
+                    // if not a range, check for register list (e.g. {R1,R3,R5})
                     match (|Matches|_|) @"([A-Z0-9]{2,3})+" regStr with
                     | Some (regNameLst) ->
                         List.map regNames.TryFind regNameLst
                         |> Ok
                     | _ -> Error "Invalid list of registers."
+                // check the final list is valid and return
                 |> Result.bind (
                     fun lst -> 
                     match List.contains None lst with
                     | true -> Error "Invalid list of registers."
                     | false -> Ok(List.choose id lst)
                 )
-            | None -> Error ("Incorrectly formatted operands.")
             
         match target with
         | Some t -> 
@@ -245,11 +249,11 @@ module MultMem
                 
                 // otherwise, load/store with next register
                 | LDM, reg :: rest -> 
-                    match cpu.MM.[WA addr] with
-                    | DataLoc data -> 
+                    match cpu.MM.TryFind (WA addr) with
+                    | Some(DataLoc data) -> 
                         { cpu with Regs = cpu.Regs.Add (reg, data); }
                         |> fun newCpu -> exec' rest newAddr newCpu
-                    | _ -> Error "Invalid memory address (code)."
+                    | _ -> Error "Invalid memory address."
                 | STM, reg :: rest -> 
                     cpu.Regs.[reg]
                     |> fun data -> { cpu with MM = cpu.MM.Add (WA addr, DataLoc data); }
