@@ -9,6 +9,11 @@ module Arithmetic
 
     type Operations = LSL | ASR | LSR | ROR | RRX
 
+    let operationNames = 
+        Map.ofList [
+            "LSL",LSL; "ASR",ASR; "LSR",LSR; "ROR",ROR; "RRX",RRX
+        ]
+
     type Op2Types = Literal of uint32 | Register of RName | RegisterShift of RName * Operations * int32 | RegisterRegisterShift of RName * Operations * RName
 
 
@@ -122,51 +127,52 @@ module Arithmetic
         let (|FlexParse|_|) pattern input = 
             let flexMatch = Regex.Match(input, pattern)
             match flexMatch.Success with
-            | true -> Some "hello"
+            | true -> Some (List.tail [for strMatch in flexMatch.Groups -> strMatch.Value ])
             | false -> None
 
-        // Get list of operands/destination register
-        let operandsList = line.Split(",")
-                           |> Array.map (fun str -> str.Trim())
+        let (|Prefix|_|) (p:string) (s:string) =
+            if s.StartsWith(p) then
+                // Return string after #
+                Some(s.Substring(1))
+            else
+                None
 
 
-        match operandsList.Length with
-        | 3 | 4 ->
-            // Destination register string
-            let destinationStr = operandsList.[0]
-            // Op1 string
-            let op1Str = operandsList.[1]
+        match line with
+        // Regex match captures target, op1 and then everything following the last comma
+        | FlexParse "(R[0-9]+),\s*(R[0-9]+),\s*(.*)" [target; op1; op2] -> 
+            let op2List = op2.Split(",")
+            match op2List.Length with
+            | 1 -> 
+                match op2 with
+                | FlexParse "(R[0-9]+|#0b[0-1]+|#0x[0-9A-F]+|#[0-9]+)" [op2Val] -> 
+                    match op2Val with
+                    | Prefix "#" op2Num -> Ok (target, op1, Literal (uint32 (int32 op2Num)))
+                    | _ -> 
+                        match regNames.TryFind op2Val with
+                        | Some op2Reg -> Ok (target, op1, Register op2Reg)
+                        | None -> Error ("Op2 is not a valid register")
 
-            // Op2 string
-            let op2Str = 
-                match operandsList.Length with
-                | 3 -> operandsList.[2]
-                | _ -> String.concat "," operandsList.[2..]
+                | _ -> Error ("Flex op 2 has invalid format")
+            | 2 ->
+                match op2 with
+                | FlexParse "(R[0-9]+),\s*([A-Z]+)\s+(R[0-9]+|#0b[0-1]+|#0x[0-9A-F]+|#[0-9]+)" [op2Val; shift; shiftVal] ->
+                    match regNames.TryFind op2Val with
+                    | Some op2Reg -> 
+                        match operationNames.TryFind shift with
+                        | Some shiftOp -> 
+                            match shiftVal with
+                            | Prefix "#" shiftNum -> Ok (target, op1, RegisterShift(op2Reg, shiftOp, int32 shiftNum))
+                            | _ -> 
+                                match regNames.TryFind shiftVal with
+                                | Some shiftReg -> Ok (target, op1, RegisterRegisterShift(op2Reg, shiftOp, shiftReg))
+                                | None -> Error ("Shift op register is invalid")
 
-            // Partial active pattern match to see flex op 2 type - pattern match of '#'
-            let (|Prefix|_|) (p:string) (s:string) =
-                if s.StartsWith(p) then
-                    // Return string after #
-                    Some(s.Substring(1))
-                else
-                    None
-           
-            match regNames.TryFind destinationStr with
-            | Some dest -> match regNames.TryFind op1Str with
-                           | Some op1 -> match op2Str with
-                                         | Prefix "#" op2 ->
-                                            // Convert string to int for negative numbers and then force uint type
-                                            // Fail if the input number is not valid
-                                            try Ok (dest, op1, Value (uint32 (int32 op2))) with
-                                            | _ -> Error ("Invalid 32 bit number")
-                 
-                                         | _ -> match regNames.TryFind op2Str with
-                                                | Some op2 -> Ok (dest, op1, Target op2)
-                                                | None -> Error ("Op2 is not a valid register")                                 
-                           | None -> Error ("Op1 is not a valid register")
-            | None -> Error ("Destination register not valid")
-        
-        | _ -> Error ("Operand list is invalid")
+                        | None -> Error ("Shift operation is invalid")
+                    | None -> Error ("Op2 is not a valid register")
+                | _ -> Error ("Flex op 2 has invalid format")
+            | _ -> Error ("Flex op 2 has invalid format")
+        | _ -> Error ("The instruction is invalid")
 
         
         
