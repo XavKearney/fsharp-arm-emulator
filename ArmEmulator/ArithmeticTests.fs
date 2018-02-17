@@ -36,13 +36,19 @@ module MultMemTests
                 ("R7,R3,", Error "Flex op 2 has invalid format");
                 (",R7,R3", Error "The instruction is invalid");
                 ("R7,R3,#0b12", Error ("Flex op 2 has invalid format"));
-                //("R7,R3,#1111111111111", Ok (R7, R3, Literal (uint32 1111111111111)));
+                ("R7,R3,#11111111111111111111", Error ("Invalid 32 bit number"));
                 ("R7,R3,#abc", Error ("Flex op 2 has invalid format"));
+                ("R7,R3,#0xFFFFFFFF2", Error ("Invalid 32 bit number"));
+                ("R7,R3,#2, LSL #1", Error ("Flex op 2 has invalid format"));
+                ("R7,R3,R0, LSL #1", Ok (R7,R3, RegisterShift (R0, LSL, 1)));
+                ("R7,R3,R0, LSP #1", Error ("Shift operation is invalid"));
+                ("R7,R3,R0, ASR R8", Ok (R7,R3, RegisterRegisterShift (R0, ASR, R8)));
+                ("R7,R3,R0, LSL R30", Error ("Shift op register is invalid"));
             ]
     
     let config = { FsCheckConfig.defaultConfig with maxTest = 10000 }
     
-    //[<Tests>]
+    [<Tests>]
     let testParse = 
         let makeTestLineData wa opcode suffix target op1 op2 = 
             let opcodeStr = 
@@ -62,7 +68,7 @@ module MultMemTests
                          | Literal num -> "#" + string num
                          | Register reg -> regStrings.[reg]
                          | RegisterShift (op2, shift, num) -> 
-                            regStrings.[op2] + "," + operationStrings.[shift] + " " + string num
+                            regStrings.[op2] + "," + operationStrings.[shift] + " #" + string num
                          | RegisterRegisterShift (op2, shift, reg) -> 
                             regStrings.[op2] + "," + operationStrings.[shift] + " " + regStrings.[reg]
             

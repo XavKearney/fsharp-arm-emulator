@@ -157,7 +157,14 @@ module Arithmetic
                         match op2 with
                         | FlexParse "(R[0-9]+|#-?0b[0-1]+|#-?0x[0-9A-F]+|#-?[0-9]+)$" [op2Val] -> 
                             match op2Val with
-                            | Prefix "#" op2Num -> Ok (target, op1, Literal (uint32 (int32 op2Num)))
+                            | Prefix "#" op2Num ->
+                                match String.length op2Num with
+                                | x when x < 12 -> 
+                                    match int64 op2Num with
+                                    | x when x > int64 2147483647 -> Error ("Invalid 32 bit number")
+                                    | x when x < int64 -2147483648 -> Error ("Invalid 32 bit number")
+                                    | _ -> Ok (target, op1, Literal (uint32 (int32 op2Num)))
+                                | _ -> Error ("Invalid 32 bit number") 
                             | _ -> 
                                 match regNames.TryFind op2Val with
                                 | Some op2Reg -> Ok (target, op1, Register op2Reg)
@@ -172,7 +179,14 @@ module Arithmetic
                                 match operationNames.TryFind shift with
                                 | Some shiftOp -> 
                                     match shiftVal with
-                                    | Prefix "#" shiftNum -> Ok (target, op1, RegisterShift(op2Reg, shiftOp, int32 shiftNum))
+                                    | Prefix "#" shiftNum -> 
+                                        match String.length shiftNum with
+                                        | x when x < 12 -> 
+                                            match int64 shiftNum with
+                                            | x when x > int64 2147483647 -> Error ("Invalid 32 bit number")
+                                            | x when x < int64 -2147483648 -> Error ("Invalid 32 bit number")
+                                            | _ -> Ok (target, op1, RegisterShift(op2Reg, shiftOp, int32 shiftNum))
+                                        | _ -> Error ("Invalid 32 bit number")                    
                                     | _ -> 
                                         match regNames.TryFind shiftVal with
                                         | Some shiftReg -> Ok (target, op1, RegisterRegisterShift(op2Reg, shiftOp, shiftReg))
