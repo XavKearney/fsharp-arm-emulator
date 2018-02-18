@@ -63,6 +63,26 @@ module Arithmetic
     let arithOpCodes = opCodeExpand ArithSpec
     let compOpCodes = opCodeExpand CompSpec
 
+
+    // #### START - Active pattern code ####
+    
+    // Flexible operand 2 string parsing
+    let (|FlexParse|_|) pattern input = 
+        let flexMatch = Regex.Match(input, pattern)
+        match flexMatch.Success with
+        | true -> Some (List.tail [for strMatch in flexMatch.Groups -> strMatch.Value ])
+        | false -> None
+
+    let (|Prefix|_|) (p:string) (s:string) =
+        if s.StartsWith(p) then
+            // Return string after #
+            Some(s.Substring(1))
+        else
+            None
+
+    // #### END - Active pattern code ####
+
+    
     /// FlexOp2 code that performs shifts on flexible operand 2 
     let flexOp2 op2 cpuData = 
         match op2 with
@@ -146,22 +166,6 @@ module Arithmetic
 
 
     let parseOpsLine (line:string) = 
-
-        // Flexible operand 2 string parsing
-        let (|FlexParse|_|) pattern input = 
-            let flexMatch = Regex.Match(input, pattern)
-            match flexMatch.Success with
-            | true -> Some (List.tail [for strMatch in flexMatch.Groups -> strMatch.Value ])
-            | false -> None
-
-        let (|Prefix|_|) (p:string) (s:string) =
-            if s.StartsWith(p) then
-                // Return string after #
-                Some(s.Substring(1))
-            else
-                None
-
-
         match line with
         // Regex match captures target, op1 and then everything following the last comma
         | FlexParse "(R[0-9]+),\s*(R[0-9]+),\s*(.*)" [targetStr; op1Str; op2] ->
@@ -218,6 +222,56 @@ module Arithmetic
             | _ -> Error ("Target register is invalid") 
         | _ -> Error ("The instruction is invalid")
 
+
+
+    let parseCompLine line = 
+        match line with
+        | FlexParse "^(R[0-9]+),\s*(R[0-9]+|#-?0b[0-1]+|#-?0x[0-9A-F]+|#-?[0-9]+)(,\s*([A-Z]+)\s+(R[0-9]+|#-?0b[0-1]+|#-?0x[0-9A-F]+|#-?[0-9]+))?$" [op1Str; op2Str] ->
+            match regNames.TryFind op1Str with
+            | Some op1 -> 
+                match op2Str with
+                | Prefix "#" op2Num ->
+                    match String.length op2Num with
+                    | x when x < 12 -> 
+                        match int64 op2Num with
+                        | x when x > int64 2147483647 -> Error ("Invalid 32 bit number")
+                        | x when x < int64 -2147483648 -> Error ("Invalid 32 bit number")
+                        | _ -> Ok (op1, Literal (uint32 (int32 op2Num)))
+                    | _ -> Error ("Invalid 32 bit number") 
+                | _ ->
+                    match regNames.TryFind op2Str with
+                    | Some op2 -> Ok (op1, Register op2)                   
+                    | _ -> Error ("Op2 is not a register")
+            | _ -> Error ("Op1 is not a register")
+
+        | FlexParse "^(R[0-9]+),\s*(R[0-9]+|#-?0b[0-1]+|#-?0x[0-9A-F]+|#-?[0-9]+)(,\s*([A-Z]+)\s+(R[0-9]+|#-?0b[0-1]+|#-?0x[0-9A-F]+|#-?[0-9]+))?$" [op1Str; op2Str; _; shiftStr; shiftValStr] ->
+            match regNames.TryFind op1Str with
+            | Some op1 ->
+                match op2Str with
+                | Prefix "#" _ -> Error ("Op2 must be a register if performing a shift")
+                | _ ->
+                    match regNames.TryFind op2Str with
+                    | Some op2 -> 
+                        match operationNames.TryFind shiftStr with
+                        | Some shiftOp -> 
+                            match shiftValStr with
+                            | Prefix "#" shiftNum -> 
+                                match String.length shiftNum with
+                                | x when x < 12 -> 
+                                    match int64 shiftNum with
+                                    | x when x > int64 2147483647 -> Error ("Invalid 32 bit number")
+                                    | x when x < int64 -2147483648 -> Error ("Invalid 32 bit number")
+                                    | _ -> Ok (op1, RegisterShift(op2, shiftOp, int32 shiftNum))
+                                | _ -> Error ("Invalid 32 bit number")                    
+                            | _ -> 
+                                match regNames.TryFind shiftValStr with
+                                | Some shiftReg -> Ok (op1, RegisterRegisterShift(op2, shiftOp, shiftReg))
+                                | None -> Error ("Shift op register is invalid")
+                        | _ -> Error ("Shift operation is invalid")
+                    | _ -> Error ("Op2 is not a valid register")
+            | _ -> Error ("Op1 is not a register")
+        | _ -> Error ("Invalid compare instruction")
+
         
         
 
@@ -252,6 +306,26 @@ module Arithmetic
 
 
 
+    let makeCompInstr root operands = 
+        let makeInstr ins = 
+            Ok(ins)
+
+        match parseCompLine operands with
+        | Ok (op1, op2) ->
+            let baseInstr = {
+                InstrType = None;
+                Op1 = op1;
+                Op2 = op2;
+            }
+
+            match root with
+            | "CMP" -> makeInstr {baseInstr with InstrType = Some(CMP);}
+            | "CMN" -> makeInstr {baseInstr with InstrType = Some(CMN);}
+
+        | Error err -> Error err
+
+
+
 
     /// main function to parse a line of assembler
     /// ls contains the line input
@@ -265,20 +339,29 @@ module Arithmetic
             | ARITH -> 
                 match makeArithInstr root suffix ls.Operands with
                 | Ok pinstr -> Ok {
-                        PInstr = pinstr;
+                        PInstr = ArithI pinstr;
                         PLabel = ls.Label |> Option.map (fun lab -> lab, la); 
                         PSize = 4u; 
                         PCond = pCond;
                     }
                 | Error s -> Error s
+            | COMP ->
+                match makeCompInstr root ls.Operands with
+                | Ok pinstr -> Ok {
+                        PInstr = CompI pinstr;
+                        PLabel = ls.Label |> Option.map (fun lab -> lab, la); 
+                        PSize = 4u; 
+                        PCond = pCond;
+                    }
+                | Error s -> Error s 
             | _ -> Error ("Instruction class not supported.")
-        Map.tryFind ls.OpCode opCodes
+        Map.tryFind ls.OpCode arithOpCodes
         |> Option.map parse'
    
 
     /// Execute an arithmetic instruction
     /// Performs arithmetic on given cpuData
-    let doArithmetic input cpuData = 
+    let doArithmetic (input: Parse<ReturnInstr>) cpuData = 
         // Register map
         let regMap = cpuData.Regs
 
@@ -314,15 +397,22 @@ module Arithmetic
             | Error _ -> failwithf "The instruction is invalid"
 
         let instr = input.PInstr
-        let arithInstr = instr.InstrType
-        let suffix = instr.SuffixSet
-        let target = instr.Target
-        let op1 = instr.Op1
-        let op2 = instr.Op2
 
-        match arithInstr with
-        | Some(ins) -> arithLogic ins target op1 op2
-        | None -> failwithf "No instruction specified"
+        match instr with
+        | ArithI instr ->
+            let arithInstr = instr.InstrType
+            let suffix = instr.SuffixSet
+            let target = instr.Target
+            let op1 = instr.Op1
+            let op2 = instr.Op2
+
+            match arithInstr with
+            | Some(ins) -> arithLogic ins target op1 op2
+            | None -> failwithf "No instruction specified"
+        | _ -> 
+            failwithf "Not completed comp instruction"
+
+        
 
 
     let (|IMatch|_|) = parse
