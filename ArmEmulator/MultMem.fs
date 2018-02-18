@@ -114,22 +114,22 @@ module MultMem
     /// returns error if anything is incorrect
     let parseOps (ops: string) =
         // split the operands by ',' e.g. "R10!, {R1,R2,R3}"
-        let sLst = ops.Split(',') |> Array.map (fun s-> s.Trim())
+        let sLst = ops.Split(',') |> Array.map (fun s-> s.Trim()) |> Array.toList
         // get the target register as a string, e.g. "R10!"
-        let targetStr = sLst.[0]
+        let targetStr = sLst.Head
         // check for writeback suffix '!'
         let wb = targetStr.EndsWith('!')
         // get the target register's RName from string without '!' suffix
         let target = regNames.TryFind (targetStr.Trim('!'))
         // recombine the list of registers
-        let reglstStr = String.concat "," sLst.[1..]
+        let reglstStr = String.concat "," sLst.Tail
 
         let matchRegLst =
             // if string starts and ends with curly braces, get string inside
             match reglstStr with
             | GetInside "{" "}" regStr ->
-                // check for a register range (e.g. {R0-R5}), returns start and end registers
                 match regStr with
+                // check for a register range (e.g. {R0-R5}), returns start and end registers
                 // if active pattern matches, get start and end registers
                 | MatchGroups @"^([A-Z0-9]{2,3})(?:-)([A-Z0-9]{2,3})$" (rStart :: [rEnd]) ->
                     // check the start and end registers are valid
@@ -138,7 +138,7 @@ module MultMem
                         match List.contains None lst with
                         | true -> Error "Invalid register list range." 
                         | false ->  Ok (List.choose id lst)
-                    // get the range as an integer
+                    // get the range as integers
                     |> Result.bind (
                         function
                         | rNameStart :: [rNameEnd] -> Ok [rNameStart.RegNum..rNameEnd.RegNum]
@@ -162,7 +162,6 @@ module MultMem
                 | true -> Error "Invalid list of registers."
                 | false -> Ok(List.choose id lst)
             )
-            
             
         match target with
         | Some t -> 
@@ -293,36 +292,33 @@ module MultMem
                 // otherwise, load/store with next register
                 | LDM, reg :: rest -> 
                     match cpu.MM.TryFind (WA addr) with
-                    | Some(DataLoc data) -> 
-                        { cpu with Regs = cpu.Regs.Add (reg, data); }
+                    | Some(DataLoc d) -> 
+                        { cpu with Regs = cpu.Regs.Add (reg, d); }
                         |> fun newCpu -> exec' rest newAddr newCpu
                     | _ -> Error "Invalid memory address."
                 | STM, reg :: rest -> 
                     cpu.Regs.[reg]
-                    |> fun data -> { cpu with MM = cpu.MM.Add (WA addr, DataLoc data); }
-                    |> fun newCpu -> exec' rest newAddr newCpu
-
-            match wb with
-            | true ->
-                exec' orderedRLst (dirOp cpuData.Regs.[targ] (initialN*4u)) cpuData
-                |> function
-                    | Ok(cpu, addr) -> Ok ({cpu with Regs = cpu.Regs.Add (targ, addr)};)
-                    | Error s -> Error s
-            | false -> 
-                exec' orderedRLst (dirOp cpuData.Regs.[targ] (initialN*4u)) cpuData
-                |> function
-                    | Ok(cpu, _) -> Ok(cpu)
-                    | Error s -> Error s
+                    |> fun d -> { cpu with MM = cpu.MM.Add (WA addr, DataLoc d); }
+                    |> exec' rest newAddr
+            
+            // execute the instruction
+            exec' orderedRLst (dirOp cpuData.Regs.[targ] (initialN*4u)) cpuData
+            |> function
+                | Ok(cpu, addr) ->
+                    // check for writeback
+                    match wb with
+                    | true -> Ok ({cpu with Regs = cpu.Regs.Add (targ, addr)};)
+                    | false -> Ok cpu
+                | Error s -> Error s
 
         let instr = parsed.PInstr
         let dir, targ, wb, rlst = instr.Direction, instr.Target, instr.WriteBack, instr.RegList
-        match checkValid instr with
-        | Ok _ ->
+        checkValid instr
+        |> Result.bind (fun _ ->
             match instr.InsType with
             | Some(LDM) -> exec LDM dir targ wb rlst
             | Some(STM) -> exec STM dir targ wb rlst
-            | None -> failwithf "No instruction type given."
-        | Error s -> Error s
+            | None -> failwithf "No instruction type given.")
         
 
     /// Parse Active Pattern used by top-level code
