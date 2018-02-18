@@ -4,6 +4,9 @@ module MultMemTests
     open Arithmetic
     open Expecto
     open FsCheck
+    open VisualTest.Visual
+    open VisualTest.VTest
+    open VisualTest.VCommon
 
     /// take a function f, test name
     /// and list of (input, output) tuples
@@ -47,32 +50,39 @@ module MultMemTests
             ]
     
     let config = { FsCheckConfig.defaultConfig with maxTest = 10000 }
+
+    let makeInstrString opcode suffix target op1 op2 = 
+        let opcodeStr = 
+            match opcode with
+            | ADD -> "ADD"
+            | ADC -> "ADC"
+            | SUB -> "SUB"
+            | SBC -> "SBC"
+            | RSB -> "RSB"
+            | RSC -> "RSC"
+
+        let suffixStr = if suffix then "S" else "" 
+
+        let targetStr = regStrings.[target]
+        let op1Str = regStrings.[op1]
+        let op2Str = match op2 with
+                     | Literal num -> "#" + string num
+                     | Register reg -> regStrings.[reg]
+                     | RegisterShift (op2, shift, num) -> 
+                        regStrings.[op2] + "," + operationStrings.[shift] + " #" + string num
+                     | RegisterRegisterShift (op2, shift, reg) -> 
+                        regStrings.[op2] + "," + operationStrings.[shift] + " " + regStrings.[reg]
+        
+        let operandStr = targetStr + "," + op1Str + "," + op2Str
+        
+        opcodeStr, suffixStr, operandStr
+
     
     [<Tests>]
     let testParse = 
         let makeTestLineData wa opcode suffix target op1 op2 = 
-            let opcodeStr = 
-                match opcode with
-                | ADD -> "ADD"
-                | ADC -> "ADC"
-                | SUB -> "SUB"
-                | SBC -> "SBC"
-                | RSB -> "RSB"
-                | RSC -> "RSC"
-
-            let suffixStr = if suffix then "S" else "" 
-
-            let targetStr = regStrings.[target]
-            let op1Str = regStrings.[op1]
-            let op2Str = match op2 with
-                         | Literal num -> "#" + string num
-                         | Register reg -> regStrings.[reg]
-                         | RegisterShift (op2, shift, num) -> 
-                            regStrings.[op2] + "," + operationStrings.[shift] + " #" + string num
-                         | RegisterRegisterShift (op2, shift, reg) -> 
-                            regStrings.[op2] + "," + operationStrings.[shift] + " " + regStrings.[reg]
             
-            let operandStr = targetStr + "," + op1Str + "," + op2Str
+            let opcodeStr, suffixStr, operandStr = makeInstrString opcode suffix target op1 op2
   
             {
                 LoadAddr = wa;
@@ -104,3 +114,23 @@ module MultMemTests
             
             let result = parse ls
             Expect.equal result expected "Parse Test"
+
+    [<Tests>]
+    let testExec =
+        let makeTestExecStr opcode suffix target op1 op2 = 
+            let opcodeStr, suffixStr, operandStr = makeInstrString opcode suffix target op1 op2
+            //Return full instruction string of opcode + suffix + operands
+            opcodeStr + suffixStr + " " + operandStr
+
+
+        //testPropertyWithConfig config "Test Arithmetic Execution" <|
+        //fun opcode suffix target op1 op2 ->
+            //let instrStr = makeTestExecStr opcode suffix target op1 op2
+            
+        testList "Trial visual tests"
+            [
+            VisualFrameworkTest defaultParas
+            vTest "SUB test" "SUB R0, R0, #1" "0000" [R 0, -1]
+            ]
+        
+
