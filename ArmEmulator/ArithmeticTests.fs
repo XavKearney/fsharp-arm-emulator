@@ -98,7 +98,7 @@ module MultMemTests
 
             let expected = match opcode with
                            | _ -> Some (Ok {
-                                        PInstr = 
+                                        PInstr = ArithI
                                             {
                                             InstrType = Some opcode;
                                             SuffixSet = suffix;

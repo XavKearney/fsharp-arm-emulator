@@ -321,6 +321,7 @@ module Arithmetic
             match root with
             | "CMP" -> makeInstr {baseInstr with InstrType = Some(CMP);}
             | "CMN" -> makeInstr {baseInstr with InstrType = Some(CMN);}
+            | _ -> Error ("Opcode is invalid or not supported in this module")
 
         | Error err -> Error err
 
