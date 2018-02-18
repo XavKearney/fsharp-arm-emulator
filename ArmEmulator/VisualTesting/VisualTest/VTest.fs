@@ -546,7 +546,7 @@ module VTest =
         Cached = true                // true if results are stored in a cache on disk and reused to speed 
                                      // up future repeat simulations
         VisualPath =  
-            @".\ArmEmulator\VisualTesting\visualapp\visual\"  // the directory in which the downloaded VisUAL.exe can be found
+            @"/Applications/VisUAL.app/Contents/MacOS/visual_headless.jar"  // the directory in which the downloaded VisUAL.exe can be found
         WorkFileDir = 
             @".\ArmEmulator\VisualTesting\visualWork\"        // the directory in which both temporary files and the persistent cache file are put
         CacheFileName = 
