@@ -115,7 +115,7 @@ module MultMemTests
             let result = parse ls
             Expect.equal result expected "Parse Test"
 
-    [<Tests>]
+    //[<Tests>]
     let testExec =
         let makeTestExecStr opcode suffix target op1 op2 = 
             let opcodeStr, suffixStr, operandStr = makeInstrString opcode suffix target op1 op2
