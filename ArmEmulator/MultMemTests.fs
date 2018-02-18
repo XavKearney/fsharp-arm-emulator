@@ -150,7 +150,7 @@ module MultMemTests
                 {ls with OpCode = "BLX"; Operands = "testLabel";}, 
                     None
             ]
-    let config = { FsCheckConfig.defaultConfig with maxTest = 1 }
+    let config = { FsCheckConfig.defaultConfig with maxTest = 10000 }
 
     /// property-based testing of parse function
     /// for randomly generated branch instructions
@@ -280,7 +280,7 @@ module MultMemTests
             |> fun s -> (s, dirOp, initialN, suffixStr)
 
         testPropertyWithConfig config "Property Test ExecMultMem" <| 
-        fun opcode direction (target: RName) wb (rLst: RName list) flags->
+        fun opcode direction (target: RName) wb (rLst: RName list) (flags: CommonData.Flags)->
             // generate random values for registers R0-R11, set R12-R14 to 0
             let regVals = 
                 genRandomUint32List (-0x7FFFFFFF, 0xFFFFFFFF) 12
@@ -289,26 +289,27 @@ module MultMemTests
             let instrString, dirOp, initialN, suffixStr = 
                 makeInstrString opcode direction target wb rLst
             let valid =  
-                match opcode, target, wb, rLst with
+                match opcode, target, wb, rLst, flags with
                 // the following are ARM restrictions
                 // NB: not all restrictions listed, as some VisUAL restrictions overlap
-                | _, _, _, [] -> false
-                | _, t, _, _ when t = R15 -> false
-                | _, _, _, rlst when List.contains R13 rlst -> false
-                | STM, _, _, rlst when List.contains R15 rlst -> false
-                | LDM, _, _, rlst when List.contains R14 rlst && List.contains R15 rlst -> false
+                | _, _, _, [], _ -> false
+                | _, t, _, _, _ when t = R15 -> false
+                | _, _, _, rlst, _ when List.contains R13 rlst -> false
+                | STM, _, _, rlst, _ when List.contains R15 rlst -> false
+                | LDM, _, _, rlst, _ when List.contains R14 rlst && List.contains R15 rlst -> false
                 // the following are VisUAL restrictions
                 // VisUAL doesn't allow target register within reg list
-                | _, _, _, rlst when List.contains target rlst -> false
+                | _, _, _, rlst, _ when List.contains target rlst -> false
                 // VisUAL memory addresses are > 0x1000 (extra 0x30 to allow for descending instructions)
-                | _, t, _, _ when regVals.[t.RegNum] < 0x1030u -> false
+                | _, t, _, _, _ when regVals.[t.RegNum] < 0x1030u -> false
                 // VisUAL requires mem addresses to be divisible by 4
-                | _, t, _, _ when (dirOp regVals.[t.RegNum] (initialN*4u)) % 4u <> 0u -> false
+                | _, t, _, _, _ when (dirOp regVals.[t.RegNum] (initialN*4u)) % 4u <> 0u -> false
                 // Can't test if R15 is in rlst because it will branch
-                | _, _, _, rlst when List.contains R15 rlst -> false
+                | _, _, _, rlst, _ when List.contains R15 rlst -> false
                 // need to be able to read the registers in the list
                 // VTest only allows reading up to 12
-                | _, _, _, rlst when rlst.Length > 12 -> false
+                | _, _, _, rlst, _ when rlst.Length > 12 -> false
+                | _, _, _, _, f when f.N && f.Z -> false
                 | _ -> true
             
             match valid with
@@ -350,10 +351,13 @@ module MultMemTests
                             InitRegs = regVals;
                             //initialise memory locations 
                             InitMem = visMemMap;
+                            //initialise flags
+                            InitFlags = {FN=flags.N;FZ=flags.Z; FC=flags.C;FV=flags.V}
                             //Read memBase..memBase+12 into R1-R12, starting at wbAddr
                             MemReadBase = wbAddr;
                             // use the loadSuffix as the direction for the LDM instruction
                             MemReadDirection = loadSuffix;
+
                     }
                 // create the parsed MultMemInstr
                 let parsed = {
@@ -367,7 +371,14 @@ module MultMemTests
                         PLabel = None; PSize = 4u; PCond = Cal;
                     }
                 // run VisUAL with the instruction and parameters above
-                let _, outExp, memExp = RunVisualWithFlagsOut testParas instrString
+                let flagsExp, outExp, memExp = RunVisualWithFlagsOut testParas instrString
+                // convert between Flags types
+                let flagsActual = {
+                    N = flagsExp.FN;
+                    Z = flagsExp.FZ;
+                    C = flagsExp.FC;
+                    V = flagsExp.FV;
+                }
 
                 // get the values of the registers from VisUAL in ascending order
                 let regsExp = 
@@ -409,4 +420,6 @@ module MultMemTests
                     Expect.equal regsActual regsExp.[..regsExp.Length - 2]  "Registers"
                     // check that the memory in VisUAL = memory after execution
                     Expect.equal memActual memCheck "Memory"
+                    // check that the flags in VisUAL = flags after execution
+                    Expect.equal flags flagsActual "Flags"
                 | Error _ -> ()
