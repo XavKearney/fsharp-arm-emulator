@@ -4,7 +4,7 @@ module memInstructionsTests
     open CommonLex
     open Expecto
     open Expecto.ExpectoFsCheck
-    open memInstructions
+    open MemInstructions
     open Expecto.Logging
     open System
 
@@ -107,7 +107,7 @@ module memInstructionsTests
                 ]
 
 
-
+    [<Tests>]
     let parseMemInsTest = 
         let x:SymbolTable = ["a",uint32 2] |> Map.ofList
         let ldFunc Ops = 
@@ -118,16 +118,235 @@ module memInstructionsTests
                     Operands= Ops}
         let makeTest root suffix ld name output =
             testCase name <| fun () ->
-                Expect.equal (parseMemIns root suffix ld) output (sprintf "Parse LDR/STR Tests '%s'" root)
+                Expect.equal (parseMemIns root suffix ld) output (sprintf "Parse LDR/STR Tests\nTest: %A" name)
         Expecto.Tests.testList "parseMemIns Tests"
                 [   
-
-                    makeTest "LDR" "" (ldFunc "R0, [R1]") "LDR1" {InstructionType= LDR;
+                    //LDR tests
+                    makeTest "LDR" "" (ldFunc "R0, [R1]") "LDR Base Case" (Some {InstructionType= LDR;
                                                                     DestSourceReg= R0; AddressReg= R1;
                                                                     BytesNotWords= false; IncrementValue= 0;
-                                                                    PreIndexRbBy= false; PostIndexRbBy= false; 
+                                                                    PreIndexRb= false; PostIndexRb= false; 
                                                                     ExtraAddressReg= None;
-                                                                    ShiftExtraRegBy= None;}
+                                                                    ShiftExtraRegBy= None;})
+                    makeTest "LDR" "" (ldFunc "R6, [R5, #4]") "LDR Num Increment" (Some{InstructionType= LDR;
+                                                                    DestSourceReg= R6; AddressReg= R5;
+                                                                    BytesNotWords= false; IncrementValue= 4;
+                                                                    PreIndexRb= false; PostIndexRb= false; 
+                                                                    ExtraAddressReg= None;
+                                                                    ShiftExtraRegBy= None;})
+                    makeTest "LDR" "" (ldFunc "R8, [R7], #40") "LDR Post Increment" (Some {InstructionType= LDR;
+                                                                    DestSourceReg= R8; AddressReg= R7;
+                                                                    BytesNotWords= false; IncrementValue= 40;
+                                                                    PreIndexRb= false; PostIndexRb= true; 
+                                                                    ExtraAddressReg= None;
+                                                                    ShiftExtraRegBy= None;})
+                    makeTest "LDR" "" (ldFunc "R10, [R9, #4]!") "LDR Pre Increment" (Some {InstructionType= LDR;
+                                                                    DestSourceReg= R10; AddressReg= R9;
+                                                                    BytesNotWords= false; IncrementValue= 4;
+                                                                    PreIndexRb= true; PostIndexRb= false; 
+                                                                    ExtraAddressReg= None;
+                                                                    ShiftExtraRegBy= None;})
+                    makeTest "LDR" "" (ldFunc "R12, [R11, R1]") "LDR Adding Registers" (Some {InstructionType= LDR;
+                                                                    DestSourceReg= R12; AddressReg= R11;
+                                                                    BytesNotWords= false; IncrementValue= 0;
+                                                                    PreIndexRb= false; PostIndexRb= false; 
+                                                                    ExtraAddressReg= Some R1;
+                                                                    ShiftExtraRegBy= None;})
+                    makeTest "LDR" "" (ldFunc "R0, [R11, R1, LSL #1]") "LDR Shifted Register" (Some {InstructionType= LDR;
+                                                                    DestSourceReg= R0; AddressReg= R11;
+                                                                    BytesNotWords= false; IncrementValue= 0;
+                                                                    PreIndexRb= false; PostIndexRb= false; 
+                                                                    ExtraAddressReg= Some R1;
+                                                                    ShiftExtraRegBy= Some 1;})
+                    makeTest "LDR" "" (ldFunc "R0, [R11, R1, LSL #1]!") "LDR Shifted and Pre" (Some {InstructionType= LDR;
+                                                                    DestSourceReg= R0; AddressReg= R11;
+                                                                    BytesNotWords= false; IncrementValue= 0;
+                                                                    PreIndexRb= true; PostIndexRb= false; 
+                                                                    ExtraAddressReg= Some R1;
+                                                                    ShiftExtraRegBy= Some 1;})
+                    makeTest "LDR" "" (ldFunc "R0, [R11, R1, LSL #0]!") "LDR 0 Shift and Pre" (Some {InstructionType= LDR;
+                                                                    DestSourceReg= R0; AddressReg= R11;
+                                                                    BytesNotWords= false; IncrementValue= 0;
+                                                                    PreIndexRb= true; PostIndexRb= false; 
+                                                                    ExtraAddressReg= Some R1;
+                                                                    ShiftExtraRegBy= Some 0;})
+                    makeTest "LDR" "" (ldFunc "R0, [R11, R1, LSL #-1]!") "LDR -1 Shift and Pre" (Some {InstructionType= LDR;
+                                                                    DestSourceReg= R0; AddressReg= R11;
+                                                                    BytesNotWords= false; IncrementValue= 0;
+                                                                    PreIndexRb= true; PostIndexRb= false; 
+                                                                    ExtraAddressReg= None;
+                                                                    ShiftExtraRegBy= None;})
+
+
+                    //LDR tests with Bytes
+                    makeTest "LDR" "B" (ldFunc "R0, [R1]") "LDR Base Case, bytes" (Some {InstructionType= LDR;
+                                                                    DestSourceReg= R0; AddressReg= R1;
+                                                                    BytesNotWords= true; IncrementValue= 0;
+                                                                    PreIndexRb= false; PostIndexRb= false; 
+                                                                    ExtraAddressReg= None;
+                                                                    ShiftExtraRegBy= None;})
+                    makeTest "LDR" "B" (ldFunc "R6, [R5, #4]") "LDR Num Increment, bytes" (Some{InstructionType= LDR;
+                                                                    DestSourceReg= R6; AddressReg= R5;
+                                                                    BytesNotWords= true; IncrementValue= 4;
+                                                                    PreIndexRb= false; PostIndexRb= false; 
+                                                                    ExtraAddressReg= None;
+                                                                    ShiftExtraRegBy= None;})
+                    makeTest "LDR" "B" (ldFunc "R8, [R7], #40") "LDR Post Increment, bytes" (Some {InstructionType= LDR;
+                                                                    DestSourceReg= R8; AddressReg= R7;
+                                                                    BytesNotWords= true; IncrementValue= 40;
+                                                                    PreIndexRb= false; PostIndexRb= true; 
+                                                                    ExtraAddressReg= None;
+                                                                    ShiftExtraRegBy= None;})
+                    makeTest "LDR" "B" (ldFunc "R10, [R9, #4]!") "LDR Pre Increment, bytes" (Some {InstructionType= LDR;
+                                                                    DestSourceReg= R10; AddressReg= R9;
+                                                                    BytesNotWords= true; IncrementValue= 4;
+                                                                    PreIndexRb= true; PostIndexRb= false; 
+                                                                    ExtraAddressReg= None;
+                                                                    ShiftExtraRegBy= None;})
+                    makeTest "LDR" "B" (ldFunc "R12, [R11, R1]") "LDR Adding Registers, bytes" (Some {InstructionType= LDR;
+                                                                    DestSourceReg= R12; AddressReg= R11;
+                                                                    BytesNotWords= true; IncrementValue= 0;
+                                                                    PreIndexRb= false; PostIndexRb= false; 
+                                                                    ExtraAddressReg= Some R1;
+                                                                    ShiftExtraRegBy= None;})
+                    makeTest "LDR" "B" (ldFunc "R0, [R11, R1, LSL #1]") "LDR Shifted Register, bytes" (Some {InstructionType= LDR;
+                                                                    DestSourceReg= R0; AddressReg= R11;
+                                                                    BytesNotWords= true; IncrementValue= 0;
+                                                                    PreIndexRb= false; PostIndexRb= false; 
+                                                                    ExtraAddressReg= Some R1;
+                                                                    ShiftExtraRegBy= Some 1;})
+                    makeTest "LDR" "B" (ldFunc "R0, [R11, R1, LSL #1]!") "LDR Shifted and Pre, bytes" (Some {InstructionType= LDR;
+                                                                    DestSourceReg= R0; AddressReg= R11;
+                                                                    BytesNotWords= true; IncrementValue= 0;
+                                                                    PreIndexRb= true; PostIndexRb= false; 
+                                                                    ExtraAddressReg= Some R1;
+                                                                    ShiftExtraRegBy= Some 1;})
+                    makeTest "LDR" "B" (ldFunc "R0, [R11, R1, LSL #0]!") "LDR 0 Shift and Pre, bytes" (Some {InstructionType= LDR;
+                                                                    DestSourceReg= R0; AddressReg= R11;
+                                                                    BytesNotWords= true; IncrementValue= 0;
+                                                                    PreIndexRb= true; PostIndexRb= false; 
+                                                                    ExtraAddressReg= Some R1;
+                                                                    ShiftExtraRegBy= Some 0;})
+                    makeTest "LDR" "B" (ldFunc "R0, [R11, R1, LSL #-1]!") "LDR -1 Shift and Pre, bytes" (Some {InstructionType= LDR;
+                                                                    DestSourceReg= R0; AddressReg= R11;
+                                                                    BytesNotWords= true; IncrementValue= 0;
+                                                                    PreIndexRb= true; PostIndexRb= false; 
+                                                                    ExtraAddressReg= None;
+                                                                    ShiftExtraRegBy= None;})
+
+
+                
+                    //STR tests
+                    makeTest "STR" "" (ldFunc "R0, [R1]") "STR Base Case" (Some {InstructionType= STR;
+                                                                    DestSourceReg= R0; AddressReg= R1;
+                                                                    BytesNotWords= false; IncrementValue= 0;
+                                                                    PreIndexRb= false; PostIndexRb= false; 
+                                                                    ExtraAddressReg= None;
+                                                                    ShiftExtraRegBy= None;})
+                    makeTest "STR" "" (ldFunc "R6, [R5, #4]") "STR Num Increment" (Some{InstructionType= STR;
+                                                                    DestSourceReg= R6; AddressReg= R5;
+                                                                    BytesNotWords= false; IncrementValue= 4;
+                                                                    PreIndexRb= false; PostIndexRb= false; 
+                                                                    ExtraAddressReg= None;
+                                                                    ShiftExtraRegBy= None;})
+                    makeTest "STR" "" (ldFunc "R8, [R7], #40") "STR Post Increment" (Some {InstructionType= STR;
+                                                                    DestSourceReg= R8; AddressReg= R7;
+                                                                    BytesNotWords= false; IncrementValue= 40;
+                                                                    PreIndexRb= false; PostIndexRb= true; 
+                                                                    ExtraAddressReg= None;
+                                                                    ShiftExtraRegBy= None;})
+                    makeTest "STR" "" (ldFunc "R10, [R9, #4]!") "STR Pre Increment" (Some {InstructionType= STR;
+                                                                    DestSourceReg= R10; AddressReg= R9;
+                                                                    BytesNotWords= false; IncrementValue= 4;
+                                                                    PreIndexRb= true; PostIndexRb= false; 
+                                                                    ExtraAddressReg= None;
+                                                                    ShiftExtraRegBy= None;})
+                    makeTest "STR" "" (ldFunc "R12, [R11, R1]") "STR Adding Registers" (Some {InstructionType= STR;
+                                                                    DestSourceReg= R12; AddressReg= R11;
+                                                                    BytesNotWords= false; IncrementValue= 0;
+                                                                    PreIndexRb= false; PostIndexRb= false; 
+                                                                    ExtraAddressReg= Some R1;
+                                                                    ShiftExtraRegBy= None;})
+                    makeTest "STR" "" (ldFunc "R0, [R11, R1, LSL #1]") "STR Shifted Register" (Some {InstructionType= STR;
+                                                                    DestSourceReg= R0; AddressReg= R11;
+                                                                    BytesNotWords= false; IncrementValue= 0;
+                                                                    PreIndexRb= false; PostIndexRb= false; 
+                                                                    ExtraAddressReg= Some R1;
+                                                                    ShiftExtraRegBy= Some 1;})
+                    makeTest "STR" "" (ldFunc "R0, [R11, R1, LSL #1]!") "STR Shifted and Pre" (Some {InstructionType= STR;
+                                                                    DestSourceReg= R0; AddressReg= R11;
+                                                                    BytesNotWords= false; IncrementValue= 0;
+                                                                    PreIndexRb= true; PostIndexRb= false; 
+                                                                    ExtraAddressReg= Some R1;
+                                                                    ShiftExtraRegBy= Some 1;})
+                    makeTest "STR" "" (ldFunc "R0, [R11, R1, LSL #0]!") "STR 0 Shift and Pre" (Some {InstructionType= STR;
+                                                                    DestSourceReg= R0; AddressReg= R11;
+                                                                    BytesNotWords= false; IncrementValue= 0;
+                                                                    PreIndexRb= true; PostIndexRb= false; 
+                                                                    ExtraAddressReg= Some R1;
+                                                                    ShiftExtraRegBy= Some 0;})
+                    makeTest "STR" "" (ldFunc "R0, [R11, R1, LSL #-1]!") "STR -1 Shift and Pre" (Some {InstructionType= STR;
+                                                                    DestSourceReg= R0; AddressReg= R11;
+                                                                    BytesNotWords= false; IncrementValue= 0;
+                                                                    PreIndexRb= true; PostIndexRb= false; 
+                                                                    ExtraAddressReg= None;
+                                                                    ShiftExtraRegBy= None;})
+                
+                    //STR tests with Bytes
+                    makeTest "STR" "B" (ldFunc "R0, [R1]") "STR Base Case, bytes" (Some {InstructionType= STR;
+                                                                    DestSourceReg= R0; AddressReg= R1;
+                                                                    BytesNotWords= true; IncrementValue= 0;
+                                                                    PreIndexRb= false; PostIndexRb= false; 
+                                                                    ExtraAddressReg= None;
+                                                                    ShiftExtraRegBy= None;})
+                    makeTest "STR" "B" (ldFunc "R6, [R5, #4]") "STR Num Increment, bytes" (Some{InstructionType= STR;
+                                                                    DestSourceReg= R6; AddressReg= R5;
+                                                                    BytesNotWords= true; IncrementValue= 4;
+                                                                    PreIndexRb= false; PostIndexRb= false; 
+                                                                    ExtraAddressReg= None;
+                                                                    ShiftExtraRegBy= None;})
+                    makeTest "STR" "B" (ldFunc "R8, [R7], #40") "STR Post Increment, bytes" (Some {InstructionType= STR;
+                                                                    DestSourceReg= R8; AddressReg= R7;
+                                                                    BytesNotWords= true; IncrementValue= 40;
+                                                                    PreIndexRb= false; PostIndexRb= true; 
+                                                                    ExtraAddressReg= None;
+                                                                    ShiftExtraRegBy= None;})
+                    makeTest "STR" "B" (ldFunc "R10, [R9, #4]!") "STR Pre Increment, bytes" (Some {InstructionType= STR;
+                                                                    DestSourceReg= R10; AddressReg= R9;
+                                                                    BytesNotWords= true; IncrementValue= 4;
+                                                                    PreIndexRb= true; PostIndexRb= false; 
+                                                                    ExtraAddressReg= None;
+                                                                    ShiftExtraRegBy= None;})
+                    makeTest "STR" "B" (ldFunc "R12, [R11, R1]") "STR Adding Registers, bytes" (Some {InstructionType= STR;
+                                                                    DestSourceReg= R12; AddressReg= R11;
+                                                                    BytesNotWords= true; IncrementValue= 0;
+                                                                    PreIndexRb= false; PostIndexRb= false; 
+                                                                    ExtraAddressReg= Some R1;
+                                                                    ShiftExtraRegBy= None;})
+                    makeTest "STR" "B" (ldFunc "R0, [R11, R1, LSL #1]") "STR Shifted Register, bytes" (Some {InstructionType= STR;
+                                                                    DestSourceReg= R0; AddressReg= R11;
+                                                                    BytesNotWords= true; IncrementValue= 0;
+                                                                    PreIndexRb= false; PostIndexRb= false; 
+                                                                    ExtraAddressReg= Some R1;
+                                                                    ShiftExtraRegBy= Some 1;})
+                    makeTest "STR" "B" (ldFunc "R0, [R11, R1, LSL #1]!") "STR Shifted and Pre, bytes" (Some {InstructionType= STR;
+                                                                    DestSourceReg= R0; AddressReg= R11;
+                                                                    BytesNotWords= true; IncrementValue= 0;
+                                                                    PreIndexRb= true; PostIndexRb= false; 
+                                                                    ExtraAddressReg= Some R1;
+                                                                    ShiftExtraRegBy= Some 1;})
+                    makeTest "STR" "B" (ldFunc "R0, [R11, R1, LSL #0]!") "STR 0 Shift and Pre, bytes" (Some {InstructionType= STR;
+                                                                    DestSourceReg= R0; AddressReg= R11;
+                                                                    BytesNotWords= true; IncrementValue= 0;
+                                                                    PreIndexRb= true; PostIndexRb= false; 
+                                                                    ExtraAddressReg= Some R1;
+                                                                    ShiftExtraRegBy= Some 0;})
+                    makeTest "STR" "B" (ldFunc "R0, [R11, R1, LSL #-1]!") "STR -1 Shift and Pre, bytes" (Some {InstructionType= STR;
+                                                                    DestSourceReg= R0; AddressReg= R11;
+                                                                    BytesNotWords= true; IncrementValue= 0;
+                                                                    PreIndexRb= true; PostIndexRb= false; 
+                                                                    ExtraAddressReg= None;
+                                                                    ShiftExtraRegBy= None;})
                 ]
 
 

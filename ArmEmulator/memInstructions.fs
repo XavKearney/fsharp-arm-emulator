@@ -1,5 +1,5 @@
 //MemInstructions
-module memInstructions
+module MemInstructions
 
     open CommonData
     open CommonLex
@@ -17,16 +17,18 @@ module memInstructions
     type LabelM = string option
 
 
-    /// instruction (dummy: must change)
-    type memInstr =
+    ///The Record type which encapsulates all the 
+    /// information needed to execute an LDR or STR 
+    /// instruction
+    type MemInstr =
         {
             InstructionType: MemInstrType;
             DestSourceReg: RName;
             AddressReg: RName;
             BytesNotWords: bool;
             IncrementValue: int;
-            PreIndexRbBy: bool;
-            PostIndexRbBy: bool;
+            PreIndexRb: bool;
+            PostIndexRb: bool;
             ExtraAddressReg: RName option;
             ShiftExtraRegBy: int option;
         }
@@ -42,30 +44,9 @@ module memInstructions
         Suffixes = [""; "B"]
     }
 
-    /// map of all possible opcodes recognised
-    // let opCodesMem = opCodeExpand memSpec
-
 
     /// Parse Active Pattern used by top-level code
     // let (|IMatch|_|) = parse
-
-    let testS = "R0!, [R1, #N]!"
-    let testTrim = testS.Trim()
-    let len = testS.Length
-    let IO = testTrim.LastIndexOf("!")
-    
-    /// Match a regular expression
-    /// Return Some (m,grps) where m is the match string,
-    /// grps is the list of match groups (if any)
-    /// return None on no match
-    let regexMatch (regex:string) (str:string) =
-        let m = Text.RegularExpressions.Regex(regex).Match(str)
-        printfn "m: %A" m
-        if m.Success
-        then
-            let mLst = [ for x in m.Groups -> x.Value ]
-            Some (List.head mLst, List.tail mLst)
-        else None
 
 
     ///Match the pattern using a cached compiled Regex
@@ -77,30 +58,16 @@ module memInstructions
             else None
 
 
-    type Name = {First:string; Middle:option<string>; Last:string}
-
-    let parseName name =
-        match name with
-        | Match @"^(\w+) (\w+) (\w+)$" [_; first; middle; last] ->
-            Some({First=first.Value; Middle=Some(middle.Value); Last=last.Value})
-        | Match @"^(\w+) (\w+)$" [_; first; last] ->
-            Some({First=first.Value; Middle=None; Last=last.Value})
-        | _ -> 
-            None
-
-    let testP = parseName "Alistair Patrick Wallace"
-
-    // let RE = regexMatch "R[0-5]+" testS
-    // let RE3 = regexMatch "(R)\w+" testS
-    // let RE2 = regexMatch "R[0-15], *\[R[0-16], *#[0-6]\]"
-
     type FromOps = {Ra:RName; Rb: RName; IncrVal: int;
                         Post: bool; Rc: RName option;
                         Shift: int option}
 
-///Parse function for Memory instructions such as LDR and
-/// STR. Returns a record with all the information needed
-/// to execute an LDR or STR instruction.
+    let (|GreaterThanZero|Error|) x = if (x>=0) then GreaterThanZero else Error
+    let isPos (x: Group) (y: Group) = match (x.Value|>int) with GreaterThanZero -> (Some (x.Value|>int),(Some regNames.[y.Value])) | Error -> (None,None)
+
+    ///Parse function for Memory instructions such as LDR and
+    /// STR. Returns a record with all the information needed
+    /// to execute an LDR or STR instruction.
     let parseMemIns root suffix ls =
         let instTypeTmp = 
             match root with
@@ -114,26 +81,32 @@ module memInstructions
 
         let parseOps ops =
             match ops with
-            | Match @"R([1-9]|1[0-5])+ *, *\[ *R([1-9]|1[0-5])+ *]" [rA; rB] -> //Base Case
-                Some({Ra=regNames.[rA.Value]; Rb=regNames.[rB.Value]; IncrVal=0; Post= false; Rc= None; Shift= None;})
-            | Match @"R([1-9]|1[0-5])+ *, *\[ *R([1-9]|1[0-5])+ *, *#[0-9]+ *\]" [rA; rB; incV] -> //Increment
-                Some({Ra=regNames.[rA.Value]; Rb=regNames.[rB.Value]; IncrVal=(incV.Value|>int); Post= false; Rc= None; Shift= None;})
-            | Match @"R([1-9]|1[0-5])+ *, *\[ *R([1-9]|1[0-5])+ *] *, *#[0-9]+" [rA; rB; incV] -> //Post Indexing
+            | Match @"(R[0-9]|1[0-5]) *, *\[ *(R[0-9]|1[0-5]) *] *, *#([0-9]+)" [_; rA; rB; incV] -> //Post Increment
                 Some({Ra=regNames.[rA.Value]; Rb=regNames.[rB.Value]; IncrVal=(incV.Value|>int); Post= true; Rc= None; Shift= None;})
-            | Match @"R([1-9]|1[0-5]) *, *\[ *R([1-9]|1[0-5]) *, *R([1-9]|1[0-5]) *\]" [rA; rB; incV] -> //Adding Registers
+            | Match @"(R[0-9]|R1[0-5]) *, *\[ *(R[0-9]|R1[0-5]) *]" [_; rA; rB] -> //Base Case
+                Some({Ra=regNames.[rA.Value]; Rb=regNames.[rB.Value]; IncrVal=0; Post= false; Rc= None; Shift= None;})
+            | Match @"(R[0-9]|R1[0-5]) *, *\[ *(R[0-9]|R1[0-5]) *, *#([0-9]+) *\]" [_; rA; rB; incV] -> //Num Increment
                 Some({Ra=regNames.[rA.Value]; Rb=regNames.[rB.Value]; IncrVal=(incV.Value|>int); Post= false; Rc= None; Shift= None;})
-            | Match @"R([1-9]|1[0-5]) *, *\[ *R([1-9]|1[0-5]) *, *R([1-9]|1[0-5]) *, *LSL *#[0-9] *\]" [rA; rB; rC; shft] -> //Shifting
-                Some({Ra=regNames.[rA.Value]; Rb=regNames.[rB.Value]; IncrVal=0; Post= false; Rc= Some regNames.[rC.Value]; Shift= Some (shft.Value|>int);})
+            | Match @"(R[0-9]|R1[0-5]) *, *\[ *(R[0-9]|R1[0-5]) *, *(R[0-9]|R1[0-5]) *\]" [_; rA; rB; rC] -> //Adding Registers
+                Some({Ra=regNames.[rA.Value]; Rb=regNames.[rB.Value]; IncrVal=0; Post= false; Rc= Some regNames.[rC.Value]; Shift= None;})
+            | Match @"(R[0-9]|R1[0-5]) *, *\[ *(R[0-9]|R1[0-5]) *, *(R[0-9]|R1[0-5]) *, *LSL *#(-*[0-9]+) *\]" [_; rA; rB; rC; shft] -> //Shifting
+                let Shft, RC = isPos shft rC
+                Some({Ra=regNames.[rA.Value]; Rb=regNames.[rB.Value]; IncrVal=0; Post= false; Rc= RC; Shift= Shft;})
             | _ -> 
+                printfn "ops didn't match anything\nops: %A\n" ops
                 None
-        let regExMat = Option.get (parseOps ((ls.Operands).Trim()))
 
-        {InstructionType= instTypeTmp;
-            DestSourceReg= regExMat.Ra; AddressReg= regExMat.Rb;
-            BytesNotWords= bytes; IncrementValue= regExMat.IncrVal;
-            PreIndexRbBy= pre; PostIndexRbBy= regExMat.Post; 
-            ExtraAddressReg= regExMat.Rc;
-            ShiftExtraRegBy= regExMat.Shift;}
+        match (parseOps ((ls.Operands).Trim())) with
+        | None -> None
+        | _ ->  let regExMatVal = Option.get (parseOps ((ls.Operands).Trim()))
+                Some {InstructionType= instTypeTmp;
+            DestSourceReg= regExMatVal.Ra; AddressReg= regExMatVal.Rb;
+            BytesNotWords= bytes; IncrementValue= regExMatVal.IncrVal;
+            PreIndexRb= pre; PostIndexRb= regExMatVal.Post; 
+            ExtraAddressReg= regExMatVal.Rc;
+            ShiftExtraRegBy= regExMatVal.Shift;}
+
+        
 
 
 
@@ -177,7 +150,8 @@ module memInstructions
     /// Parse Active Pattern used by top-level code
     // let (|IMatch|_|) = parse
 
-
+    // let parseAdrIns root ls =
+    //     jlkj
 
 
 
