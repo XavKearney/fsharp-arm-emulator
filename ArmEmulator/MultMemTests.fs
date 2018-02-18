@@ -134,7 +134,7 @@ module MultMemTests
                     Some(Error "Register list cannot contain target reg if writeback is enabled.")
                 | _ -> Some (
                         Ok {
-                            PInstr =  { 
+                            PInstr = MemI { 
                                         InsType = Some(opcode); 
                                         Direction = Some(direction);
                                         Target = target; 

@@ -51,6 +51,8 @@ module MultMem
         // for STM: "FD" and "DB" are synonyms
         Suffixes = [""; "L";]
     }
+
+
     /// multiple memory access instruction type
     type BranchInstr = 
         {   
@@ -60,17 +62,17 @@ module MultMem
             Link: bool;
         }
     
-    type ReturnInstr = X of MultMemInstr | Y of BranchInstr
+    type ReturnInstr = | MemI of MultMemInstr | BranchI of BranchInstr
 
     let makeBranchInstr suffix (operands: string) =
         let label = operands.Trim()
         match label.Contains(" ") with
         | true -> Error "Branch label cannot contain whitespace."
         | false ->
-            Ok {
+            Ok (BranchI {
                 Label = label;
                 Link = (suffix = "L");
-            }
+            })
 
     /// maps of all possible opcodes recognised
     let multMemOpCodes = opCodeExpand multMemSpec
@@ -182,7 +184,7 @@ module MultMem
             Error "Register list cannot contain PC(R15) if it contains LR for LDM."
         | _, t, rlst, wb when wb && List.contains t rlst ->
             Error "Register list cannot contain target reg if writeback is enabled."
-        | _ -> Ok (ins)
+        | _ -> Ok (MemI ins)
 
     /// take opcode root, suffix and string of operands
     /// if the operands parse, return instruction
@@ -227,30 +229,26 @@ module MultMem
         let parse' (instrC, (root,suffix,pCond)) =
             let (WA la) = ls.LoadAddr
             match instrC with
-            | MEM -> 
-                match makeMultMemInstr root suffix ls.Operands with
-                | Ok pinstr -> Ok {
-                        PInstr = pinstr;
-                        PLabel = ls.Label |> Option.map (fun lab -> lab, la); 
-                        PSize = 4u; 
-                        PCond = pCond;
-                    }
-                | Error s -> Error s
-            // | MISC -> 
-            //     match root with
-            //     | "B" -> 
-            //         match makeBranchInstr suffix ls.Operands with
-            //         | Ok pinstr -> Ok {
-            //                 PInstr = pinstr;
-            //                 PLabel = ls.Label |> Option.map (fun lab -> lab, la); 
-            //                 PSize = 4u; 
-            //                 PCond = pCond;
-            //             }
-            //         | Error s -> Error s
-            //     | _ -> Error "Invalid instruction root."
+            | MEM -> makeMultMemInstr root suffix ls.Operands
+            | MISC -> 
+                match root with
+                | "B" -> makeBranchInstr suffix ls.Operands
+                | _ -> Error "Invalid instruction root."
             | _ -> Error "Instruction class not supported."
-        Map.tryFind ls.OpCode multMemOpCodes
-        |> Option.map parse'
+            |> Result.bind (
+                fun instr ->  
+                    Ok  {
+                            PInstr = instr;
+                            PLabel = ls.Label |> Option.map (fun lab -> lab, la); 
+                            PSize = 4u; 
+                            PCond = pCond;
+                        })
+        let memInstr = Map.tryFind ls.OpCode multMemOpCodes
+        let branchInstr = Map.tryFind ls.OpCode branchOpCodes
+        match memInstr, branchInstr with
+        | Some (mem), None -> Some(parse' mem)
+        | None, Some(branch) -> Some(parse' branch)
+        | _ -> None
 
 
     /// Execute a MultMem Instruction
