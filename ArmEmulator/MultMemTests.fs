@@ -31,58 +31,161 @@ module MultMemTests
         List.map (fun (i, o) -> makeTest i o) inOutLst
         |> testList (sprintf "%s Test List" name) 
 
+    /// unit tests for parseOps function
+    /// takes a string, corresponding to ls.Operands
+    /// returns either an error or
+    /// target register, writeback (bool) and a register list
     [<Tests>]
     let testParseOpsUnit = 
         makeUnitTestList parseOps "parseOps Unit" 
             [
-                ("R7, {R3,R9,R1}", Ok (R7, false, [R3;R9;R1]));
-                ("R0!, {R2,R12,R1,R3}", Ok (R0, true, [R2;R12;R1;R3]));
-                ("R0!, {LR,PC,SP}", Ok (R0, true, [R14; R15; R13]));
-                ("R7, {R1-R3}", Ok (R7, false, [R1;R2;R3]));
-                ("R7, {R10-LR}", Ok (R7, false, [R10; R11; R12; R13; R14]));
-                ("R7, {SP-LR}", Ok (R7, false, [R13; R14]));
-                ("R7, {R3-R1}", Error "Invalid register list range.");
-                ("R7, {R0-R17}", Error "Invalid register list range.");
-                ("R7, {R0R4}", Error "Invalid list of registers.");
-                ("R4, {}", Error "Invalid list of registers.");
-                ("R4, {E3}", Error "Invalid list of registers.");
-                ("R4 {R1,R2}", Error "Target register not found.");
-                ("R, {R3,R9,R1}", Error "Target register not found.");
-                ("R7,, {R3,R9,R1}", Error "Incorrectly formatted operands.");
-                ("R7, {R3,R9,R1", Error "Incorrectly formatted operands.");
-                ("R7, R3,R9,R1", Error "Incorrectly formatted operands.");
-                ("R7, R3,R9,R1}", Error "Incorrectly formatted operands.");
-                ("R7 {R3,R9,R1}", Error "Target register not found.");
+                // test valid input
+                "R7, {R3,R9,R1}", Ok (R7, false, [R3;R9;R1])
+                "R0!, {R2,R12,R1,R3}", Ok (R0, true, [R2;R12;R1;R3])
+                "R0!, {LR,PC,SP}", Ok (R0, true, [R14; R15; R13])
+                "R7, {R1-R3}", Ok (R7, false, [R1;R2;R3])
+                "R7, {R10-LR}", Ok (R7, false, [R10; R11; R12; R13; R14])
+                "R7, {SP-LR}", Ok (R7, false, [R13; R14])
+                // test invalid input
+                "R7, {R3-R1}", Error "Invalid register list range."
+                "R7, {R0-R17}", Error "Invalid register list range."
+                "R7, {R0R4}", Error "Invalid list of registers."
+                "R4, {}", Error "Invalid list of registers."
+                "R4, {E3}", Error "Invalid list of registers."
+                "R4 {R1,R2}", Error "Target register not found."
+                "R, {R3,R9,R1}", Error "Target register not found."
+                "R7,, {R3,R9,R1}", Error "Incorrectly formatted operands."
+                "R7, {R3,R9,R1", Error "Incorrectly formatted operands."
+                "R7, R3,R9,R1", Error "Incorrectly formatted operands."
+                "R7, R3,R9,R1}", Error "Incorrectly formatted operands."
+                "R7 {R3,R9,R1}", Error "Target register not found."
             ]
-
     [<Tests>]
-    let testParseUnit = 
+    let testMakeBranchInstrUnit = 
+        let testSymTab = [("testLab", 37u); ("otherLab", 94u)] |> Map.ofList
+        makeUnitTestList makeBranchInstr "makeBranchInstr Unit" 
+            [
+                // test valid input without symbol table
+                ("", "someLabel", (WA 0u), None), 
+                    Ok (BranchI {Label = "someLabel"; BranchAddr = None; Link = None;})
+                ("L", "anotherLABEL", (WA 0u), None),
+                    Ok (BranchI {Label = "anotherLABEL"; BranchAddr = None; Link = Some(WA 4u);})
+                ("L", " aLabel ", (WA 0u), None), 
+                    Ok (BranchI {Label = "aLabel"; BranchAddr = None; Link = Some(WA 4u);})
+                // test valid input with symbol table (2nd pass)
+                ("L", "testLab", (WA 0u), Some(testSymTab)), 
+                    Ok (BranchI {Label = "testLab"; BranchAddr = Some(37u); Link = Some(WA 4u);})
+                ("", "otherLab", (WA 0u), Some(testSymTab)), 
+                    Ok (BranchI {Label = "otherLab"; BranchAddr = Some(94u); Link = None;})
+                // test invalid input
+                ("", "unknownLab", (WA 0u), Some(testSymTab)), Error "Branch label not found."
+                ("K", "yetAnotherLabel", (WA 0u), None), Error "Invalid branch instruction."
+                ("L", "label with spaces", (WA 0u), None), Error "Invalid branch instruction."
+                ("", "", (WA 0u), None), Error "Invalid branch instruction."
+                ("L", "", (WA 0u), None), Error "Invalid branch instruction."
+                ("", " ", (WA 0u), None), Error "Invalid branch instruction."
+            ]
+    // unit tests for parse function
+    // with input corresponding to LDM/STM instructions
+    [<Tests>]
+    let testParseUnitMultMem = 
         let ls = { LoadAddr = WA 0u; Label = None; SymTab = None;
                 OpCode = ""; Operands = ""; }
-        makeUnitTestList parse "parse Unit" 
+        makeUnitTestList parse "parse Unit-MultMem" 
             [
-                ({ls with OpCode = "STM"; Operands = "R15, {R1,R3}";}, 
-                    Some(Error "Target register cannot be PC (R15)."));
-                ({ls with OpCode = "LDM"; Operands = "R15, {R1,R3}";}, 
-                    Some(Error "Target register cannot be PC (R15)."));
-                ({ls with OpCode = "LDM"; Operands = "R7, {R1,R13}";}, 
-                    Some(Error "Register list cannot contain SP (R13)."));
-                ({ls with OpCode = "STM"; Operands = "R4, {R15,R3}";}, 
-                    Some(Error "Register list cannot contain PC (R15) for STM instructions."));
-                ({ls with OpCode = "LDM"; Operands = "R4, {R15,R14,R5}";}, 
-                    Some(Error "Register list cannot contain PC(R15) if it contains LR for LDM."));
-                ({ls with OpCode = "LDM"; Operands = "R4!, {R4,R7,R9}";}, 
-                    Some(Error "Register list cannot contain target reg if writeback is enabled."));
-                ({ls with OpCode = "STM"; Operands = "R9!, {R4,R1,R9}";}, 
-                    Some(Error "Register list cannot contain target reg if writeback is enabled."));
-                ({ls with OpCode = "STMEF"; Operands = "R15, {R1,R3}";}, 
-                    None);
-                ({ls with OpCode = "ADD"; Operands = "R15, R15, #5";}, 
-                    None);
+                // test ARM restrictions are caught correctly
+                {ls with OpCode = "STM"; Operands = "R15, {R1,R3}";}, 
+                    Some(Error "Target register cannot be PC (R15).")
+                {ls with OpCode = "LDM"; Operands = "R15, {R1,R3}";}, 
+                    Some(Error "Target register cannot be PC (R15).")
+                {ls with OpCode = "LDM"; Operands = "R7, {R1,R13}";}, 
+                    Some(Error "Register list cannot contain SP (R13).")
+                {ls with OpCode = "STM"; Operands = "R4, {R15,R3}";}, 
+                    Some(Error "Register list cannot contain PC (R15) for STM instructions.")
+                {ls with OpCode = "LDM"; Operands = "R4, {R15,R14,R5}";}, 
+                    Some(Error "Register list cannot contain PC(R15) if it contains LR for LDM.")
+                {ls with OpCode = "LDM"; Operands = "R4!, {R4,R7,R9}";}, 
+                    Some(Error "Register list cannot contain target reg if writeback is enabled.")
+                {ls with OpCode = "STM"; Operands = "R9!, {R4,R1,R9}";}, 
+                    Some(Error "Register list cannot contain target reg if writeback is enabled.")
+                // test invalid and unsupported opcodes return None
+                {ls with OpCode = "STMEF"; Operands = "R15, {R1,R3}";}, 
+                    None
+                {ls with OpCode = "ADD"; Operands = "R15, R15, #5";}, 
+                    None
             ]
-    let config = { FsCheckConfig.defaultConfig with maxTest = 10000 }
+    // unit tests for parse function
+    // with input corresponding to B/BL/END instructions
     [<Tests>]
-    let testParse =
+    let testParseUnitBranch = 
+        let testSymTab = [("testLab", 37u); ("otherLab", 94u)] |> Map.ofList
+        // define test LineData default
+        let ls = { LoadAddr = WA 0u; Label = None; SymTab = None;
+                OpCode = ""; Operands = ""; }
+        // also define test LineData default with a SymbolTable
+        let lsSymTab = {ls with SymTab = Some testSymTab}
+        // default result
+        let res = {PInstr = BranchI {Label = ""; BranchAddr = None; Link = None;}; 
+                    PLabel = None; PSize = 4u; PCond = Cal;}
+        makeUnitTestList parse "parse Unit-Branch" 
+            [
+                // test valid input
+                {ls with OpCode = "B"; Operands = "testLabel";}, 
+                    Some(Ok {res with PInstr = BranchI {Label = "testLabel"; BranchAddr = None; Link = None;}})
+                {ls with OpCode = "BL"; Operands = "testLabel";}, 
+                    Some(Ok {res with PInstr = BranchI {Label = "testLabel"; BranchAddr = None; Link = Some (WA 4u);}})
+                {lsSymTab with OpCode = "B"; Operands = "testLab";}, 
+                    Some(Ok {res with PInstr = BranchI {Label = "testLab"; BranchAddr = Some 37u; Link = None;}})
+                {lsSymTab with OpCode = "BL"; Operands = "otherLab";}, 
+                    Some(Ok {res with PInstr = BranchI {Label = "otherLab"; BranchAddr = Some 94u; Link = Some (WA 4u);}})
+                {ls with OpCode = "BL"; Operands = "   Testwhitespace    ";}, 
+                    Some(Ok {res with PInstr = BranchI {Label = "Testwhitespace"; BranchAddr = None; Link = Some (WA 4u);}})
+                // test invalid input
+                {ls with OpCode = "BL"; Operands = "multiple words";}, 
+                    Some(Error "Invalid branch instruction.")
+                {lsSymTab with OpCode = "B"; Operands = "wrongLabel";}, 
+                    Some(Error "Branch label not found.")
+                {lsSymTab with OpCode = "BL"; Operands = "wrongLabel";}, 
+                    Some(Error "Branch label not found.")
+                {ls with OpCode = "BLX"; Operands = "testLabel";}, 
+                    None
+            ]
+    let config = { FsCheckConfig.defaultConfig with maxTest = 1 }
+
+    /// property-based testing of parse function
+    /// for randomly generated branch instructions
+    [<Tests>]
+    let testExecBranchInsr = 
+        testPropertyWithConfig config "Property Test execBranchInstr" <| 
+        fun flags memMap label branchAddr linkAddr->
+            // generate random values for registers R0-R15
+            let regVals = genRandomUint32List (-0x7FFFFFFF, 0xFFFFFFFF) 16
+            // create randomised cpuData
+            let cpuData = {
+                Fl = flags;
+                Regs = List.mapi (fun i x -> (inverseRegNums.[i], x)) regVals |> Map.ofList;
+                MM = memMap;
+            }
+            // create randomised parsed branch instruction
+            let parsed = {
+                PInstr = {Label = label; BranchAddr = branchAddr; Link = linkAddr;}; 
+                    PLabel = None; PSize = 4u; PCond = Cal;}
+            let result = execBranchInstr parsed cpuData
+            // determine the correct result given randomised data
+            let expected =
+                match branchAddr, linkAddr with
+                | Some b, None ->
+                    Ok {cpuData with Regs = cpuData.Regs.Add (R15, b)}
+                | Some b, Some (WA l) ->
+                    {cpuData with Regs = cpuData.Regs.Add (R15, b)}
+                    |> fun cpu -> Ok {cpu with Regs = cpuData.Regs.Add (R14, l)}
+                | _ -> Error "Invalid branch instruction."
+            Expect.equal result expected "cpuData"
+
+    /// property-based testing of parse function
+    /// for randomly generated LDM/STM instructions
+    [<Tests>]
+    let testParseMultMem =
         let makeLineData wa opcode suffixStr target wb rLst = 
             let opCodeStr = 
                 match opcode with
@@ -101,7 +204,7 @@ module MultMemTests
                 Operands = operandStr;
             }
 
-        testPropertyWithConfig config "Property Test Parse" <| 
+        testPropertyWithConfig config "Property Test Parse-MultMem" <| 
         fun wa opcode target wb rLst ->
             // choose a random suffix string, including aliases
             let suffixStr = chooseFromList ["";"FD";"FA";"ED";"EA";"IA";"DB"]
@@ -120,6 +223,7 @@ module MultMemTests
             // determine correct output based on params
             let expected = 
                 match opcode, target, wb, rLst with
+                // check ARM restrictions
                 | _, _, _, [] -> 
                     Some (Error "Invalid list of registers.")
                 | _, t, _, _ when t = R15 -> 
@@ -132,6 +236,7 @@ module MultMemTests
                     Some(Error "Register list cannot contain PC(R15) if it contains LR for LDM.")
                 | _, t, wb, rlst when wb && List.contains t rlst ->
                     Some(Error "Register list cannot contain target reg if writeback is enabled.")
+                // if not restricted, must return a parsed instruction
                 | _ -> Some (
                         Ok {
                             PInstr = MemI { 
@@ -144,7 +249,7 @@ module MultMemTests
                             PLabel = None; PSize = 4u; PCond = Cal;
                     })
             let res = parse ls
-            Expect.equal res expected "test parse"
+            Expect.equal res expected "cpuData"
     
     [<Tests>]
     let testExecMultMem = 
@@ -301,7 +406,7 @@ module MultMemTests
                             | _, DataLoc x -> x
                             | _ -> failwithf "Should never happen")
                     // check that the registers in VisUAL = registers after execution
-                    Expect.equal regsActual regsExp.[..regsExp.Length - 2]  "test mem regs"
+                    Expect.equal regsActual regsExp.[..regsExp.Length - 2]  "Registers"
                     // check that the memory in VisUAL = memory after execution
-                    Expect.equal memActual memCheck "test mem memory"
+                    Expect.equal memActual memCheck "Memory"
                 | Error _ -> ()

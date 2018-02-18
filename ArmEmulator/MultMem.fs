@@ -24,6 +24,18 @@ module MultMem
             // list of registers to store/load to/from
             RegList: RName list;
         }
+    
+    /// branch instruction type
+    type BranchInstr = 
+        {   
+            // label string to branch to
+            Label: string;
+            // label string to branch to
+            BranchAddr: uint32 option ;
+            // optional link "L" suffix
+            // requires address of next instruction
+            Link: WAddr option;
+        }
 
     /// parse error (dummy, but will do)
     type ErrInstr = string
@@ -52,27 +64,8 @@ module MultMem
         Suffixes = [""; "L";]
     }
 
-
-    /// multiple memory access instruction type
-    type BranchInstr = 
-        {   
-            // label string to branch to
-            Label: string;
-            // optional link "L" suffix
-            Link: bool;
-        }
-    
+    /// return type to allow parse to return multiple instruction types
     type ReturnInstr = | MemI of MultMemInstr | BranchI of BranchInstr
-
-    let makeBranchInstr suffix (operands: string) =
-        let label = operands.Trim()
-        match label.Contains(" ") with
-        | true -> Error "Branch label cannot contain whitespace."
-        | false ->
-            Ok (BranchI {
-                Label = label;
-                Link = (suffix = "L");
-            })
 
     /// maps of all possible opcodes recognised
     let multMemOpCodes = opCodeExpand multMemSpec
@@ -89,13 +82,20 @@ module MultMem
         else None
 
     /// matches a string with regex pattern
-    /// returns a list of the matches
+    /// returns a list of all of the matches
     let (|Matches|_|) (pat:string) (inp:string) =
         let m = Regex.Matches(inp, pat) in
         if m.Count > 0
         then Some ([ for g in m -> g.Value ])
         else None
 
+    /// matches a string with regex pattern
+    /// returns a list of the matches
+    let (|Match1|_|) (pat:string) (inp:string) =
+        let m = Regex.Matches(inp, pat) in
+        if m.Count = 1
+        then Some (m.[0].Value)
+        else None
     /// matches a string with regex pattern
     /// returns list of the matched groups (excluding the whole match)
     let (|MatchGroups|_|) (pat:string) (inp:string) =
@@ -219,6 +219,35 @@ module MultMem
             | _ -> Error "Opcode not supported."
         )
 
+    /// takes a suffix and operands as strings
+    /// determines whether the branch corresponds to a link ("L")
+    /// and gets the label from the operands
+    /// provided it contains no whitespace
+    /// argument is a tuple for easier testing
+    let makeBranchInstr (suffix, operands:string, WA loadaddr, symtab:Map<string,uint32> option) =
+        // get link and label
+        match suffix, operands with
+        // link address is address of next instruction (current address + 4)
+        | "L", Match1 @"(\S+)" label -> Ok (label, Some (WA (loadaddr+4u)))
+        | "", Match1 @"(\S+)" label -> Ok(label, None)
+        | _ -> Error "Invalid branch instruction."
+        // if valid, and symtable not none, try find address of label
+        |> Result.bind (fun (label, link) ->
+            match symtab with
+            | None -> Ok (label, None, link)
+            | Some (symtab) ->
+                symtab.TryFind label
+                |> function
+                | Some (addr) -> Ok (label, Some(addr), link)
+                | None -> Error "Branch label not found.")
+        // if valid, return branch instruction
+        |> Result.map (fun (label, addr, link) ->
+            BranchI {
+                Label = label;
+                BranchAddr = addr;
+                Link = link;
+            }
+        )
 
     /// main function to parse a line of assembler
     /// ls contains the line input
@@ -228,21 +257,23 @@ module MultMem
     let parse ls =
         let parse' (instrC, (root,suffix,pCond)) =
             let (WA la) = ls.LoadAddr
+            // generate correct instruction type based on Instruction Class
             match instrC with
             | MEM -> makeMultMemInstr root suffix ls.Operands
             | MISC -> 
                 match root with
-                | "B" -> makeBranchInstr suffix ls.Operands
+                | "B" -> makeBranchInstr (suffix, ls.Operands, ls.LoadAddr, ls.SymTab)
                 | _ -> Error "Invalid instruction root."
             | _ -> Error "Instruction class not supported."
-            |> Result.bind (
+            // if valid instruction, wrap in Parse type
+            |> Result.map (
                 fun instr ->  
-                    Ok  {
-                            PInstr = instr;
-                            PLabel = ls.Label |> Option.map (fun lab -> lab, la); 
-                            PSize = 4u; 
-                            PCond = pCond;
-                        })
+                    {
+                        PInstr = instr;
+                        PLabel = ls.Label |> Option.map (fun lab -> lab, la); 
+                        PSize = 4u; 
+                        PCond = pCond;
+                    })
         let memInstr = Map.tryFind ls.OpCode multMemOpCodes
         let branchInstr = Map.tryFind ls.OpCode branchOpCodes
         match memInstr, branchInstr with
@@ -317,7 +348,22 @@ module MultMem
             | Some(LDM) -> exec LDM dir targ wb rlst
             | Some(STM) -> exec STM dir targ wb rlst
             | None -> failwithf "No instruction type given.")
-        
+
+    /// executes a parsed branch instruction
+    /// given cpuData        
+    let execBranchInstr parsed cpuData =
+        let instr = parsed.PInstr
+        match instr.BranchAddr, instr.Link with
+        | Some bAddr, None ->
+            // set PC to branch address
+            Ok {cpuData with Regs = cpuData.Regs.Add (R15, bAddr)}
+        | Some bAddr, Some (WA lAddr) ->
+            // set PC to branch address
+            let branchedCpu = {cpuData with Regs = cpuData.Regs.Add (R15, bAddr)}
+            // and set LR to link address
+            Ok {branchedCpu with Regs = cpuData.Regs.Add (R14, lAddr)}
+        | _ -> Error "Invalid branch instruction."
+            
 
     /// Parse Active Pattern used by top-level code
     let (|IMatch|_|)  = parse
