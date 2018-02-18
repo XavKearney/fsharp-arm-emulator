@@ -5,6 +5,8 @@ module Arithmetic
 
     type ArithInstrType = ADD | ADC | SUB | SBC | RSB | RSC
 
+    type CompInstrType = CMP | CMN
+
     type OpCode = Target of RName | Value of uint32
 
     type Operations = LSL | ASR | LSR | ROR | RRX
@@ -37,13 +39,29 @@ module Arithmetic
             Op2: Op2Types;
         }
 
+    type CompInstr = 
+        {
+            InstrType: CompInstrType option;
+            Op1: RName;
+            Op2: Op2Types;
+        }
+
+    let CompSpec = {
+        InstrC = COMP
+        Roots = ["CMP";"CMN"]
+        Suffixes = [""]
+    }
+
     let ArithSpec = {
         InstrC = ARITH
         Roots = ["ADD";"ADC";"SUB";"SBC";"RSB";"RSC"]
         Suffixes = [""; "S"]
     }
 
-    let opCodes = opCodeExpand ArithSpec
+    type ReturnInstr = | ArithI of ArithInstr | CompI of CompInstr
+
+    let arithOpCodes = opCodeExpand ArithSpec
+    let compOpCodes = opCodeExpand CompSpec
 
     /// FlexOp2 code that performs shifts on flexible operand 2 
     let flexOp2 op2 cpuData = 
