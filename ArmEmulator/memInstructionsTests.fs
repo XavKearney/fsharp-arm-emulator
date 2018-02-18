@@ -10,7 +10,7 @@ module memInstructionsTests
 
 
     [<Tests>]
-    let tTest = 
+    let parseLabelInsTest = 
         let x:SymbolTable = ["a",uint32 2] |> Map.ofList
         let ldFunc Lab Ops = 
                 {LoadAddr= WA 100u; 
@@ -18,40 +18,69 @@ module memInstructionsTests
                     SymTab= Some x;
                     OpCode= "";
                     Operands= Ops}
-        let lineDataEQU = ldFunc "labelT" "4"
         let makeTest root ld name output =
             testCase name <| fun () ->
-                Expect.equal (parseLabelIns root ld) output (sprintf "Identity Test '%s'" root)
+                Expect.equal (parseLabelIns root ld) output (sprintf "Label Parsing Tests '%s'" root)
         Expecto.Tests.testList "parseLabelIns Tests"
                 [   
 
-                    makeTest "EQU" lineDataEQU "EQU1" {InstructionType = EQU; Name = (StrLabel (Some "labelT")); 
-                                                        EQUExpr = Some (Num (Some 4u)); DCDValueList = None;
+                    makeTest "EQU" (ldFunc "labelT" "4") "EQU1" {InstructionType = EQU; Name = (StrLabelL (Some "labelT")); 
+                                                        EQUExpr = (Some 4u); DCDValueList = None;
                                                         FillN = None}
-                    makeTest "EQU" (ldFunc "labelT" "2") "EQU2" {InstructionType = EQU; Name = (StrLabel (Some "labelT")); 
-                                                                            EQUExpr = Some (Num (Some 2u)); DCDValueList = None;
+                    makeTest "EQU" (ldFunc "labelT" "2") "EQU2" {InstructionType = EQU; Name = (StrLabelL (Some "labelT")); 
+                                                                            EQUExpr = (Some 2u); DCDValueList = None;
                                                                             FillN = None}
-                    makeTest "EQU" (ldFunc "labelT" "3*4") "EQU Mult" {InstructionType = EQU; Name = (StrLabel (Some "labelT")); 
-                                                                                    EQUExpr = Some (Num (Some 12u)); DCDValueList = None;
+                    makeTest "EQU" (ldFunc "labelT" "3*4") "EQU Mult" {InstructionType = EQU; Name = (StrLabelL (Some "labelT")); 
+                                                                                    EQUExpr = (Some 12u); DCDValueList = None;
                                                                                     FillN = None}
-                    makeTest "EQU" (ldFunc "labelT" "1+2") "EQU Add" {InstructionType = EQU; Name = (StrLabel (Some "labelT")); 
-                                                                                    EQUExpr = Some (Num (Some 3u)); DCDValueList = None;
+                    makeTest "EQU" (ldFunc "labelT" "1+2") "EQU Add" {InstructionType = EQU; Name = (StrLabelL (Some "labelT")); 
+                                                                                    EQUExpr = (Some 3u); DCDValueList = None;
                                                                                     FillN = None}
-                    makeTest "EQU" (ldFunc "labelT" "3-2") "EQU Sub" {InstructionType = EQU; Name = (StrLabel (Some "labelT")); 
-                                                                                    EQUExpr = Some (Num (Some 1u)); DCDValueList = None;
+                    makeTest "EQU" (ldFunc "labelT" "3-2") "EQU Sub" {InstructionType = EQU; Name = (StrLabelL (Some "labelT")); 
+                                                                                    EQUExpr = (Some 1u); DCDValueList = None;
                                                                                     FillN = None}
-                    makeTest "EQU" (ldFunc "labelT" "5-4*3-1*1+2*2*2") "EQU All" {InstructionType = EQU; Name = (StrLabel (Some "labelT"));
-                                                                                    EQUExpr = Some (Num (Some 24u)); DCDValueList = None;
+                    makeTest "EQU" (ldFunc "labelT" "5-4*3-1*1+2*2*2") "EQU All" {InstructionType = EQU; Name = (StrLabelL (Some "labelT"));
+                                                                                    EQUExpr = (Some 24u); DCDValueList = None;
                                                                                     FillN = None}
-                    // makeTest "DCD" (ldFunc 100u "labelT" x "" "1") "DCD 1" {InstructionType = DCD; Name = (StrLabel (Some "labelT"));
-                    //                                                                 EQUExpr = None; DCDValueList = Some ["1"];
-                    //                                                                 FillN = None}
-                    // makeTest "DCD" (ldFunc 100u "labelT" x "" "1, 3, 5") "DCD 1,3,5" {InstructionType = DCD; Name = (StrLabel (Some "labelT"));
-                    //                                                                 EQUExpr = None; DCDValueList = Some ["1"; "3"; "5"];
-                    //                                                                 FillN = None}
-                    // makeTest "DCD" lineData "DCD1" "test DCD 1,3,5" (Some (Ok "1,3,5"))
-                    // parseLabelIns root ls
-
+                    makeTest "FILL" (ldFunc "labelT" "4") "FILL 4" {InstructionType = FILL; Name = (StrLabelL (Some "labelT"));
+                                                                                    EQUExpr = None; DCDValueList = None;
+                                                                                    FillN = Some 4u}
+                    makeTest "FILL" (ldFunc "labelT" "64") "FILL 64" {InstructionType = FILL; Name = (StrLabelL (Some "labelT"));
+                                                                                    EQUExpr = None; DCDValueList = None;
+                                                                                    FillN = Some 64u}
+                    makeTest "FILL" (ldFunc "labelT" "3") "FILL 3" {InstructionType = FILL; Name = (StrLabelL (Some "labelT"));
+                                                                                    EQUExpr = None; DCDValueList = None;
+                                                                                    FillN = Some 0u}
+                    makeTest "FILL" (ldFunc "labelT" "123") "FILL 123" {InstructionType = FILL; Name = (StrLabelL (Some "labelT"));
+                                                                                    EQUExpr = None; DCDValueList = None;
+                                                                                    FillN = Some 0u}
+                    makeTest "FILL" (ldFunc "labelT" "0") "FILL 0" {InstructionType = FILL; Name = (StrLabelL (Some "labelT"));
+                                                                                    EQUExpr = None; DCDValueList = None;
+                                                                                    FillN = Some 0u}
+                    makeTest "FILL" (ldFunc "labelT" "-1") "FILL -1" {InstructionType = FILL; Name = (StrLabelL (Some "labelT"));
+                                                                                    EQUExpr = None; DCDValueList = None;
+                                                                                    FillN = Some 0u}
+                    makeTest "FILL" (ldFunc "labelT" "-4") "FILL -4" {InstructionType = FILL; Name = (StrLabelL (Some "labelT"));
+                                                                                    EQUExpr = None; DCDValueList = None;
+                                                                                    FillN = Some 0u}
+                    makeTest "DCD" (ldFunc "labelT" "1") "DCD 1" {InstructionType = DCD; Name = (StrLabelL (Some "labelT"));
+                                                                                    EQUExpr = None; DCDValueList = Some ["1"];
+                                                                                    FillN = None}
+                    makeTest "DCD" (ldFunc "labelT" "1,3,5") "DCD 1,3,5" {InstructionType = DCD; Name = (StrLabelL (Some "labelT"));
+                                                                                    EQUExpr = None; DCDValueList = Some ["1";"3";"5"];
+                                                                                    FillN = None}
+                    makeTest "DCD" (ldFunc "labelT" "1, 3, 5") "DCD 1, 3, 5" {InstructionType = DCD; Name = (StrLabelL (Some "labelT"));
+                                                                                    EQUExpr = None; DCDValueList = Some ["1";"3";"5"];
+                                                                                    FillN = None}
+                    makeTest "DCD" (ldFunc "labelT" "1, -3, 5") "DCD 1, -3, 5" {InstructionType = DCD; Name = (StrLabelL (Some "labelT"));
+                                                                                    EQUExpr = None; DCDValueList = Some ["1";"-3";"5"];
+                                                                                    FillN = None}
+                    makeTest "DCD" (ldFunc "labelT" "-1, 0, 5") "DCD -1, 0, 5" {InstructionType = DCD; Name = (StrLabelL (Some "labelT"));
+                                                                                    EQUExpr = None; DCDValueList = Some ["-1";"0";"5"];
+                                                                                    FillN = None}
+                    makeTest "DCD" (ldFunc "labelT" "") "DCD no input" {InstructionType = DCD; Name = (StrLabelL (Some "labelT"));
+                                                                                    EQUExpr = None; DCDValueList = Some [""];
+                                                                                    FillN = None}
                 ]
 
 
@@ -79,6 +108,27 @@ module memInstructionsTests
 
 
 
+    let parseMemInsTest = 
+        let x:SymbolTable = ["a",uint32 2] |> Map.ofList
+        let ldFunc Ops = 
+                {LoadAddr= WA 100u; 
+                    Label= Some "labelT"; 
+                    SymTab= Some x;
+                    OpCode= "";
+                    Operands= Ops}
+        let makeTest root suffix ld name output =
+            testCase name <| fun () ->
+                Expect.equal (parseMemIns root suffix ld) output (sprintf "Parse LDR/STR Tests '%s'" root)
+        Expecto.Tests.testList "parseMemIns Tests"
+                [   
+
+                    makeTest "LDR" "" (ldFunc "R0, [R1]") "LDR1" {InstructionType= LDR;
+                                                                    DestSourceReg= R0; AddressReg= R1;
+                                                                    BytesNotWords= false; IncrementValue= 0;
+                                                                    PreIndexRbBy= false; PostIndexRbBy= false; 
+                                                                    ExtraAddressReg= None;
+                                                                    ShiftExtraRegBy= None;}
+                ]
 
 
 

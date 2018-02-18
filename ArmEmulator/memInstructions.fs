@@ -3,8 +3,9 @@ module memInstructions
 
     open CommonData
     open CommonLex
-    open System.Reflection.Emit
     open System
+    open System.Text.RegularExpressions
+
 
 
 
@@ -13,16 +14,21 @@ module memInstructions
 //----------MEMORY INSTRUCTION DEFINITION AND PARSING-------------------------------------------------
 
     type MemInstrType = LDR | STR 
-    type FlexOp2Mem = | Label | Addr | AddrPlus | PreIndexed | PostIndexed | AddrPlusAddr | AddrShftOp
     type LabelM = string option
 
 
     /// instruction (dummy: must change)
     type memInstr =
         {
-            InstructionType: MemInstrType option;
-            DestSourceReg: RName option;
-            SecondOp: FlexOp2Mem;
+            InstructionType: MemInstrType;
+            DestSourceReg: RName;
+            AddressReg: RName;
+            BytesNotWords: bool;
+            IncrementValue: int;
+            PreIndexRbBy: bool;
+            PostIndexRbBy: bool;
+            ExtraAddressReg: RName option;
+            ShiftExtraRegBy: int option;
         }
 
     /// parse error (dummy, but will do)
@@ -43,6 +49,91 @@ module memInstructions
     /// Parse Active Pattern used by top-level code
     // let (|IMatch|_|) = parse
 
+    let testS = "R0!, [R1, #N]!"
+    let testTrim = testS.Trim()
+    let len = testS.Length
+    let IO = testTrim.LastIndexOf("!")
+    
+    /// Match a regular expression
+    /// Return Some (m,grps) where m is the match string,
+    /// grps is the list of match groups (if any)
+    /// return None on no match
+    let regexMatch (regex:string) (str:string) =
+        let m = Text.RegularExpressions.Regex(regex).Match(str)
+        printfn "m: %A" m
+        if m.Success
+        then
+            let mLst = [ for x in m.Groups -> x.Value ]
+            Some (List.head mLst, List.tail mLst)
+        else None
+
+
+    ///Match the pattern using a cached compiled Regex
+    let (|Match|_|) pattern input =
+        if input = null then None
+        else
+            let m = Regex.Match(input, pattern, RegexOptions.Compiled)
+            if m.Success then Some [for x in m.Groups -> x]
+            else None
+
+
+    type Name = {First:string; Middle:option<string>; Last:string}
+
+    let parseName name =
+        match name with
+        | Match @"^(\w+) (\w+) (\w+)$" [_; first; middle; last] ->
+            Some({First=first.Value; Middle=Some(middle.Value); Last=last.Value})
+        | Match @"^(\w+) (\w+)$" [_; first; last] ->
+            Some({First=first.Value; Middle=None; Last=last.Value})
+        | _ -> 
+            None
+
+    let testP = parseName "Alistair Patrick Wallace"
+
+    // let RE = regexMatch "R[0-5]+" testS
+    // let RE3 = regexMatch "(R)\w+" testS
+    // let RE2 = regexMatch "R[0-15], *\[R[0-16], *#[0-6]\]"
+
+    type FromOps = {Ra:RName; Rb: RName; IncrVal: int;
+                        Post: bool; Rc: RName option;
+                        Shift: int option}
+
+///Parse function for Memory instructions such as LDR and
+/// STR. Returns a record with all the information needed
+/// to execute an LDR or STR instruction.
+    let parseMemIns root suffix ls =
+        let instTypeTmp = 
+            match root with
+            | "LDR"  -> LDR 
+            | "STR" -> STR
+        let bytes = 
+            match suffix with
+            | "" -> false
+            | "B" -> true
+        let pre = ((ls.Operands).Trim()).LastIndexOf("!") = (((ls.Operands).Trim()).Length-1)
+
+        let parseOps ops =
+            match ops with
+            | Match @"R([1-9]|1[0-5])+ *, *\[ *R([1-9]|1[0-5])+ *]" [rA; rB] -> //Base Case
+                Some({Ra=regNames.[rA.Value]; Rb=regNames.[rB.Value]; IncrVal=0; Post= false; Rc= None; Shift= None;})
+            | Match @"R([1-9]|1[0-5])+ *, *\[ *R([1-9]|1[0-5])+ *, *#[0-9]+ *\]" [rA; rB; incV] -> //Increment
+                Some({Ra=regNames.[rA.Value]; Rb=regNames.[rB.Value]; IncrVal=(incV.Value|>int); Post= false; Rc= None; Shift= None;})
+            | Match @"R([1-9]|1[0-5])+ *, *\[ *R([1-9]|1[0-5])+ *] *, *#[0-9]+" [rA; rB; incV] -> //Post Indexing
+                Some({Ra=regNames.[rA.Value]; Rb=regNames.[rB.Value]; IncrVal=(incV.Value|>int); Post= true; Rc= None; Shift= None;})
+            | Match @"R([1-9]|1[0-5]) *, *\[ *R([1-9]|1[0-5]) *, *R([1-9]|1[0-5]) *\]" [rA; rB; incV] -> //Adding Registers
+                Some({Ra=regNames.[rA.Value]; Rb=regNames.[rB.Value]; IncrVal=(incV.Value|>int); Post= false; Rc= None; Shift= None;})
+            | Match @"R([1-9]|1[0-5]) *, *\[ *R([1-9]|1[0-5]) *, *R([1-9]|1[0-5]) *, *LSL *#[0-9] *\]" [rA; rB; rC; shft] -> //Shifting
+                Some({Ra=regNames.[rA.Value]; Rb=regNames.[rB.Value]; IncrVal=0; Post= false; Rc= Some regNames.[rC.Value]; Shift= Some (shft.Value|>int);})
+            | _ -> 
+                None
+        let regExMat = Option.get (parseOps ((ls.Operands).Trim()))
+
+        {InstructionType= instTypeTmp;
+            DestSourceReg= regExMat.Ra; AddressReg= regExMat.Rb;
+            BytesNotWords= bytes; IncrementValue= regExMat.IncrVal;
+            PreIndexRbBy= pre; PostIndexRbBy= regExMat.Post; 
+            ExtraAddressReg= regExMat.Rc;
+            ShiftExtraRegBy= regExMat.Shift;}
 
 
 
@@ -96,15 +187,16 @@ module memInstructions
 
 //----------MEMORY INSTRUCTION DEFINITION AND PARSING-------------------------------------------------
 
-    type LabelInstrType = EQU | Fill | DCD
+    type LabelInstrType = EQU | FILL | DCD
                                    //EquExpr is either:
                                    //a register relative address
                                    //a PC relative address
                                    //an absolute address
                                    //or a 32 bit integer
-    type EquExpr = Num of uint32 option | Exp of string 
+    type EquExpr = uint32 
     type ValueList = string list
-    type LabelL = StrLabel of string option 
+    type LabelL = StrLabelL of string option
+
 
 
     /// instruction (dummy: must change)
@@ -123,7 +215,7 @@ module memInstructions
     /// very incomplete!
     let labelSpec = {
         InstrC = LABEL
-        Roots = ["EQU";"Fill";"DCD"]
+        Roots = ["EQU";"FILL";"DCD"]
         Suffixes = [""]
     }
 
@@ -165,24 +257,33 @@ module memInstructions
         evalExpression' exp0
 
 
-///Parse function for 
+
+    let (|PosMultFour|Error|) x = if ((x % 4 = 0)&&(x>=0)) then PosMultFour else Error
+    let isPosAndDivisibleByFour x = match x with PosMultFour -> x | Error -> 0
+
+
+///Parse function for Label based instructions such as EQU
+/// FILL and DCD. Returns a record with all the information
+/// needed to execute an LDR or STR instruction.
     let parseLabelIns root ls =
         let InstTypeTmp = 
             match root with
             | "EQU"  -> EQU 
-            | "Fill" -> Fill
+            | "FILL" -> FILL
             | "DCD"  -> DCD
         let (fillN, valList, equExp) =
             match InstTypeTmp with
-            | EQU ->    let equExp1 = evalExpression ls.Operands
-                        (None, None, Some (Num (Some equExp1)))  
-            | Fill ->   let fillN1 = ls.Operands |> uint32
-                        (Some fillN1, None, Some (Num None))
-            | DCD ->    let valList1 = (ls.Operands).Split(',') 
+            | EQU  ->   let equExp1 = evalExpression ls.Operands
+                        (None, None, (Some equExp1))  
+            | FILL ->   let fillN1 = ls.Operands |> int 
+                                    |> isPosAndDivisibleByFour 
+                                    |> uint32
+                        (Some fillN1, None, None)
+            | DCD  ->   let valList1 = (ls.Operands).Split(',') 
                                         |> Array.map (fun s-> s.Trim()) 
                                         |> Seq.toList
-                        (None, Some valList1, Some (Num None))
-        let nameOut = StrLabel ls.Label
+                        (None, Some valList1, None)
+        let nameOut = StrLabelL ls.Label
         {InstructionType = InstTypeTmp; Name = nameOut; 
             EQUExpr = equExp; DCDValueList = valList; 
             FillN = fillN}
@@ -256,10 +357,32 @@ module memInstructions
 
 
 
-        
+    //Active Pattern Matching Messing
+    // let (|Odd|Even|) x = if x % 2 = 0 then Even else Odd
+    // let isDivisibleByTwo x = match x with Even -> true | Odd -> false
+    // let test4 = isDivisibleByTwo 4
+    // let test3 = isDivisibleByTwo 3
+
+
+    // let (|UpperCase|) (x:string) = x.ToUpper()
+    // let result = match "foo2" with
+    //              | UpperCase "FOO" -> true
+    //              | _ -> false
+    // assert (result = true)
+    // let ucName name = match name with UpperCase result -> result
+    // let testUC = ucName "test"
 
 
 
+    // let (|ToColor|) x =
+    //     match x with
+    //     | "red"   -> System.Drawing.Color.Red
+    //     | "blue"  -> System.Drawing.Color.Blue
+    //     | "white" -> System.Drawing.Color.White
+    //     | _       -> failwith "Unknown Color"
+    // let form = new System.Windows.Forms.Form()
+    // let (ToColor col) = "red"
+    // form.BackColor <- col
 
 
 
@@ -298,7 +421,7 @@ module memInstructions
         //insert psuedo code here
         0
 
-    let ADRexec (Rdest: RName) (Lab: Label) = 
+    let ADRexec (Rdest: RName) (Lab: LabelADR) = 
         //Takes the address of a label and puts it into the 
         // register. 
         //Eg: ADR		R0, BUFFIN1
