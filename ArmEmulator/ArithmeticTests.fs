@@ -18,7 +18,14 @@ module MultMemTests
             testCase testName <| fun () ->
                 Expect.equal (testFun inp) outp testName
         List.map (fun (input, output) -> makeTest input output) testVals
-        |> testList (sprintf "%s Test List" name) 
+        |> testList (sprintf "%s Test List" name)
+
+    
+    // Taken from xk-mult-mem
+    let genRandomUint32List (min,max) count =
+        let rnd = System.Random()
+        List.init count (fun _ -> rnd.Next (min, max))
+        |> List.map uint32 
 
 
     [<Tests>]
@@ -116,21 +123,80 @@ module MultMemTests
             Expect.equal result expected "Parse Test"
 
     //[<Tests>]
-    let testExec =
+    let testArithExec =
         let makeTestExecStr opcode suffix target op1 op2 = 
             let opcodeStr, suffixStr, operandStr = makeInstrString opcode suffix target op1 op2
             //Return full instruction string of opcode + suffix + operands
             opcodeStr + suffixStr + " " + operandStr
 
 
-        //testPropertyWithConfig config "Test Arithmetic Execution" <|
-        //fun opcode suffix target op1 op2 ->
-            //let instrStr = makeTestExecStr opcode suffix target op1 op2
+        testPropertyWithConfig config "Test Arithmetic Execution" <|
+        fun opcode suffix target op1 op2 (flags: CommonData.Flags) ->
+            let instrStr = makeTestExecStr opcode suffix target op1 op2
             
-        testList "Trial visual tests"
-            [
-            VisualFrameworkTest defaultParas
-            vTest "SUB test" "SUB R0, R0, #1" "0000" [R 0, -1]
-            ]
+            let valid = 
+                match flags with
+                | f when f.N && f.Z -> false
+                | _ -> true
+
+            match valid with
+            | false -> ()
+            | true -> 
+                let randomRegs = 
+                    genRandomUint32List (-0x7FFFFFFF, 0xFFFFFFFF) 12
+                    |> fun lst -> List.concat [lst; [0u; 0u; 0u;]]
+                
+                let testParas = {
+                    defaultParas with
+                        InitRegs = randomRegs; 
+                        //initialise flags
+                        InitFlags = {FN=flags.N;FZ=flags.Z; FC=flags.C;FV=flags.V}
+                    }
+                
+                let initTestRegs = List.mapi (fun i x -> (inverseRegNums.[i], x)) randomRegs |> Map.ofList;
+
+                let parsed = {
+                    PInstr = ArithI
+                            {
+                            InstrType = Some opcode;
+                            SuffixSet = suffix;
+                            Target = target;
+                            Op1 = op1;
+                            Op2 = op2;
+                            }
+                    PLabel = None;
+                    PSize = 4u;
+                    PCond = Cal;
+                }
+
+                let visFlags, visRegs, _ = RunVisualWithFlagsOut testParas instrStr
+
+                let flagsActual = {
+                    N = visFlags.FN;
+                    Z = visFlags.FZ;
+                    C = visFlags.FC;
+                    V = visFlags.FV;
+                }
+
+                // get the values of the registers from VisUAL in ascending order
+                let regsActual = 
+                    visRegs.Regs
+                    |> List.sortBy (fun (r, _) -> r)
+                    |> List.map (fun (_, i) -> uint32 i)
+
+                let cpuData = {
+                    Fl = flags;
+                    Regs = initTestRegs
+                    MM = Map.empty;
+                }
+
+                let resCpu = doArithmetic parsed cpuData
+
+                let localRegs = 
+                    resCpu
+                    |> Map.toList
+                    |> List.map (fun (_, i) -> uint32 i)
+
+                Expect.equal regsActual localRegs "Registers"
         
 
