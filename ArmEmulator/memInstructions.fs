@@ -57,6 +57,13 @@ module MemInstructions
             if m.Success then Some [for x in m.Groups -> x]
             else None
 
+    let (|Matches|_|) pattern input =
+        if input = null then None
+        else
+            let m = Regex.Matches(input, pattern, RegexOptions.Compiled)
+            if m.Count > 0 then Some ([ for x in m -> x.Value])
+            else None
+
 
     type FromOps = {Ra:RName; Rb: RName; IncrVal: int;
                         Post: bool; Rc: RName option;
@@ -122,7 +129,7 @@ module MemInstructions
 //----------ADR INSTRUCTION DEFINITION AND PARSING-------------------------------------------------
 
     type ADRInstrType = ADRm 
-    type LabelADR = string option
+    type LabelAdrExp = uint32
 
 
     /// instruction (dummy: must change)
@@ -130,7 +137,7 @@ module MemInstructions
         {
             InstructionType: ADRInstrType option;
             DestSourceReg: RName option;
-            SecondOp: LabelADR;
+            SecondOp: LabelAdrExp;
         }
 
     /// parse error (dummy, but will do)
@@ -150,8 +157,24 @@ module MemInstructions
     /// Parse Active Pattern used by top-level code
     // let (|IMatch|_|) = parse
 
+    //Mem testing
+
     // let parseAdrIns root ls =
-    //     jlkj
+    //     let ADRInstrTypeTmp =
+    //         match root with
+    //         | "ADR" -> ADRm
+    //     let Ra =    
+    //         match ((ls.Operands).Trim()) with
+    //         | Match @"(R[0-9]|1[0-5])" [_; rA] -> //Post Increment
+    //             Some regNames.[rA.Value]
+    //         | _ ->
+    //             None
+    //     // let LabelExpVal =
+            
+    //     {InstructionType= Some ADRInstrTypeTmp;
+    //         DestSourceReg= Ra;
+    //         SecondOp= LabelAdrExp;
+    //     }
 
 
 
@@ -207,28 +230,51 @@ module MemInstructions
     let opCodesADR = opCodeExpand ADRSpec
     let opCodesMem = opCodeExpand memSpec
     let opCodesLabel = opCodeExpand labelSpec
+            
+    // let testS = "abcdefghij"
+    // let t = testS.[1..(testS.Length-2)]
+    // let testS2 = " efgh"
+    // let testL = [testS; testS2; testS; testS2]
+    // let testTail = List.tail testL
+    // let testC = List.reduce (fun a b -> a+b) testL
+
+    // let Numbers = (0x9F, 0o77, 0b1010)
+    // let dec = byte testBin
 
 
-    let evalExpression (exp0: string) =
-        let rec evalExpression' (exp: string) = 
-            if String.exists (fun c -> (c ='*')) exp then
+    let evalExpression (exp0: string) (symTab0: SymbolTable) =
+        let rec evalExpression' (exp: string) (symTab: SymbolTable) = 
+            if String.exists (fun c -> (c ='(')||(c =')')) exp then
+                match exp with 
+                | Matches @"((\([^)]*\)*)|[^()]*)" tl -> 
+                                                        let bracketsEvaled = 
+                                                                tl
+                                                                |> List.map (fun x -> if (String.exists (fun c -> (c ='(')||(c =')')) x) then ((evalExpression' x.[1..(x.Length-2)] symTab)|>string) else x)
+                                                                |> List.reduce (fun a b -> a+b)
+                                                        evalExpression' bracketsEvaled symTab
+            elif String.exists (fun c -> (c ='*')) exp then
                 exp.Split('*') 
                 |> Seq.toList
-                |> List.map (fun x -> evalExpression' x)
+                |> List.map (fun x -> evalExpression' x symTab)
                 |> List.reduce (fun a b -> a*b)
             elif String.exists (fun c -> (c ='+')) exp then
                 exp.Split('+') 
                 |> Seq.toList
-                |> List.map (fun x -> evalExpression' x)
+                |> List.map (fun x -> evalExpression' x symTab)
                 |> List.reduce (fun a b -> a+b)
             elif String.exists (fun c -> (c ='-')) exp then
                 exp.Split('-') 
                 |> Seq.toList
-                |> List.map (fun x -> evalExpression' x)
+                |> List.map (fun x -> evalExpression' x symTab)
                 |> List.reduce (fun a b -> a-b)
             else 
-                exp |> uint32
-        evalExpression' exp0
+                match exp with 
+                | Match @"(0x[0-9]+)" [_; ex] -> ex.Value |> uint32
+                | Match @"(&[0-9]+)" [_; ex] -> ("0x"+(ex.Value).[1..(ex.Length-1)]) |> uint32
+                | Match @"(0b[0-1]+)" [_; ex] -> ex.Value |> uint32
+                | Match @"([0-9]+)" [_; ex] -> ex.Value |> uint32
+                | Match @"(\w+)" [_; lab] -> symTab.[lab.Value]
+        evalExpression' exp0 symTab0
 
 
 
@@ -247,7 +293,7 @@ module MemInstructions
             | "DCD"  -> DCD
         let (fillN, valList, equExp) =
             match InstTypeTmp with
-            | EQU  ->   let equExp1 = evalExpression ls.Operands
+            | EQU  ->   let equExp1 = evalExpression ls.Operands (Option.get (ls.SymTab))
                         (None, None, (Some equExp1))  
             | FILL ->   let fillN1 = ls.Operands |> int 
                                     |> isPosAndDivisibleByFour 
@@ -395,7 +441,7 @@ module MemInstructions
         //insert psuedo code here
         0
 
-    let ADRexec (Rdest: RName) (Lab: LabelADR) = 
+    let ADRexec (Rdest: RName) (Lab: LabelAdrExp) = 
         //Takes the address of a label and puts it into the 
         // register. 
         //Eg: ADR		R0, BUFFIN1
@@ -417,6 +463,8 @@ module MemInstructions
         // data3, however the U means that the values are not
         // word aligned.
         //NOTE: this line will not run in visual but it should
+        
+        //Update Symbol Table and update the DataPath.MM
         0
 
     let EQUexec = 
@@ -427,6 +475,7 @@ module MemInstructions
         //Eg2: xyz EQU label+8
         // this assigns the address (label+8) to the label xyz
 
+        //Update Symbol Table and update the DataPath.MM
         0
 
     let FILLexec = 
@@ -437,5 +486,7 @@ module MemInstructions
         // evaluate to a multiple of 4.
         //Eg2:   data4	Fill		4*3
         //As you can see, the last operand can be an expression
+        
+        //Update Symbol Table and update the DataPath.MM
         0
         

@@ -90,10 +90,11 @@ module memInstructionsTests
 
 
     [<Tests>]
-    let evalExpressionTest = 
+    let evalExpressionTest =
+        let st:SymbolTable = ["testL",256u; "testL2",260u] |> Map.ofList
         let makeevalExpTest name input output =
             testCase name <| fun () ->
-                Expect.equal (evalExpression input) output (sprintf "evalExpression Test '%s'" input)
+                Expect.equal (evalExpression input st) output (sprintf "evalExpression Test '%s'" input)
         Expecto.Tests.testList "evalExpressions Tests"
                 [   //parseDCD
 
@@ -103,6 +104,19 @@ module memInstructionsTests
                     makeevalExpTest "All" "1*2*3*4+5*3-2" 54u
                     makeevalExpTest "All2" "5-4*3-1*1+2*2*2" 24u
                     makeevalExpTest "Num Only" "3" 3u
+                    makeevalExpTest "Label Only" "testL" 256u
+                    makeevalExpTest "Label + 2" "testL + 2" 258u
+                    makeevalExpTest "Label Right Multiply" "testL + 2*2" 516u
+                    makeevalExpTest "Label Left Multiply" "2*2 + testL" 516u
+                    makeevalExpTest "Label Add Hex" "testL + 0x4" 260u
+                    makeevalExpTest "Label Add Hex&" "testL + &4" 260u
+                    makeevalExpTest "Label Add Bin" "testL + 0b100" 260u
+                    makeevalExpTest "Brackets1" "(4*2)+3" 11u
+                    makeevalExpTest "Brackets2" "testL + (2*2)" 260u
+                    // makeevalExpTest "Label Right Left Multiply" "4*2 + testL + 2*2" 532u
+
+
+
 
                 ]
 
@@ -350,6 +364,33 @@ module memInstructionsTests
                 ]
 
 
+
+    // let Mem1 = DataLoc 2u
+    // let Addr1 = WA 256u
+    // let (MachMem1: MachineMemory<'INS>) = (Map.empty).Add(Addr1,Mem1) 
+
+    // let (symTab: SymbolTable) = (Map.empty).Add("testLabel",256u)
+
+
+    // let parseAdrInsTest = 
+    //     let st:SymbolTable = ["testL",256u; "testL2",260u] |> Map.ofList
+    //     let ldFunc symTab Ops = 
+    //             {LoadAddr= WA 100u; 
+    //                 Label= Some "labelT"; 
+    //                 SymTab= Some symTab;
+    //                 OpCode= "";
+    //                 Operands= Ops}
+    //     let makeTest root ld name output =
+    //         testCase name <| fun () ->
+    //             Expect.equal (parseAdrIns root ld) output (sprintf "Parse ADR Tests\nTest: %A" name)
+    //     Expecto.Tests.testList "parseAdrIns Tests"
+    //             [   
+    //                 //LDR tests
+    //                 makeTest "ADR" (ldFunc st "R0, testL") "ADR Base Case" {InstructionType= Some ADRm;
+    //                                                                             DestSourceReg= Some R0;
+    //                                                                             SecondOp= 256u;}
+
+    //             ]
 
 
 

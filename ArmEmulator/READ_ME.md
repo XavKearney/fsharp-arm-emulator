@@ -8,7 +8,10 @@ This section covers six instructions seperated into three groups:
   - Label Instructions - DCD, EQU, Fil
   - ADR - ADR
 
-I seperated the instructions in this way because each group contained instrucitons which recieved their input in the same form and so could be easily parsed together. 
+I seperated the instructions in this way because each group contained instrucitons which recieved their input in the same form and so could be easily parsed together.
+
+
+
 
 # LDR & STR
 ### Documentation of visUAL implementation
@@ -28,14 +31,32 @@ There are six ways in which you can implement LDR and STR nicely summarised in t
 ### visUAL Quirks 
 1. In the shifted register case, if you give it a negative N, then instead of shifting Rc to the right by 1 (x -> x/2) it ignores the Rc and the shift and implements it the same as if it was the base case LDR Ra,[Rb].
 2. 
+### How I've Tested it 
+So far I have tested my LDR and STR parser using a series of 36 unit tests going through most of the combinations of the six ways in which LDR and STR can be implemented, however so far they have only been tested for valid inputs.
+
+
+
 
 # DCD, EQU & Fill
 
-
+### How I've Tested it 
+So fair I have tested these three instuctions using a series of 33 unit tests which test base case inputs and some edge cases such as negative inputs to the #N part of Fill N.
 
 # ADR
 
+### Examples
+Let testL be a label for the address 256 (0x100) and testL2 be the label for 260 (0x104)
+| Instruction | Meaning | Label |
+| ------ | ------ | ------ |
+| ADR R0 label | R0 := 256 | Base Case |
+| ADR R0 testL + 4 | R0 := (256 + 4) = 260 | Addition |
+| ADR R0 4\*2 + testL | R0 := (4\*2 + 256) = 264 | Left Multiplication |
+| ADR R0 testL + 4\*2 | R0 := (256 + 4)\*2 = 520 | Right Multiplication |
+| ADR R0 4\*2 + testL + 2\*2 | R0 := (4\*2 + 256 + 4)\*2 = 528 | Left & Right Multiplication |
+| ADR R0 testL + testL2 | R0 := (256 + 260) = 516 | Adding Labels |
+
 ### visUAL Quirks 
+Note from the examples above that the visUAL does not parse the expression for the label using the normal BIDMAS rules, instead it seems to use a lect accumulate multiplication method.
 1. If you have an expression instead of a label for the second operand of ADR then it does not add normally.
   - Eg: if testL = 256
   - testL + 4\*2 -> (256 + 4)\*2 -> 520
@@ -43,8 +64,10 @@ There are six ways in which you can implement LDR and STR nicely summarised in t
   - This seems to be a left accumulate addition method.
 
 2. 
+### How I've Tested it 
 
 
+# Demo Stuff
   - Import a HTML file and watch it magically convert to Markdown
   - Drag and drop images (requires your Dropbox account be linked)
 
