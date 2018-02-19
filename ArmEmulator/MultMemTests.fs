@@ -371,27 +371,27 @@ module MultMemTests
                         PLabel = None; PSize = 4u; PCond = Cal;
                     }
                 // run VisUAL with the instruction and parameters above
-                let flagsExp, outExp, memExp = RunVisualWithFlagsOut testParas instrString
+                let visFlags, visRegs, visMem = RunVisualWithFlagsOut testParas instrString
                 // convert between Flags types
-                let flagsActual = {
-                    N = flagsExp.FN;
-                    Z = flagsExp.FZ;
-                    C = flagsExp.FC;
-                    V = flagsExp.FV;
+                let flagsExp = {
+                    N = visFlags.FN;
+                    Z = visFlags.FZ;
+                    C = visFlags.FC;
+                    V = visFlags.FV;
                 }
 
                 // get the values of the registers from VisUAL in ascending order
                 let regsExp = 
-                    outExp.Regs
+                    visRegs.Regs
                     |> List.sortBy (fun (r, _) -> r)
                     |> List.map (fun (_, i) -> uint32 i)
                 // get the relevant memory contents from VisUAL
-                let memCheck = 
+                let memExp = 
                     match opcode, direction with
                     | STM, (ED | FD) | LDM, (FD | ED) -> 
-                        memExp |> List.rev |> List.tail |> List.take rLst.Length
+                        visMem |> List.rev |> List.tail |> List.take rLst.Length
                     | STM, (EA | FA) | LDM, (EA | FA)->
-                        memExp |> List.take rLst.Length |> List.rev
+                        visMem |> List.take rLst.Length |> List.rev
                
                // create a DataPath with the correct initial register and mem contents
                 let cpuData = {
@@ -419,7 +419,7 @@ module MultMemTests
                     // check that the registers in VisUAL = registers after execution
                     Expect.equal regsActual regsExp.[..regsExp.Length - 2]  "Registers"
                     // check that the memory in VisUAL = memory after execution
-                    Expect.equal memActual memCheck "Memory"
+                    Expect.equal memActual memExp "Memory"
                     // check that the flags in VisUAL = flags after execution
-                    Expect.equal flags flagsActual "Flags"
+                    Expect.equal flags flagsExp "Flags"
                 | Error _ -> ()
