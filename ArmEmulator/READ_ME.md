@@ -26,11 +26,11 @@ There are six ways in which you can implement LDR and STR nicely summarised in t
 | LDR Ra, [Rb,Rc,LSL #N] | Ra := Mem~32~[Rb+Rc*2^N^] | Shifted Register |
 
   - Note: You can add the ! to the end of any line. Ie: if you add an ! to the end a Shifted Register type line then you will increment Rb by Rc*2^N^.
-  - 
+  - Note: You can swap LDR for STR in any of these instructions
 
 ### visUAL Quirks 
 1. In the shifted register case, if you give it a negative N, then instead of shifting Rc to the right by 1 (x -> x/2) it ignores the Rc and the shift and implements it the same as if it was the base case LDR Ra,[Rb].
-2. 
+2. In the ARM instruction guide which can be found at (http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.dui0552a/BABCAEDD.html) it states that N in the shifted case is limited to 0-3. However in visUAL this number is only limited to  being positive.
 ### How I've Tested it 
 So far I have tested my LDR and STR parser using a series of 36 unit tests going through most of the combinations of the six ways in which LDR and STR can be implemented, however so far they have only been tested for valid inputs.
 
