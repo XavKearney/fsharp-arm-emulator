@@ -61,7 +61,11 @@ module MultMemTests
                 ("R0, R12, #-3*6+-1", Error ("Invalid expression"));
                 ("R0, R12, #0b11*6+1", Ok (R0, R12, Literal (uint32 19)));
                 ("R0, R12, #0b12*6+1", Error ("Invalid 32 bit number"));
-                ("R0, R12, #3-2-", Error ("Invalid expression"));         
+                ("R0, R12, #3-2-", Error ("Invalid expression"));
+                ("R7,R3,#0b111101001101101", Error ("Op2 is not a valid 32 bit number"));
+                ("R7,R3,#0b111111110", Error ("Op2 is not a valid 32 bit number"));
+                ("R7,R3,#0b1111111100", Ok (R7, R3, Literal (uint32 1020)));
+                         
             ]
 
 

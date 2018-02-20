@@ -173,7 +173,17 @@ module Arithmetic
         match int64 input with
         | x when x > int64 System.Int32.MaxValue -> Error ("Invalid 32 bit number")
         | x when x < int64 System.Int32.MinValue -> Error ("Invalid 32 bit number")
-        | x -> Ok x
+        | x -> 
+            let rotates = [0;2;4;6;8;10;12;14;16;18;20;22;24;26;28;30]
+            let valid = 
+                List.map (fun a -> uint32((x <<< (32-a)) + (x >>> a))) rotates
+                |> List.collect (fun b -> [b <= uint32(255)])
+                |> List.contains true 
+                
+            match valid with
+            | true -> Ok x
+            | false -> Error ("Invalid 32 bit number")
+
 
     let recursiveSplit expression =
         let lift op a b =
