@@ -30,30 +30,30 @@ module MultMemTests
 
     [<Tests>]
     let testParseOpsLine = 
-        makeTestList parseArithLine "parseOpsLine Unit Tests" 
+        makeTestList parseArithLine "parseArithLine Unit Tests" 
             [
                 ("R7,R3,R9", Ok (R7, R3, Register R9));
                 ("R0, R12, R1", Ok (R0, R12, Register R1));
-                ("R,R3,R9", Error "Op1 or destination is an invalid register");
-                ("R7, R20, R9", Error "Op1 or op2 is an invalid register");
+                ("R,R3,R9", Error "Destination is not a valid register");
+                ("R7, R20, R9", Error "Op1 is not a valid register");
                 ("R7, R3, R20", Error "Op2 is not a valid register or expression");
                 ("R7,R3,#-2", Ok (R7, R3, Literal (uint32 -2)));
                 ("R0, R12, #0b11", Ok (R0, R12, Literal (uint32 3)));
                 ("R0, R12, #0x11", Ok (R0, R12, Literal (uint32 17)));
-                ("R7,R3", Error "The instruction is invalid");
-                ("R7,R3,R5,R9,R1", Error "Flex op 2 has invalid format");
-                ("R7,,R3", Error "The instruction is invalid");
-                //("R7,R3,", Error "Op2 is not a valid register or expression");
-                (",R7,R3", Error "The instruction is invalid");
-                ("R7,R3,#0b12", Error ("Flex op 2 has invalid format"));
-                ("R7,R3,#11111111111111111111", Error ("Invalid 32 bit number"));
-                ("R7,R3,#abc", Error ("Flex op 2 has invalid format"));
+                ("R7,R3", Error "Invalid arithmetic instruction");
+                ("R7,R3,R5,R9,R1", Error "Invalid arithmetic instruction");
+                ("R7,,R3", Error "Op1 is not a valid register");
+                ("R7,R3,", Error "Op2 is not a valid register or expression");
+                (",R7,R3", Error "Destination is not a valid register");
+                ("R7,R3,#0b12", Error ("Invalid op2 expression"));
+                ("R7,R3,#11111111111111111111", Error ("Op2 is not a valid 32 bit number"));
+                ("R7,R3,#abc", Error ("Invalid op2 expression"));
                 ("R7,R3,#0xFFFFFFFF2", Error ("Invalid 32 bit number"));
-                ("R7,R3,#2, LSL #1", Error ("Flex op 2 has invalid format"));
+                ("R7,R3,#2, LSL #1", Error ("Invalid op2 register"));
                 ("R7,R3,R0, LSL #1", Ok (R7,R3, RegisterShift (R0, LSL, 1)));
-                ("R7,R3,R0, LSP #1", Error ("Shift operation is invalid"));
+                ("R7,R3,R0, LSP #1", Error ("Invalid shift operation"));
                 ("R7,R3,R0, ASR R8", Ok (R7,R3, RegisterRegisterShift (R0, ASR, R8)));
-                ("R7,R3,R0, LSL R30", Error ("Shift op register is invalid"));
+                ("R7,R3,R0, LSL R30", Error ("Op2 is not a valid register or expression"));
             ]
     
     let config = { FsCheckConfig.defaultConfig with maxTest = 10000 }
@@ -85,7 +85,7 @@ module MultMemTests
         opcodeStr, suffixStr, operandStr
 
     
-    [<Tests>]
+    //[<Tests>]
     let testParse = 
         let makeTestLineData wa opcode suffix target op1 op2 = 
             

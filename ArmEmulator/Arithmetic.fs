@@ -186,21 +186,21 @@ module Arithmetic
                 expression.Split('+')
                 |> Array.map (fun s-> s.Trim()) 
                 |> Array.toList
-                |> List.map recursiveSplit'
+                |> List.map ((fun s -> if s = "" then "0" else s) >> recursiveSplit')
                 |> List.reduce (lift (+))
 
             elif String.exists (fun c -> c='-') expression then
                 expression.Split('-')
-                |> Array.map (fun s-> s.Trim()) 
+                |> Array.map (fun s -> s.Trim())
                 |> Array.toList
-                |> List.map recursiveSplit'
+                |> List.map ((fun s -> if s = "" then "0" else s) >> recursiveSplit')
                 |> List.reduce (lift (-))
 
             elif String.exists (fun c -> c='-') expression then
                 expression.Split('*')
                 |> Array.map (fun s-> s.Trim()) 
                 |> Array.toList
-                |> List.map recursiveSplit'
+                |> List.map ((fun s -> if s = "" then "0" else s) >> recursiveSplit')
                 |> List.reduce (lift (*))
 
             else
@@ -354,7 +354,7 @@ module Arithmetic
                     | _ -> Error ("Invalid op2 register")
                 | _ -> Error ("Invalid op1 register") 
             | _ -> Error ("Invalid destination register")
-        | _ -> Error ("Not setup yet")
+        | _ -> Error ("Invalid arithmetic instruction")
         
 
     let makeArithInstr root (suffix:string) operands =
