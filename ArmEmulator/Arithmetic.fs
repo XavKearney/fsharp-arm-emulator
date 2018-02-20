@@ -2,6 +2,11 @@ module Arithmetic
     open CommonData
     open CommonLex
     open System.Text.RegularExpressions
+    open System.Linq.Expressions
+    open VisualTest
+    open VisualTest
+    open Microsoft.VisualBasic.CompilerServices
+    open System.Threading
 
     type ArithInstrType = ADD | ADC | SUB | SBC | RSB | RSC
 
@@ -24,6 +29,7 @@ module Arithmetic
 
     type Op2Types = Literal of uint32 | Register of RName | RegisterShift of RName * Operations * int32 | RegisterRegisterShift of RName * Operations * RName
 
+    type ParseReturn = Arith of RName * RName * Op2Types | Compare of RName * Op2Types
 
     type ArithInstr = 
         {
@@ -75,8 +81,8 @@ module Arithmetic
 
     let (|Prefix|_|) (p:string) (s:string) =
         if s.StartsWith(p) then
-            // Return string after #
-            Some(s.Substring(1))
+            // Return string after pattern
+            Some(s.Substring(p.Length))
         else
             None
 
@@ -163,130 +169,188 @@ module Arithmetic
                 | {Fl = _ ; Regs = regmap } -> (Map.find reg regmap <<< (32 - integer)) + (Map.find reg regmap >>> integer)
 
 
+    let check32BitBound input =
+        match int64 input with
+        | x when x > int64 System.Int32.MaxValue -> Error ("Invalid 32 bit number")
+        | x when x < int64 System.Int32.MinValue -> Error ("Invalid 32 bit number")
+        | x -> Ok x
+
+    let recursiveSplit expression =
+        let lift op a b =
+            match a,b with
+            | Ok x, Ok y -> Ok (op x y)
+            | _, _ -> Error ("Invalid 32 bit number")
+        
+        let rec recursiveSplit' expression = 
+            if String.exists (fun c -> c='+') expression then
+                expression.Split('+')
+                |> Array.map (fun s-> s.Trim()) 
+                |> Array.toList
+                |> List.map recursiveSplit'
+                |> List.reduce (lift (+))
+
+            elif String.exists (fun c -> c='-') expression then
+                expression.Split('-')
+                |> Array.map (fun s-> s.Trim()) 
+                |> Array.toList
+                |> List.map recursiveSplit'
+                |> List.reduce (lift (-))
+
+            elif String.exists (fun c -> c='-') expression then
+                expression.Split('*')
+                |> Array.map (fun s-> s.Trim()) 
+                |> Array.toList
+                |> List.map recursiveSplit'
+                |> List.reduce (lift (*))
+
+            else
+                match expression with
+                | FlexParse "^(-?0b[0-1]+)$" [binStr] -> 
+                    match binStr.Length with
+                    | x when x > 38 -> Error ("Op2 is not a valid 32 bit number")
+                    | _ -> 
+                        match check32BitBound binStr with
+                        | Ok binInt -> Ok (binInt)
+                        | _ -> Error ("Op2 is not a valid 32 bit number")  
+
+                | FlexParse "^(-?0x[0-9A-F]+)$" [hexStr] -> 
+                    match hexStr.Length with
+                    | x when x > 14 -> Error ("Op2 is not a valid 32 bit number")
+                    | _ -> 
+                        match hexStr with
+                        | Prefix "&" hexOut ->
+                            let finalHex = "0x" + hexOut
+                            match check32BitBound finalHex with
+                            | Ok hexInt -> Ok (hexInt)
+                            | _ -> Error ("Invalid 32 bit number")
+                        | _ ->
+                            match check32BitBound hexStr with
+                            | Ok hexInt -> Ok (hexInt)
+                            | _ -> Error ("Invalid 32 bit number")
+
+                | FlexParse "^(-?[0-9]+)$" [numStr] ->
+                    match numStr.Length with
+                    | x when x > 14 -> Error ("Op2 is not a valid 32 bit number")
+                    | _ ->
+                        match check32BitBound numStr with
+                        | Ok numInt -> Ok (numInt)
+                        | _ -> Error ("Invalid 32 bit number")
+                | _ -> Error ("Invalid op2 expression")
+
+        recursiveSplit' expression
 
 
     let parseOpsLine (line:string) = 
-        match line with
-        // Regex match captures target, op1 and then everything following the last comma
-        | FlexParse "(R[0-9]+),\s*(R[0-9]+),\s*(.*)" [targetStr; op1Str; op2] ->
-            match regNames.TryFind targetStr with
-            | Some target -> 
-                match regNames.TryFind op1Str with
-                | Some op1 -> 
-                    let op2List = op2.Split(",")
-                    match op2List.Length with
-                    | 1 -> 
-                        match op2 with
-                        | FlexParse "(R[0-9]+|#-?0b[0-1]+|#-?0x[0-9A-F]+|#-?[0-9]+)$" [op2Val] -> 
-                            match op2Val with
-                            | Prefix "#" op2Num ->
-                                match String.length op2Num with
-                                | x when x < 12 -> 
-                                    match int64 op2Num with
-                                    | x when x > int64 2147483647 -> Error ("Invalid 32 bit number")
-                                    | x when x < int64 -2147483648 -> Error ("Invalid 32 bit number")
-                                    | _ -> Ok (target, op1, Literal (uint32 (int32 op2Num)))
-                                | _ -> Error ("Invalid 32 bit number") 
-                            | _ -> 
-                                match regNames.TryFind op2Val with
-                                | Some op2Reg -> Ok (target, op1, Register op2Reg)
-                                | None -> Error ("Op2 is not a valid register")
+        
+        let opList = line.Split(',') |> Array.map (fun s-> s.Trim()) |> Array.toList
 
-                        | _ -> Error ("Flex op 2 has invalid format")
-                    | 2 ->
-                        match op2 with
-                        | FlexParse "(R[0-9]+),\s*([A-Z]+)\s+(R[0-9]+|#-?0b[0-1]+|#-?0x[0-9A-F]+|#-?[0-9]+)$" [op2Val; shift; shiftVal] ->
-                            match regNames.TryFind op2Val with
-                            | Some op2Reg -> 
-                                match operationNames.TryFind shift with
-                                | Some shiftOp -> 
-                                    match shiftVal with
-                                    | Prefix "#" shiftNum -> 
-                                        match String.length shiftNum with
-                                        | x when x < 12 -> 
-                                            match int64 shiftNum with
-                                            | x when x > int64 2147483647 -> Error ("Invalid 32 bit number")
-                                            | x when x < int64 -2147483648 -> Error ("Invalid 32 bit number")
-                                            | _ -> Ok (target, op1, RegisterShift(op2Reg, shiftOp, int32 shiftNum))
-                                        | _ -> Error ("Invalid 32 bit number")                    
-                                    | _ -> 
-                                        match regNames.TryFind shiftVal with
-                                        | Some shiftReg -> Ok (target, op1, RegisterRegisterShift(op2Reg, shiftOp, shiftReg))
-                                        | None -> Error ("Shift op register is invalid")
+        match opList.Length with
+        | 2 ->
+            let op1Str = opList.[0]
+            let op2Str = opList.[1]
 
-                                | None -> Error ("Shift operation is invalid")
-                            | None -> Error ("Op2 is not a valid register")
-                        | _ -> Error ("Flex op 2 has invalid format")
-                    | _ -> Error ("Flex op 2 has invalid format")
-                | _ -> Error ("Op1 register is invalid")
-            | _ -> Error ("Target register is invalid") 
-        | _ -> Error ("The instruction is invalid")
-
-
-
-    let parseCompLine line = 
-        match line with
-        | FlexParse "^(R[0-9]+),\s*(R[0-9]+|#-?0b[0-1]+|#-?0x[0-9A-F]+|#-?[0-9]+)(,\s*([A-Z]+)\s+(R[0-9]+|#-?0b[0-1]+|#-?0x[0-9A-F]+|#-?[0-9]+))?$" [op1Str; op2Str] ->
             match regNames.TryFind op1Str with
             | Some op1 -> 
                 match op2Str with
-                | Prefix "#" op2Num ->
-                    match String.length op2Num with
-                    | x when x < 12 -> 
-                        match int64 op2Num with
-                        | x when x > int64 2147483647 -> Error ("Invalid 32 bit number")
-                        | x when x < int64 -2147483648 -> Error ("Invalid 32 bit number")
-                        | _ -> Ok (op1, Literal (uint32 (int32 op2Num)))
-                    | _ -> Error ("Invalid 32 bit number") 
+                | Prefix "#" op2Num -> 
+                    let op2 = recursiveSplit op2Num
+                    match op2 with
+                    | Ok op2Out -> Ok (Compare (op1, Literal (uint32 op2Out)))
+                    | Error err -> Error (err) 
                 | _ ->
                     match regNames.TryFind op2Str with
-                    | Some op2 -> Ok (op1, Register op2)                   
-                    | _ -> Error ("Op2 is not a register")
-            | _ -> Error ("Op1 is not a register")
+                    | Some op2 -> Ok (Compare (op1, Register op2))                  
+                    | _ -> Error("Op2 is not a valid register or expression")
+            
+            | _ -> Error ("Op1 is not a valid register")
+        
+        | 3 -> 
+            let destOrOp1Str = opList.[0]
+            let op1OrOp2Str = opList.[1]
+            let op2OrFlexStr = opList.[2]
 
-        | FlexParse "^(R[0-9]+),\s*(R[0-9]+|#-?0b[0-1]+|#-?0x[0-9A-F]+|#-?[0-9]+)(,\s*([A-Z]+)\s+(R[0-9]+|#-?0b[0-1]+|#-?0x[0-9A-F]+|#-?[0-9]+))?$" [op1Str; op2Str; _; shiftStr; shiftValStr] ->
-            match regNames.TryFind op1Str with
-            | Some op1 ->
-                match op2Str with
-                | Prefix "#" _ -> Error ("Op2 must be a register if performing a shift")
-                | _ ->
+            match regNames.TryFind destOrOp1Str with
+            | Some destOrOp1 -> 
+                match regNames.TryFind op1OrOp2Str with
+                | Some op1OrOp2 -> 
+                    match op2OrFlexStr with
+                    | FlexParse "^([A-Z]+)\s+(R[0-9]+|#-?0b[0-1]+|#-?0x[0-9A-F]+|#-?&[0-9A-F]+|#-?[0-9]+)$" [shiftOpStr;regLitStr] ->
+                        match operationNames.TryFind shiftOpStr with
+                        | Some shiftOp ->
+                            match regLitStr with
+                            | Prefix "#" op2Num -> 
+                                let op2 = recursiveSplit op2Num
+                                match op2 with
+                                | Ok op2Out -> Ok (Compare (destOrOp1, RegisterShift (op1OrOp2, shiftOp, int32 op2Out)))
+                                | Error err -> Error (err) 
+                            | _ ->
+                                match regNames.TryFind regLitStr with
+                                | Some op2Out -> Ok (Compare (destOrOp1, RegisterRegisterShift (op1OrOp2, shiftOp, op2Out)))                 
+                                | _ -> Error ("Op2 is not a valid register or expression")
+
+                        | _ -> Error ("Shift op is invalid")
+                    | _ ->
+                        match op2OrFlexStr with
+                        | Prefix "#" op2Num -> 
+                            let op2 = recursiveSplit op2Num
+                            match op2 with
+                            | Ok op2Out -> Ok (Arith (destOrOp1, op1OrOp2, Literal (uint32 op2Out)))
+                            | Error err -> Error (err) 
+                        | _ ->
+                            match regNames.TryFind op2OrFlexStr with
+                            | Some op2Out -> Ok (Arith (destOrOp1, op1OrOp2, Register op2Out))                
+                            | _ -> Error("Op2 is not a valid register or expression")
+                | _ -> Error ("Op1 or op2 is an invalid register")
+            | _ -> Error ("Op1 or destination is an invalid register")
+
+
+        | 4 -> 
+            let destStr = opList.[0]
+            let op1Str = opList.[1]
+            let op2Str = opList.[2]
+            let flexStr = opList.[3]
+
+            match regNames.TryFind destStr with
+            | Some dest -> 
+                match regNames.TryFind op1Str with
+                | Some op1 -> 
                     match regNames.TryFind op2Str with
-                    | Some op2 -> 
-                        match operationNames.TryFind shiftStr with
-                        | Some shiftOp -> 
-                            match shiftValStr with
-                            | Prefix "#" shiftNum -> 
-                                match String.length shiftNum with
-                                | x when x < 12 -> 
-                                    match int64 shiftNum with
-                                    | x when x > int64 2147483647 -> Error ("Invalid 32 bit number")
-                                    | x when x < int64 -2147483648 -> Error ("Invalid 32 bit number")
-                                    | _ -> Ok (op1, RegisterShift(op2, shiftOp, int32 shiftNum))
-                                | _ -> Error ("Invalid 32 bit number")                    
-                            | _ -> 
-                                match regNames.TryFind shiftValStr with
-                                | Some shiftReg -> Ok (op1, RegisterRegisterShift(op2, shiftOp, shiftReg))
-                                | None -> Error ("Shift op register is invalid")
-                        | _ -> Error ("Shift operation is invalid")
-                    | _ -> Error ("Op2 is not a valid register")
-            | _ -> Error ("Op1 is not a register")
-        | _ -> Error ("Invalid compare instruction")
+                    | Some op2 ->
+                        match flexStr with
+                        | FlexParse "^([A-Z]+)\s+(R[0-9]+|#-?0b[0-1]+|#-?0x[0-9A-F]+|#-?&[0-9A-F]+|#-?[0-9]+)$" [shiftOpStr;regLitStr] ->
+                            match operationNames.TryFind shiftOpStr with
+                            | Some shiftOp ->
+                                match regLitStr with
+                                | Prefix "#" shiftNumStr -> 
+                                    let shiftInt = recursiveSplit shiftNumStr
+                                    match shiftInt with
+                                    | Ok shiftVal -> Ok (Arith (dest, op1, RegisterShift (op2, shiftOp, int32 shiftVal)))
+                                    | Error err -> Error (err) 
+                                | _ ->
+                                    match regNames.TryFind regLitStr with
+                                    | Some shiftReg -> Ok (Arith (dest, op1, RegisterRegisterShift (op2, shiftOp, shiftReg)))                 
+                                    | _ -> Error ("Op2 is not a valid register or expression")
 
-        
+                            | _ -> Error ("Invalid shift operation")
+                        | _ -> Error ("Invalid flex op 2")
+                    | _ -> Error ("Invalid op2 register")
+                | _ -> Error ("Invalid op1 register") 
+            | _ -> Error ("Invalid destination register")
+        | _ -> Error ("Not setup yet")
         
 
-    let makeArithInstr root (suffix:string) operands =
+    let makeInstr root (suffix:string) operands =
         // Makes final instruction from baseInstr
         let makeInstr ins = 
-            Ok(ins)
+            ins
         
         match parseOpsLine operands with
-        | Ok (dest, op1, op2) -> 
+        | Ok (Arith (dest, op1, op2)) -> 
             // Converts suffix string into bool option
             let suffType = suffix.EndsWith('S') 
 
             // Creates basic ArithInstr type
-            let baseInstr = {
+            let baseArithInstr = {
                 InstrType = None;
                 SuffixSet = suffType;
                 Target = dest;
@@ -295,34 +359,26 @@ module Arithmetic
             }
 
             match root with
-            | "ADD" -> makeInstr {baseInstr with InstrType = Some(ADD);}
-            | "ADC" -> makeInstr {baseInstr with InstrType = Some(ADC);}
-            | "SUB" -> makeInstr {baseInstr with InstrType = Some(SUB);}
-            | "SBC" -> makeInstr {baseInstr with InstrType = Some(SBC);}
-            | "RSB" -> makeInstr {baseInstr with InstrType = Some(RSB);}
-            | "RSC" -> makeInstr {baseInstr with InstrType = Some(RSC);}
+            | "ADD" -> Ok (ArithI (makeInstr {baseArithInstr with InstrType = Some(ADD);}))
+            | "ADC" -> Ok (ArithI (makeInstr {baseArithInstr with InstrType = Some(ADC);}))
+            | "SUB" -> Ok (ArithI (makeInstr {baseArithInstr with InstrType = Some(SUB);}))
+            | "SBC" -> Ok (ArithI (makeInstr {baseArithInstr with InstrType = Some(SBC);}))
+            | "RSB" -> Ok (ArithI (makeInstr {baseArithInstr with InstrType = Some(RSB);}))
+            | "RSC" -> Ok (ArithI (makeInstr {baseArithInstr with InstrType = Some(RSC);}))
             | _ -> Error ("Opcode is invalid or not supported in this module")
-        | Error err -> Error err
 
-
-
-    let makeCompInstr root operands = 
-        let makeInstr ins = 
-            Ok(ins)
-
-        match parseCompLine operands with
-        | Ok (op1, op2) ->
-            let baseInstr = {
+        | Ok (Compare(op1, op2)) -> 
+            let baseCompInstr = {
                 InstrType = None;
                 Op1 = op1;
                 Op2 = op2;
             }
 
             match root with
-            | "CMP" -> makeInstr {baseInstr with InstrType = Some(CMP);}
-            | "CMN" -> makeInstr {baseInstr with InstrType = Some(CMN);}
+            | "CMP" -> Ok (CompI (makeInstr {baseCompInstr with InstrType = Some(CMP);}))
+            | "CMN" -> Ok (CompI (makeInstr {baseCompInstr with InstrType = Some(CMN);}))
             | _ -> Error ("Opcode is invalid or not supported in this module")
-
+        
         | Error err -> Error err
 
 
@@ -338,23 +394,22 @@ module Arithmetic
             let (WA la) = ls.LoadAddr
             match instrC with
             | ARITH -> 
-                match makeArithInstr root suffix ls.Operands with
-                | Ok pinstr -> Ok {
+                match makeInstr root suffix ls.Operands with
+                | Ok (ArithI pinstr) -> 
+                    Ok {
                         PInstr = ArithI pinstr;
                         PLabel = ls.Label |> Option.map (fun lab -> lab, la); 
                         PSize = 4u; 
                         PCond = pCond;
                     }
-                | Error s -> Error s
-            | COMP ->
-                match makeCompInstr root ls.Operands with
-                | Ok pinstr -> Ok {
+                | Ok (CompI pinstr) ->
+                    Ok {
                         PInstr = CompI pinstr;
                         PLabel = ls.Label |> Option.map (fun lab -> lab, la); 
                         PSize = 4u; 
                         PCond = pCond;
-                    }
-                | Error s -> Error s 
+                    }          
+                | Error s -> Error s
             | _ -> Error ("Instruction class not supported.")
         Map.tryFind ls.OpCode arithOpCodes
         |> Option.map parse'
@@ -412,8 +467,6 @@ module Arithmetic
             | None -> failwithf "No instruction specified"
         | _ -> 
             failwithf "Not completed comp instruction"
-
-        
 
 
     let (|IMatch|_|) = parse
