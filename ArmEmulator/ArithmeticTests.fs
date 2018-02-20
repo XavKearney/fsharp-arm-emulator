@@ -30,20 +30,20 @@ module MultMemTests
 
     [<Tests>]
     let testParseOpsLine = 
-        makeTestList parseOpsLine "parseOpsLine Unit Tests" 
+        makeTestList parseArithLine "parseOpsLine Unit Tests" 
             [
                 ("R7,R3,R9", Ok (R7, R3, Register R9));
                 ("R0, R12, R1", Ok (R0, R12, Register R1));
-                ("R,R3,R9", Error "The instruction is invalid");
-                ("R7, R20, R9", Error "Op1 register is invalid");
-                ("R7, R3, R20", Error "Op2 is not a valid register");
+                ("R,R3,R9", Error "Op1 or destination is an invalid register");
+                ("R7, R20, R9", Error "Op1 or op2 is an invalid register");
+                ("R7, R3, R20", Error "Op2 is not a valid register or expression");
                 ("R7,R3,#-2", Ok (R7, R3, Literal (uint32 -2)));
                 ("R0, R12, #0b11", Ok (R0, R12, Literal (uint32 3)));
                 ("R0, R12, #0x11", Ok (R0, R12, Literal (uint32 17)));
                 ("R7,R3", Error "The instruction is invalid");
                 ("R7,R3,R5,R9,R1", Error "Flex op 2 has invalid format");
                 ("R7,,R3", Error "The instruction is invalid");
-                ("R7,R3,", Error "Flex op 2 has invalid format");
+                //("R7,R3,", Error "Op2 is not a valid register or expression");
                 (",R7,R3", Error "The instruction is invalid");
                 ("R7,R3,#0b12", Error ("Flex op 2 has invalid format"));
                 ("R7,R3,#11111111111111111111", Error ("Invalid 32 bit number"));

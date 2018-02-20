@@ -240,7 +240,7 @@ module Arithmetic
         recursiveSplit' expression
 
 
-    let parseOpsLine (line:string) = 
+    let parseCompLine (line:string) = 
         
         let opList = line.Split(',') |> Array.map (fun s-> s.Trim()) |> Array.toList
 
@@ -255,11 +255,11 @@ module Arithmetic
                 | Prefix "#" op2Num -> 
                     let op2 = recursiveSplit op2Num
                     match op2 with
-                    | Ok op2Out -> Ok (Compare (op1, Literal (uint32 op2Out)))
+                    | Ok op2Out -> Ok (op1, Literal (uint32 op2Out))
                     | Error err -> Error (err) 
                 | _ ->
                     match regNames.TryFind op2Str with
-                    | Some op2 -> Ok (Compare (op1, Register op2))                  
+                    | Some op2 -> Ok (op1, Register op2)                 
                     | _ -> Error("Op2 is not a valid register or expression")
             
             | _ -> Error ("Op1 is not a valid register")
@@ -274,36 +274,54 @@ module Arithmetic
                 match regNames.TryFind op1OrOp2Str with
                 | Some op1OrOp2 -> 
                     match op2OrFlexStr with
-                    | FlexParse "^([A-Z]+)\s+(R[0-9]+|#-?0b[0-1]+|#-?0x[0-9A-F]+|#-?&[0-9A-F]+|#-?[0-9]+)$" [shiftOpStr;regLitStr] ->
+                    | FlexParse "^([A-Z]+)\s+(.*)$" [shiftOpStr; regLitStr] ->
                         match operationNames.TryFind shiftOpStr with
                         | Some shiftOp ->
-                            match regLitStr with
+                            match regLitStr.Trim() with
                             | Prefix "#" op2Num -> 
                                 let op2 = recursiveSplit op2Num
                                 match op2 with
-                                | Ok op2Out -> Ok (Compare (destOrOp1, RegisterShift (op1OrOp2, shiftOp, int32 op2Out)))
+                                | Ok op2Out -> Ok (destOrOp1, RegisterShift (op1OrOp2, shiftOp, int32 op2Out))
                                 | Error err -> Error (err) 
                             | _ ->
                                 match regNames.TryFind regLitStr with
-                                | Some op2Out -> Ok (Compare (destOrOp1, RegisterRegisterShift (op1OrOp2, shiftOp, op2Out)))                 
+                                | Some op2Out -> Ok (destOrOp1, RegisterRegisterShift (op1OrOp2, shiftOp, op2Out))                 
                                 | _ -> Error ("Op2 is not a valid register or expression")
-
                         | _ -> Error ("Shift op is invalid")
-                    | _ ->
-                        match op2OrFlexStr with
-                        | Prefix "#" op2Num -> 
-                            let op2 = recursiveSplit op2Num
-                            match op2 with
-                            | Ok op2Out -> Ok (Arith (destOrOp1, op1OrOp2, Literal (uint32 op2Out)))
-                            | Error err -> Error (err) 
-                        | _ ->
-                            match regNames.TryFind op2OrFlexStr with
-                            | Some op2Out -> Ok (Arith (destOrOp1, op1OrOp2, Register op2Out))                
-                            | _ -> Error("Op2 is not a valid register or expression")
+                    | _ -> Error ("Op2 is invalid")        
                 | _ -> Error ("Op1 or op2 is an invalid register")
             | _ -> Error ("Op1 or destination is an invalid register")
+        | _ -> Error ("Invalid compare instruction")
 
+    let parseArithLine (line:string) = 
 
+        let opList = line.Split(',') |> Array.map (fun s-> s.Trim()) |> Array.toList
+
+        match opList.Length with
+        | 3 ->
+            let destStr = opList.[0]
+            let op1Str = opList.[1]
+            let op2Str = opList.[2]
+
+            match regNames.TryFind destStr with
+            | Some dest ->
+                match regNames.TryFind op1Str with
+                | Some op1 ->
+                    match op2Str with
+                    | Prefix "#" op2Str ->
+                        let op2Int = recursiveSplit op2Str
+                        match op2Int with
+                        | Ok op2Val -> Ok (dest, op1, Literal (uint32 op2Val))
+                        | Error err -> Error (err) 
+                    | _ ->
+                        match regNames.TryFind op2Str with
+                        | Some op2Reg -> Ok (dest, op1, Register op2Reg)              
+                        | _ -> Error ("Op2 is not a valid register or expression")
+
+                | _ -> Error ("Op1 is not a valid register")
+
+            | _ -> Error ("Destination is not a valid register")
+        
         | 4 -> 
             let destStr = opList.[0]
             let op1Str = opList.[1]
@@ -324,11 +342,11 @@ module Arithmetic
                                 | Prefix "#" shiftNumStr -> 
                                     let shiftInt = recursiveSplit shiftNumStr
                                     match shiftInt with
-                                    | Ok shiftVal -> Ok (Arith (dest, op1, RegisterShift (op2, shiftOp, int32 shiftVal)))
+                                    | Ok shiftVal -> Ok (dest, op1, RegisterShift (op2, shiftOp, int32 shiftVal))
                                     | Error err -> Error (err) 
                                 | _ ->
                                     match regNames.TryFind regLitStr with
-                                    | Some shiftReg -> Ok (Arith (dest, op1, RegisterRegisterShift (op2, shiftOp, shiftReg)))                 
+                                    | Some shiftReg -> Ok (dest, op1, RegisterRegisterShift (op2, shiftOp, shiftReg))               
                                     | _ -> Error ("Op2 is not a valid register or expression")
 
                             | _ -> Error ("Invalid shift operation")
@@ -339,13 +357,13 @@ module Arithmetic
         | _ -> Error ("Not setup yet")
         
 
-    let makeInstr root (suffix:string) operands =
+    let makeArithInstr root (suffix:string) operands =
         // Makes final instruction from baseInstr
         let makeInstr ins = 
-            ins
+            Ok(ins)
         
-        match parseOpsLine operands with
-        | Ok (Arith (dest, op1, op2)) -> 
+        match parseArithLine operands with
+        | Ok (dest, op1, op2) -> 
             // Converts suffix string into bool option
             let suffType = suffix.EndsWith('S') 
 
@@ -359,15 +377,23 @@ module Arithmetic
             }
 
             match root with
-            | "ADD" -> Ok (ArithI (makeInstr {baseArithInstr with InstrType = Some(ADD);}))
-            | "ADC" -> Ok (ArithI (makeInstr {baseArithInstr with InstrType = Some(ADC);}))
-            | "SUB" -> Ok (ArithI (makeInstr {baseArithInstr with InstrType = Some(SUB);}))
-            | "SBC" -> Ok (ArithI (makeInstr {baseArithInstr with InstrType = Some(SBC);}))
-            | "RSB" -> Ok (ArithI (makeInstr {baseArithInstr with InstrType = Some(RSB);}))
-            | "RSC" -> Ok (ArithI (makeInstr {baseArithInstr with InstrType = Some(RSC);}))
+            | "ADD" -> makeInstr {baseArithInstr with InstrType = Some(ADD);}
+            | "ADC" -> makeInstr {baseArithInstr with InstrType = Some(ADC);}
+            | "SUB" -> makeInstr {baseArithInstr with InstrType = Some(SUB);}
+            | "SBC" -> makeInstr {baseArithInstr with InstrType = Some(SBC);}
+            | "RSB" -> makeInstr {baseArithInstr with InstrType = Some(RSB);}
+            | "RSC" -> makeInstr {baseArithInstr with InstrType = Some(RSC);}
             | _ -> Error ("Opcode is invalid or not supported in this module")
+        
+        | Error err -> Error err
 
-        | Ok (Compare(op1, op2)) -> 
+
+    let makeCompInstr root operands = 
+        let makeInstr ins = 
+            Ok(ins)
+
+        match parseCompLine operands with
+        | Ok (op1, op2) -> 
             let baseCompInstr = {
                 InstrType = None;
                 Op1 = op1;
@@ -375,10 +401,10 @@ module Arithmetic
             }
 
             match root with
-            | "CMP" -> Ok (CompI (makeInstr {baseCompInstr with InstrType = Some(CMP);}))
-            | "CMN" -> Ok (CompI (makeInstr {baseCompInstr with InstrType = Some(CMN);}))
+            | "CMP" -> makeInstr {baseCompInstr with InstrType = Some(CMP);}
+            | "CMN" -> makeInstr {baseCompInstr with InstrType = Some(CMN);}
             | _ -> Error ("Opcode is invalid or not supported in this module")
-        
+
         | Error err -> Error err
 
 
@@ -394,25 +420,33 @@ module Arithmetic
             let (WA la) = ls.LoadAddr
             match instrC with
             | ARITH -> 
-                match makeInstr root suffix ls.Operands with
-                | Ok (ArithI pinstr) -> 
-                    Ok {
+                match makeArithInstr root suffix ls.Operands with
+                | Ok (pinstr) -> Ok {
                         PInstr = ArithI pinstr;
                         PLabel = ls.Label |> Option.map (fun lab -> lab, la); 
                         PSize = 4u; 
                         PCond = pCond;
                     }
-                | Ok (CompI pinstr) ->
-                    Ok {
+                | Error s -> Error s
+            | COMP ->
+                match makeCompInstr root ls.Operands with
+                | Ok (pinstr) -> Ok {
                         PInstr = CompI pinstr;
                         PLabel = ls.Label |> Option.map (fun lab -> lab, la); 
                         PSize = 4u; 
                         PCond = pCond;
-                    }          
-                | Error s -> Error s
+                    }
+                | Error s -> Error s 
             | _ -> Error ("Instruction class not supported.")
-        Map.tryFind ls.OpCode arithOpCodes
-        |> Option.map parse'
+        
+        
+        let arithInstr = Map.tryFind ls.OpCode arithOpCodes
+        let compInstr = Map.tryFind ls.OpCode compOpCodes
+
+        match arithInstr, compInstr with
+        | Some (ari), None -> Some(parse' ari)
+        | None, Some (com) -> Some(parse' com)
+        | _ -> None
    
 
     /// Execute an arithmetic instruction
