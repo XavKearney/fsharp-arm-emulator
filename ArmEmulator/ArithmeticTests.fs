@@ -54,6 +54,14 @@ module MultMemTests
                 ("R7,R3,R0, LSP #1", Error ("Invalid shift operation"));
                 ("R7,R3,R0, ASR R8", Ok (R7,R3, RegisterRegisterShift (R0, ASR, R8)));
                 ("R7,R3,R0, LSL R30", Error ("Op2 is not a valid register or expression"));
+
+                ("R0, R12, #3*6-1", Ok (R0, R12, Literal (uint32 17)));
+                ("R0, R12, #3+6*2", Ok (R0, R12, Literal (uint32 15)));
+                ("R0, R12, #-3*6+1", Ok (R0, R12, Literal (uint32 -17)));
+                ("R0, R12, #-3*6+-1", Error ("Invalid expression"));
+                
+
+                
             ]
     
     let config = { FsCheckConfig.defaultConfig with maxTest = 10000 }

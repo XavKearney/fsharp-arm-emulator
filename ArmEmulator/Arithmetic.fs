@@ -180,64 +180,69 @@ module Arithmetic
             match a,b with
             | Ok x, Ok y -> Ok (op x y)
             | _, _ -> Error ("Invalid 32 bit number")
-        
-        let rec recursiveSplit' expression = 
-            if String.exists (fun c -> c='+') expression then
-                expression.Split('+')
-                |> Array.map (fun s-> s.Trim()) 
-                |> Array.toList
-                |> List.map ((fun s -> if s = "" then "0" else s) >> recursiveSplit')
-                |> List.reduce (lift (+))
 
-            elif String.exists (fun c -> c='-') expression then
-                expression.Split('-')
-                |> Array.map (fun s -> s.Trim())
-                |> Array.toList
-                |> List.map ((fun s -> if s = "" then "0" else s) >> recursiveSplit')
-                |> List.reduce (lift (-))
+        match expression with
+        | FlexParse "([+*-]{2})" _ ->
+            Error ("Invalid expression")
 
-            elif String.exists (fun c -> c='-') expression then
-                expression.Split('*')
-                |> Array.map (fun s-> s.Trim()) 
-                |> Array.toList
-                |> List.map ((fun s -> if s = "" then "0" else s) >> recursiveSplit')
-                |> List.reduce (lift (*))
+        | _ ->   
+            let rec recursiveSplit' expression = 
+                if String.exists (fun c -> c='+') expression then
+                    expression.Split('+')
+                    |> Array.map (fun s-> s.Trim()) 
+                    |> Array.toList
+                    |> List.map ((fun s -> if s = "" then "0" else s) >> recursiveSplit')
+                    |> List.reduce (lift (+))
 
-            else
-                match expression with
-                | FlexParse "^(-?0b[0-1]+)$" [binStr] -> 
-                    match binStr.Length with
-                    | x when x > 38 -> Error ("Op2 is not a valid 32 bit number")
-                    | _ -> 
-                        match check32BitBound binStr with
-                        | Ok binInt -> Ok (binInt)
-                        | _ -> Error ("Op2 is not a valid 32 bit number")  
+                elif String.exists (fun c -> c='-') expression then
+                    expression.Split('-')
+                    |> Array.map (fun s -> s.Trim())
+                    |> Array.toList
+                    |> List.map ((fun s -> if s = "" then "0" else s) >> recursiveSplit')
+                    |> List.reduce (lift (-))
 
-                | FlexParse "^(-?0x[0-9A-F]+)$" [hexStr] -> 
-                    match hexStr.Length with
-                    | x when x > 14 -> Error ("Op2 is not a valid 32 bit number")
-                    | _ -> 
-                        match hexStr with
-                        | Prefix "&" hexOut ->
-                            let finalHex = "0x" + hexOut
-                            match check32BitBound finalHex with
-                            | Ok hexInt -> Ok (hexInt)
-                            | _ -> Error ("Invalid 32 bit number")
+                elif String.exists (fun c -> c='*') expression then
+                    expression.Split('*')
+                    |> Array.map (fun s-> s.Trim()) 
+                    |> Array.toList
+                    |> List.map ((fun s -> if s = "" then "1" else s) >> recursiveSplit')
+                    |> List.reduce (lift (*))
+
+                else
+                    match expression with
+                    | FlexParse "^(-?0b[0-1]+)$" [binStr] -> 
+                        match binStr.Length with
+                        | x when x > 38 -> Error ("Op2 is not a valid 32 bit number")
+                        | _ -> 
+                            match check32BitBound binStr with
+                            | Ok binInt -> Ok (binInt)
+                            | _ -> Error ("Op2 is not a valid 32 bit number")  
+
+                    | FlexParse "^(-?0x[0-9A-F]+)$" [hexStr] -> 
+                        match hexStr.Length with
+                        | x when x > 14 -> Error ("Op2 is not a valid 32 bit number")
+                        | _ -> 
+                            match hexStr with
+                            | Prefix "&" hexOut ->
+                                let finalHex = "0x" + hexOut
+                                match check32BitBound finalHex with
+                                | Ok hexInt -> Ok (hexInt)
+                                | _ -> Error ("Invalid 32 bit number")
+                            | _ ->
+                                match check32BitBound hexStr with
+                                | Ok hexInt -> Ok (hexInt)
+                                | _ -> Error ("Invalid 32 bit number")
+
+                    | FlexParse "^(-?[0-9]+)$" [numStr] ->
+                        match numStr.Length with
+                        | x when x > 14 -> Error ("Op2 is not a valid 32 bit number")
                         | _ ->
-                            match check32BitBound hexStr with
-                            | Ok hexInt -> Ok (hexInt)
+                            match check32BitBound numStr with
+                            | Ok numInt -> Ok (numInt)
                             | _ -> Error ("Invalid 32 bit number")
+                    | _ -> Error ("Invalid op2 expression")
 
-                | FlexParse "^(-?[0-9]+)$" [numStr] ->
-                    match numStr.Length with
-                    | x when x > 14 -> Error ("Op2 is not a valid 32 bit number")
-                    | _ ->
-                        match check32BitBound numStr with
-                        | Ok numInt -> Ok (numInt)
-                        | _ -> Error ("Invalid 32 bit number")
-                | _ -> Error ("Invalid op2 expression")
-
-        recursiveSplit' expression
+            recursiveSplit' expression
 
 
     let parseCompLine (line:string) = 
