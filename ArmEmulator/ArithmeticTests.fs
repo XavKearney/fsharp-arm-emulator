@@ -59,11 +59,13 @@ module MultMemTests
                 ("R0, R12, #3+6*2", Ok (R0, R12, Literal (uint32 15)));
                 ("R0, R12, #-3*6+1", Ok (R0, R12, Literal (uint32 -17)));
                 ("R0, R12, #-3*6+-1", Error ("Invalid expression"));
-                
-
-                
+                ("R0, R12, #0b11*6+1", Ok (R0, R12, Literal (uint32 19)));
+                ("R0, R12, #0b12*6+1", Error ("Invalid 32 bit number"));
+                ("R0, R12, #3-2-", Error ("Invalid expression"));         
             ]
-    
+
+
+
     let config = { FsCheckConfig.defaultConfig with maxTest = 10000 }
 
     let makeInstrString opcode suffix target op1 op2 = 

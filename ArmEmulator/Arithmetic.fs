@@ -184,7 +184,10 @@ module Arithmetic
         match expression with
         | FlexParse "([+*-]{2})" _ ->
             Error ("Invalid expression")
-
+        
+        | FlexParse "([+*-])$" _ ->
+            Error ("Invalid expression")
+            
         | _ ->   
             let rec recursiveSplit' expression = 
                 if String.exists (fun c -> c='+') expression then
