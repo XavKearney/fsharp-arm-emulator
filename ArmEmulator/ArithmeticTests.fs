@@ -29,7 +29,7 @@ module MultMemTests
 
 
     [<Tests>]
-    let testParseOpsLine = 
+    let testParseArithLine = 
         let symTable = Some (["test", uint32 2] |> Map.ofList)
         makeTestList parseArithLine symTable "parseArithLine Unit Tests" 
             [
@@ -74,7 +74,23 @@ module MultMemTests
                 ("R0, R12, #test", Ok (R0, R12, Literal (uint32 2)));             
             ]
 
-
+    [<Tests>]
+    let testParseCompLine = 
+        let symTable = Some (["test", uint32 2] |> Map.ofList)
+        makeTestList parseCompLine symTable "parseCompLine Unit Tests"
+            [
+                ("R7,R3", Ok (R7, Register R3));
+                ("R7,fd", Error ("Op2 is not a valid register or expression"));
+                ("R7,fd,,", Error ("Invalid compare instruction"));
+                ("Radfsa", Error ("Invalid compare instruction"));
+                ("R7,#test*4+2", Ok (R7, Literal (uint32 10)));
+                ("R7,#lol", Error ("Symbol does not exist"));
+                ("R7,#test*&A", Ok (R7, Literal (uint32 20)));
+                ("R7,#test*4+2, LSL #5", Error ("Op2 is an invalid register"));
+                ("R7,R1, LSL #1", Ok (R7, RegisterShift (R1, LSL, int32 1)));
+                ("R7,R1, LSP #5", Error ("Shift op is invalid"));
+                ("R7,R1, LSL R8", Ok (R7, RegisterRegisterShift (R1, LSL, R8)));
+            ]
 
     let config = { FsCheckConfig.defaultConfig with maxTest = 10000 }
 

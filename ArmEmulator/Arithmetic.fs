@@ -292,32 +292,32 @@ module Arithmetic
             | _ -> Error ("Op1 is not a valid register")
         
         | 3 -> 
-            let destOrOp1Str = opList.[0]
-            let op1OrOp2Str = opList.[1]
-            let op2OrFlexStr = opList.[2]
+            let op1Str = opList.[0]
+            let op2Str = opList.[1]
+            let flexStr = opList.[2]
 
-            match regNames.TryFind destOrOp1Str with
-            | Some destOrOp1 -> 
-                match regNames.TryFind op1OrOp2Str with
-                | Some op1OrOp2 -> 
-                    match op2OrFlexStr with
+            match regNames.TryFind op1Str with
+            | Some op1 -> 
+                match regNames.TryFind op2Str with
+                | Some op2 -> 
+                    match flexStr with
                     | FlexParse "^([A-Z]+)\s+(.*)$" [shiftOpStr; regLitStr] ->
                         match operationNames.TryFind shiftOpStr with
                         | Some shiftOp ->
                             match regLitStr.Trim() with
                             | Prefix "#" op2Num -> 
-                                let op2 = recursiveSplit op2Num symTable
-                                match op2 with
-                                | Ok op2Out -> Ok (destOrOp1, RegisterShift (op1OrOp2, shiftOp, int32 op2Out))
+                                let flexVal = recursiveSplit op2Num symTable
+                                match flexVal with
+                                | Ok flexOut -> Ok (op1, RegisterShift (op2, shiftOp, int32 flexOut))
                                 | Error err -> Error (err) 
                             | _ ->
                                 match regNames.TryFind regLitStr with
-                                | Some op2Out -> Ok (destOrOp1, RegisterRegisterShift (op1OrOp2, shiftOp, op2Out))                 
-                                | _ -> Error ("Op2 is not a valid register or expression")
+                                | Some flexOut -> Ok (op1, RegisterRegisterShift (op2, shiftOp, flexOut))                 
+                                | _ -> Error ("Flex is not a valid register or expression")
                         | _ -> Error ("Shift op is invalid")
-                    | _ -> Error ("Op2 is invalid")        
-                | _ -> Error ("Op1 or op2 is an invalid register")
-            | _ -> Error ("Op1 or destination is an invalid register")
+                    | _ -> Error ("Flex is invalid")        
+                | _ -> Error ("Op2 is an invalid register")
+            | _ -> Error ("Op1 is an invalid register")
         | _ -> Error ("Invalid compare instruction")
 
     let parseArithLine (line:string) symTable = 
