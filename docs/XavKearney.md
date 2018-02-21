@@ -80,7 +80,8 @@ In testing, a number of differences from VisUAL were discovered:
 6. VisUAL instructions are case-insensitive. This module assumes upper-case instructions, and the intention is that the top-level code in the group phase of the project will convert instructions to upper-case to allow case insensitivity.
 7. VisUAL throws a Java exception if a reverse-ordered register list is given, e.g. `LDM R0, {R5-R1}`. The `MultMem` module handles this case, returning an Error within a Result monad.
 
-## Module Implementation Specifics
+# Module Implementation Specifics
+## Instruction Operation
 
 ### LDM - Load Multiple Registers
 `LDM` is ARM's _Load Multiple Registers_ instruction. It has the syntax:
