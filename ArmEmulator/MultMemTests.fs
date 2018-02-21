@@ -33,13 +33,13 @@ module MultMemTests
         List.map (fun (i, o) -> makeTest i o) inOutLst
         |> testList (sprintf "%s Test List" name) 
 
-    /// unit tests for parseOps function
+    /// unit tests for parseMemOps function
     /// takes a string, corresponding to ls.Operands
     /// returns either an error or
     /// target register, writeback (bool) and a register list
     [<Tests>]
-    let testParseOpsUnit = 
-        makeUnitTestList parseOps "parseOps Unit" 
+    let testParseMemOpsUnit = 
+        makeUnitTestList parseMemOps "parseOps Unit" 
             [
                 // test valid input
                 "R7, {R3,R9,R1}", Ok (R7, false, [R3;R9;R1])

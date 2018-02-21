@@ -5,13 +5,40 @@
 module ParseExpr
     open CommonLex
     open System.Text.RegularExpressions
+    /// ----------- ACTIVE PATTERNS ---------------
 
+    /// takes a string and ensures it starts and ends with
+    /// a given prefix and suffix
+    /// if so, returns the string inside
+    let (|GetInside|_|) (prefix:string) (suffix: string) (str:string) =
+        if (str.StartsWith(prefix) && str.EndsWith(suffix))
+        then Some (str.[1..String.length str - 2])
+        else None
+
+    /// checks if a string contains a character
+    /// if so, split at that character and return list
+    let (|SplitAt|_|) (c:string) (str:string) =
+        if str.Contains(c) 
+        then Some(str.Split(c) |> Seq.toList)
+        else None
+
+    /// matches a string with regex pattern
+    /// returns a list of all of the matches
+    let (|Matches|_|) (pat:string) (inp:string) =
+        let m = Regex.Matches(inp, pat) in
+        if m.Count > 0
+        then Some ([ for g in m -> g.Value ])
+        else None
+
+    /// matches a string with regex pattern
+    /// if there is a single match, it is returned
     let (|Match1|_|) (pat:string) (inp:string) =
         let m = Regex.Matches(inp, pat) in
         if m.Count = 1
         then Some (m.[0].Value)
         else None
-
+    /// matches a string with regex pattern
+    /// returns list of the matched groups (excluding the whole match)
     let (|MatchGroups|_|) (pat:string) (inp:string) =
         let m = Regex.Matches(inp, pat) in
         if m.Count > 0
@@ -21,7 +48,10 @@ module ParseExpr
             |> List.tail // remove the whole matched string
             |> Some 
         else None
-
+    
+    /// matches a literal in hex form (0x.. or &..),
+    /// in binary form (0b..) or as a standard number
+    /// if no match, try and find the string in the SymbolTable
     let (|Literal|_|) (symTab:SymbolTable) (inp:string) =
         match inp with
         | Match1 @"^(0x[a-fA-F0-9]+)$" x -> uint32 x |> Some
@@ -29,6 +59,9 @@ module ParseExpr
         | Match1 @"^(0b[0-1]+)$" x -> uint32 x |> Some
         | Match1 @"^([0-9]+)$" x -> uint32 x |> Some
         | label -> symTab.TryFind label
+
+    /// ----------- END ACTIVE PATTERNS ---------------
+
 
     type Operator = 
         | Add

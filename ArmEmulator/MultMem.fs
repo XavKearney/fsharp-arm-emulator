@@ -37,6 +37,8 @@ module MultMem
             LinkAddr: WAddr option;
         }
 
+    type EndInstr = END
+
     /// parse error (dummy, but will do)
     type ErrInstr = string
 
@@ -57,11 +59,13 @@ module MultMem
     let branchSpec = {
         InstrC = MISC
         Roots = ["B"]
-        // for LDM: "", "IA" and "FD" are synonyms
-        // for LDM: "EA" and "DB" are synonyms
-        // for STM: "", "EA" and "IA" are synonyms
-        // for STM: "FD" and "DB" are synonyms
         Suffixes = [""; "L";]
+    }
+
+    let endSpec = {
+        InstrC = MISC
+        Roots = ["END"]
+        Suffixes = [""]
     }
 
     /// return type to allow parse to return multiple instruction types
@@ -70,58 +74,13 @@ module MultMem
     /// maps of all possible opcodes recognised
     let multMemOpCodes = opCodeExpand multMemSpec
     let branchOpCodes = opCodeExpand branchSpec
+    let endOpCodes = opCodeExpand endSpec
 
-    /// ----------- ACTIVE PATTERNS ---------------
-
-    /// takes a string and ensures it starts and ends with
-    /// a given prefix and suffix
-    /// if so, returns the string inside
-    let (|GetInside|_|) (prefix:string) (suffix: string) (str:string) =
-        if (str.StartsWith(prefix) && str.EndsWith(suffix))
-        then Some (str.[1..String.length str - 2])
-        else None
-
-    /// checks if a string contains a character
-    /// if so, split at that character and return list
-    let (|SplitAt|_|) (c:string) (str:string) =
-        if str.Contains(c) 
-        then Some(str.Split(c) |> Seq.toList)
-        else None
-
-    /// matches a string with regex pattern
-    /// returns a list of all of the matches
-    let (|Matches|_|) (pat:string) (inp:string) =
-        let m = Regex.Matches(inp, pat) in
-        if m.Count > 0
-        then Some ([ for g in m -> g.Value ])
-        else None
-
-    /// matches a string with regex pattern
-    /// if there is a single match, it is returned
-    let (|Match1|_|) (pat:string) (inp:string) =
-        let m = Regex.Matches(inp, pat) in
-        if m.Count = 1
-        then Some (m.[0].Value)
-        else None
-    /// matches a string with regex pattern
-    /// returns list of the matched groups (excluding the whole match)
-    let (|MatchGroups|_|) (pat:string) (inp:string) =
-        let m = Regex.Matches(inp, pat) in
-        if m.Count > 0
-        then 
-            [ for x in m -> x.Groups ]
-            |> List.collect (fun x -> [for y in x -> y.Value])
-            |> List.tail // remove the whole matched string
-            |> Some 
-        else None
-    
-    /// ----------- END ACTIVE PATTERNS ---------------
-
-    /// take a string of all operands and parse
+    /// take a string of all LDM/STM operands and parse
     /// into target reg, writeback and list of reg
     /// to load/store
     /// returns error if anything is incorrect
-    let parseOps (ops: string) =
+    let parseMemOps (ops: string) =
         // split the operands by ',' e.g. "R10!, {R1,R2,R3}"
         let sLst = ops.Split(',') |> Array.map (fun s-> s.Trim()) |> Array.toList
         // get the target register as a string, e.g. "R10!"
@@ -197,7 +156,7 @@ module MultMem
     /// if the operands parse, return instruction
     /// if not, return an error
     let makeMultMemInstr root suffix operands =
-        parseOps operands
+        parseMemOps operands
         |> Result.bind (fun (target, wb, regLst) ->
             // create template result with empty InsType & Direction
             let defaultIns = {
@@ -229,11 +188,11 @@ module MultMem
 
     /// takes a suffix and operands as strings
     /// determines whether the branch corresponds to a link ("L")
-    /// and gets the label from the operands
-    /// provided it contains no whitespace
-    /// argument is a tuple for easier testing
+    /// and gets the addres corresponding to the expression in the operands
+    /// will return None for all fields if symbol table not given (1st pass)
     let makeBranchInstr (suffix, operands:string, WA loadaddr, symTab:Map<string,uint32> option) =
         match symTab with
+        // symbol table given (2nd pass), so can process expression
         | Some syms ->
             let branchAddr = evalExpr syms operands
             let linkAddr = 
@@ -250,6 +209,7 @@ module MultMem
                     LinkAddr = linkAddr;
                 }
             )
+        // no symbol table given, must be first pass
         | None -> BranchI { BranchAddr = None; LinkAddr = None;} |> Ok
 
     /// main function to parse a line of assembler
@@ -277,12 +237,13 @@ module MultMem
                         PSize = 4u; 
                         PCond = pCond;
                     })
-        let memInstr = Map.tryFind ls.OpCode multMemOpCodes
-        let branchInstr = Map.tryFind ls.OpCode branchOpCodes
-        match memInstr, branchInstr with
-        | Some (mem), None -> Some(parse' mem)
-        | None, Some(branch) -> Some(parse' branch)
-        | _ -> None
+        // check each of the opcode maps to see if any match
+        [multMemOpCodes; branchOpCodes; endOpCodes]
+        |> List.choose (Map.tryFind ls.OpCode)
+        |> function 
+            // should only be a single result, if so, parse it
+            | [instr] -> Some(parse' instr)
+            | _ -> None
 
 
     /// Execute a MultMem Instruction
