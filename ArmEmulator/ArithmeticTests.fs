@@ -216,7 +216,7 @@ module MultMemTests
 
 
 
-    //[<Tests>]
+    [<Tests>]
     let testArithExec =
         let makeTestExecStr opcode suffix target op1 op2 = 
             let opcodeStr, suffixStr, operandStr = makeArithInstrString opcode suffix target op1 op2
