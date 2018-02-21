@@ -64,7 +64,7 @@ Execution of the `B/BL` instructions is tested using a property-based test with 
 
 This cannot be tested against VisUAL because branching to a random instruction location would break in the test code. As a result, the returned modified `cpuData` is checked to ensure its registers, memory and flags equal the expected values in the case of both `B` and `BL`.
 
-#### Differences from VisUAL
+## Differences from VisUAL
 In testing, a number of differences from VisUAL were discovered:
 1. VisUAL does not allow `LDM/STM` instructions without a suffix, e.g. `LDM R0, {R1}`. 
    - These instructions are excluded from randomised testing against VisUAL, but allowed by both the parsing and execution functions because it is a trivial difference, conforms to the ARM spec, and allows easier, more readable code to be written.
