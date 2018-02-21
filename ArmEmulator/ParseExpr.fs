@@ -42,18 +42,22 @@ module ParseExpr
         | Op of Operator
 
     let tokenize expr (symTab: SymbolTable) =
-        let rec tok' s = 
-            match s with
+        let recIfOk a f x =
+            match f x with
+            | Ok y -> Ok (a :: y)
+            | Error s -> Error s
+        let rec tok' cLst = 
+            match cLst with
             // if the charlist starts with an operator, match it
-            | '+' :: rest -> Op Add :: tok' rest
-            | '-' :: rest -> Op Sub :: tok' rest
-            | '*' :: rest -> Op Mul :: tok' rest
-            | '(' :: rest -> LBra :: tok' rest
-            | ')' :: rest -> RBra :: tok' rest
+            | '+' :: rest -> recIfOk (Op Add) tok' rest
+            | '-' :: rest -> recIfOk (Op Sub) tok' rest
+            | '*' :: rest -> recIfOk (Op Mul) tok' rest
+            | '(' :: rest -> recIfOk (LBra) tok' rest
+            | ')' :: rest -> recIfOk (RBra) tok' rest
             | ' ' :: rest -> tok' rest
             // if empty, we're done
-            | [] -> []
-            // otherwise, it must be a literal (number or label)
+            | [] -> Ok []
+            // otherwise, the next item must be a literal (number or label)
             | chrLst -> 
                 // convert the remaining characters into a string
                 chrLst |> List.toArray |> System.String |> 
@@ -61,16 +65,16 @@ module ParseExpr
                 // match if the only thing remaining is a literal
                 | Match1 @"^([&a-zA-Z0-9]+)$" x -> 
                     match x with
-                    | Literal symTab n -> [Num n]
-                    | _ -> failwithf "Incorrect literal input."
+                    | Literal symTab n -> Ok [Num n]
+                    | _ -> Error "Invalid literal at end of expression."
                 // otherwise, match the label/number up to the next operator
                 | MatchGroups @"^([&a-zA-Z0-9]+)(.+)$" (txt :: [rest]) ->
                     match txt with
-                    | Literal symTab n -> Num n :: tok' (Seq.toList rest)
-                    | _ -> failwithf "Incorrect pre-finish literal input."
-                | _ -> failwithf "Incorrect input."
-
+                    | Literal symTab n -> recIfOk (Num n) tok' (Seq.toList rest)
+                    | _ -> Error "Invalid literal in expression."
+                | _ -> Error "Invalid expression."
         tok' (Seq.toList expr)
+
 
     let evalTokenized tokInput =
         let doOp op right left = 
@@ -91,7 +95,7 @@ module ParseExpr
                 // needed if multiple pending operations, to get order correct
                 match ops <> [] && ops.Head > (Op op) with
                 // operator should be applied now
-                | true ->
+                | true when nums.Length >= 2 ->
                     let first, second, remaining = first2 nums
                     doOp ops.Head first second
                     |> fun res -> eval' rest (res::remaining) (Op op::ops.Tail)
@@ -101,6 +105,7 @@ module ParseExpr
                     | [], [] -> eval' rest (0u::nums) (Op op::ops)
                     // otherwise just add the operator to the stack
                     | _ -> eval' rest nums (Op op::ops)
+                | _ -> Error "Invalid expression."
             // open a bracketed expression
             | LBra :: rest -> eval' rest nums (LBra::ops)
             // close a bracketed expression
@@ -113,20 +118,20 @@ module ParseExpr
                     |> fun res -> eval' toks (res::remaining) restOps
                 // handle nested brackets
                 | LBra :: restOps -> eval' rest nums restOps
-                | _ -> failwithf "Invalid tokenized input."
+                | _ -> Error "Invalid expression."
             // if nothing left
             | [] -> 
                 match ops with
                 // perform any remaining operations
-                | Op op :: restOps ->
+                | Op op :: restOps when nums.Length >= 2->
                     let first, second, remaining = first2 nums
                     doOp (Op op) first second
                     |> fun res -> eval' [] (res::remaining) restOps
                 // otherwise return the result
-                | [] -> nums.Head
-                | _ -> failwithf "Should never happen."
+                | [] -> Ok nums.Head
+                | _ -> Error "Invalid expression."
         eval' tokInput [] []
 
     let evalExpr symTab expr = 
         tokenize expr symTab
-        |> evalTokenized
+        |> Result.bind evalTokenized
