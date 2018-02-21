@@ -17,19 +17,19 @@ To maximise compatibility, the majority of the code is based on the standard int
 The main interface to the `MultMem` module is via the `parse` function, which takes `LineData` and outputs a parsed instruction if the instruction is handled by the module and is valid. The result of the `parse` function can then be fed to the `execInstr` function which returns the correct function to be executed for any given instruction in the module.
 
 ## Table of Features
-| Instruction/s | Feature | Tested?|  
-|:---:|:---|:---:|:---|
-| `LDM/STM` | All 4 direction suffixes | ✔️    |
-| `LDM/STM` | All aliases | ✔️    |
-| `LDM/STM` | Register list as range (e.g. `R0-R5`) | ✔️    |
-| `LDM/STM` | Write-back suffix | ✔️    |
-| `LDM/STM` | Registers sorted in increasing order | ✔️    |
-| `LDM/STM` | All ARM restrictions | ✔️    |
-| `LDM/STM` | Descriptive error messages, no exceptions | ✔️    |
-| `B/BL` | VisUAL-style expression parsing with labels | ✔️    |
-| `B/BL` | Descriptive error messages, no exceptions | ✔️    |
-| `END` | Implemented | ✔️    |
-| `All` | Universal parse and execution functions. | ✔️    |
+| Instruction/s | Feature | Tested? |  
+|:---:|:---|:---:|
+| `LDM/STM` | All 4 direction suffixes | ✔️ |
+| `LDM/STM` | All aliases | ✔️|
+| `LDM/STM` | Register list as range (e.g. `R0-R5`) | ✔️ |
+| `LDM/STM` | Write-back suffix | ✔️ |
+| `LDM/STM` | Registers sorted in increasing order | ✔️|
+| `LDM/STM` | All ARM restrictions | ✔️|
+| `LDM/STM` | Descriptive error messages, no exceptions | ✔️ |
+| `B/BL` | VisUAL-style expression parsing with labels | ✔️ |
+| `B/BL` | Descriptive error messages, no exceptions | ✔️|
+| `END` | Implemented | ✔️|
+| `All` | Universal parse and execution functions. | ✔️|
 
 Below is a description of the testing, as well as notable differences from VisUAL. After this there is a more complete explanation of the instruction operation, inteded as a README for the module (rather than as part of the deliverable).
 
