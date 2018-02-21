@@ -13,6 +13,7 @@ module ParseExprTests
                 "17+94", 17u+94u
                 "97-6", 97u-6u
                 "-97+1", 0u-97u+1u
+                "+97+1", 97u+1u
                 // test combining multiple operators
                 "97-6+7", 97u-6u+7u
                 "97-6+7-19", 97u-6u+7u-19u
@@ -25,6 +26,7 @@ module ParseExprTests
                 "(8-2)*(6+3)", (8u-2u)*(6u+3u)
                 "2*(6+3)*5", 2u*(6u+3u)*5u
                 "2*(6+(3*4)-(6+3))*5", 2u*(6u+(3u*4u)-(6u+3u))*5u
+                "-2*(6+(3*4)-(6+3))*5", 0u-2u*(6u+(3u*4u)-(6u+3u))*5u
                 "(2*(6+3)*5)+(5*4)", (2u*(6u+3u)*5u)+(5u*4u)
                 // test labels
                 "test2*test1", 23u*10u

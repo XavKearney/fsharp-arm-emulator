@@ -58,9 +58,7 @@ module ParseExpr
                 // convert the remaining characters into a string
                 chrLst |> List.toArray |> System.String |> 
                 function
-                // match if the only thing remaining is a number 
-                | Match1 @"^([0-9]+)$" x -> [Num (uint32 x)]
-                // match if the only thing remaining is a label
+                // match if the only thing remaining is a literal
                 | Match1 @"^([a-zA-Z0-9]+)$" x -> 
                     match x with
                     | Literal symTab n -> [Num n]
@@ -86,16 +84,23 @@ module ParseExpr
         
         let rec eval' toks nums ops =
             match toks with
+            // if a number, put in the number stack
             | Num n :: rest -> eval' rest (n::nums) ops
             | Op op :: rest -> 
                 // comparison of ops determines which comes first
                 // needed if multiple pending operations, to get order correct
                 match ops <> [] && ops.Head > (Op op) with
+                // operator should be applied now
                 | true ->
                     let first, second, remaining = first2 nums
                     doOp ops.Head first second
                     |> fun res -> eval' rest (res::remaining) (Op op::ops.Tail)
-                | false -> eval' rest nums (Op op::ops)
+                | false -> 
+                    match nums, ops with
+                    // if it starts with an operator, put in a 0 at the beginning
+                    | [], [] -> eval' rest (0u::nums) (Op op::ops)
+                    // otherwise just add the operator to the stack
+                    | _ -> eval' rest nums (Op op::ops)
             | LBra :: rest -> eval' rest nums (LBra::ops)
             | RBra :: rest ->
                 match ops with
