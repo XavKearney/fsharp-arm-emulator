@@ -33,24 +33,30 @@ module ParseExpr
     let tokenize expr (symTab: SymbolTable) =
         let rec tok' s = 
             match s with
-            | ' ' :: rest -> tok' rest
-            | '(' :: rest -> LBra :: tok' rest
-            | ')' :: rest -> RBra :: tok' rest
+            // if the charlist starts with an operator, match it
             | '+' :: rest -> Op Add :: tok' rest
             | '-' :: rest -> Op Sub :: tok' rest
             | '*' :: rest -> Op Mul :: tok' rest
             | '/' :: rest -> Op Div :: tok' rest
+            | '(' :: rest -> LBra :: tok' rest
+            | ')' :: rest -> RBra :: tok' rest
+            | ' ' :: rest -> tok' rest
+            // if empty, we're done
             | [] -> []
-            | charlist -> 
-                charlist |> List.toArray |> System.String |> 
+            // otherwise, it must be a literal (number or label)
+            | chrLst -> 
+                // convert the remaining characters into a string
+                chrLst |> List.toArray |> System.String |> 
                 function
+                // match if the only thing remaining is a number
                 | Match1 @"^([0-9]+)$" x -> [Num (uint32 x)]
+                // otherwise, match the label/number up to the next operator
                 | MatchGroups @"^([a-zA-Z0-9]+)(.+)$" (txt :: [rest]) ->
                     match txt with
-                    | Match1 @"(0x[0-9]+)" x -> uint32 x
-                    | Match1 @"(&[0-9]+)" x -> "0x"+x.[1..(x.Length-1)] |> uint32
-                    | Match1 @"(0b[0-1]+)" x -> uint32 x
-                    | Match1 @"([0-9]+)" x -> uint32 x
+                    | Match1 @"^(0x[0-9]+)$" x -> uint32 x
+                    | Match1 @"^(&[0-9]+)$" x -> "0x"+x.[1..(x.Length-1)] |> uint32
+                    | Match1 @"^(0b[0-1]+)$" x -> uint32 x
+                    | Match1 @"^([0-9]+)$" x -> uint32 x
                     | label -> symTab.[label]
                     |> fun n -> Num n :: tok' (Seq.toList rest)
                 | _ -> failwithf "Incorrect input."

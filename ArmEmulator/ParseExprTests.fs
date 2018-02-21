@@ -5,7 +5,7 @@ module ParseExprTests
 
     [<Tests>]
     let testEvalExprUnit =
-        let testSymTab = [("test1",1u);("test2",2u)] |> Map.ofList 
+        let testSymTab = [("test1",10u);("test2",23u)] |> Map.ofList 
         makeUnitTestList (evalExpr testSymTab) "evalExpr Unit"
            [
                 "5*5", 5u*5u
@@ -21,4 +21,6 @@ module ParseExprTests
                 "2*(6+3)*5", 2u*(6u+3u)*5u
                 "2*(6+(3*4)-(6+3))*5", 2u*(6u+(3u*4u)-(6u+3u))*5u
                 "(2*(6+3)*5)+(5*4)", (2u*(6u+3u)*5u)+(5u*4u)
+                "(test1*(6+3)*5)+(5*4)", (10u*(6u+3u)*5u)+(5u*4u)
+                "(test1*test2)", 10u*23u
             ]
