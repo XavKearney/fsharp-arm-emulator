@@ -1,3 +1,7 @@
+/// this module implements a parser for mathematical expressions
+/// it supports multiply, add & subtract with 
+/// literals in normal, binary (0b) or hex (0x/&) form
+/// as well as labels, where the label is converted into its address
 module ParseExpr
     open CommonLex
     open System.Text.RegularExpressions
@@ -18,11 +22,18 @@ module ParseExpr
             |> Some 
         else None
 
+    let (|Literal|_|) (symTab:SymbolTable) (inp:string) =
+        match inp with
+        | Match1 @"^(0x[a-fA-F0-9]+)$" x -> uint32 x |> Some
+        | Match1 @"^(&[a-fA-F0-9]+)$" x -> "0x"+x.[1..(x.Length-1)] |> uint32 |> Some
+        | Match1 @"^(0b[0-1]+)$" x -> uint32 x |> Some
+        | Match1 @"^([0-9]+)$" x -> uint32 x |> Some
+        | label -> symTab.TryFind label
+
     type Operator = 
         | Add
         | Sub
         | Mul
-        | Div
 
     type Token = 
         | Num of uint32
@@ -37,7 +48,6 @@ module ParseExpr
             | '+' :: rest -> Op Add :: tok' rest
             | '-' :: rest -> Op Sub :: tok' rest
             | '*' :: rest -> Op Mul :: tok' rest
-            | '/' :: rest -> Op Div :: tok' rest
             | '(' :: rest -> LBra :: tok' rest
             | ')' :: rest -> RBra :: tok' rest
             | ' ' :: rest -> tok' rest
@@ -51,16 +61,15 @@ module ParseExpr
                 // match if the only thing remaining is a number 
                 | Match1 @"^([0-9]+)$" x -> [Num (uint32 x)]
                 // match if the only thing remaining is a label
-                | Match1 @"^([a-zA-Z0-9]+)$" x -> [Num symTab.[x]]
+                | Match1 @"^([a-zA-Z0-9]+)$" x -> 
+                    match x with
+                    | Literal symTab n -> [Num n]
+                    | _ -> failwithf "Incorrect  literal input."
                 // otherwise, match the label/number up to the next operator
                 | MatchGroups @"^([a-zA-Z0-9]+)(.+)$" (txt :: [rest]) ->
                     match txt with
-                    | Match1 @"^(0x[0-9]+)$" x -> uint32 x
-                    | Match1 @"^(&[0-9]+)$" x -> "0x"+x.[1..(x.Length-1)] |> uint32
-                    | Match1 @"^(0b[0-1]+)$" x -> uint32 x
-                    | Match1 @"^([0-9]+)$" x -> uint32 x
-                    | label -> symTab.[label]
-                    |> fun n -> Num n :: tok' (Seq.toList rest)
+                    | Literal symTab n -> Num n :: tok' (Seq.toList rest)
+                    | _ -> failwithf "Incorrect input."
                 | _ -> failwithf "Incorrect input."
 
         tok' (Seq.toList expr)
@@ -71,7 +80,6 @@ module ParseExpr
             | Op Add -> left + right
             | Op Sub -> left - right
             | Op Mul -> left * right
-            | Op Div -> left / right
             | _ -> failwithf "Invalid operator."
         
         let first2 (lst: 'a list) = lst.Head, lst.Tail.Head, lst.Tail.Tail
@@ -80,6 +88,8 @@ module ParseExpr
             match toks with
             | Num n :: rest -> eval' rest (n::nums) ops
             | Op op :: rest -> 
+                // comparison of ops determines which comes first
+                // needed if multiple pending operations, to get order correct
                 match ops <> [] && ops.Head > (Op op) with
                 | true ->
                     let first, second, remaining = first2 nums
@@ -93,8 +103,7 @@ module ParseExpr
                     let first, second, remaining = first2 nums
                     doOp (Op op) first second
                     |> fun res -> eval' toks (res::remaining) restOps
-                | LBra :: _ ->
-                    eval' rest nums ops.Tail
+                | LBra :: _ -> eval' rest nums ops.Tail
                 | _ -> failwithf "Invalid tokenized input."
             | [] -> 
                 match ops with
