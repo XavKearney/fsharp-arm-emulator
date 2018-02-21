@@ -19,6 +19,7 @@ The main interface to the `MultMem` module is via the `parse` function, which ta
 ## Table of Features
 | Instruction/s | Feature | Tested? |  
 |:---:|:---|:---:|
+| `LDM/STM` | Basic operation implemented | ✔️ |
 | `LDM/STM` | All 4 direction suffixes | ✔️ |
 | `LDM/STM` | All aliases | ✔️|
 | `LDM/STM` | Register list as range (e.g. `R0-R5`) | ✔️ |
@@ -26,12 +27,13 @@ The main interface to the `MultMem` module is via the `parse` function, which ta
 | `LDM/STM` | Registers sorted in increasing order | ✔️|
 | `LDM/STM` | All ARM restrictions | ✔️|
 | `LDM/STM` | Descriptive error messages, no exceptions | ✔️ |
+| `B/BL` | Basic operation implemented | ✔️ |
 | `B/BL` | VisUAL-style expression parsing with labels | ✔️ |
 | `B/BL` | Descriptive error messages, no exceptions | ✔️|
 | `END` | Implemented | ✔️|
 | `All` | Universal parse and execution functions. | ✔️|
 
-Below is a description of the testing, as well as notable differences from VisUAL. After this there is a more complete explanation of the instruction operation, inteded as a README for the module (rather than as part of the deliverable).
+Below is a description of the testing, as well as notable differences from VisUAL. After this there is a more complete explanation of the instruction operation, intended as a README for the module (rather than as part of the deliverable).
 
 ## Testing
 ### LDM & STM
