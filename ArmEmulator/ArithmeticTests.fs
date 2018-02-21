@@ -94,7 +94,7 @@ module MultMemTests
 
     let config = { FsCheckConfig.defaultConfig with maxTest = 10000 }
 
-    let makeInstrString opcode suffix target op1 op2 = 
+    let makeArithInstrString opcode suffix target op1 op2 = 
         let opcodeStr = 
             match opcode with
             | ADD -> "ADD"
@@ -121,11 +121,11 @@ module MultMemTests
         opcodeStr, suffixStr, operandStr
 
     
-    //[<Tests>]
-    let testParse = 
+    [<Tests>]
+    let testArithParse = 
         let makeTestLineData wa opcode suffix target op1 op2 = 
             
-            let opcodeStr, suffixStr, operandStr = makeInstrString opcode suffix target op1 op2
+            let opcodeStr, suffixStr, operandStr = makeArithInstrString opcode suffix target op1 op2
   
             {
                 LoadAddr = wa;
@@ -135,7 +135,7 @@ module MultMemTests
                 Operands = operandStr
             }
 
-        testPropertyWithConfig config "Test Parse" <| 
+        testPropertyWithConfig config "Test Arith Parse" <| 
         fun wa opcode suffix target op1 op2 ->
             let ls = makeTestLineData wa opcode suffix target op1 op2
 
@@ -156,12 +156,70 @@ module MultMemTests
 
             
             let result = parse ls
-            Expect.equal result expected "Parse Test"
+            Expect.equal result expected "Parse Arith Test"
+
+
+    let makeCompInstrString opcode op1 op2 = 
+        let opcodeStr = 
+            match opcode with
+            | CMP -> "CMP"
+            | CMN -> "CMN"
+
+        let op1Str = regStrings.[op1]
+        let op2Str = match op2 with
+                     | Literal num -> "#" + string num
+                     | Register reg -> regStrings.[reg]
+                     | RegisterShift (op2, shift, num) -> 
+                        regStrings.[op2] + "," + operationStrings.[shift] + " #" + string num
+                     | RegisterRegisterShift (op2, shift, reg) -> 
+                        regStrings.[op2] + "," + operationStrings.[shift] + " " + regStrings.[reg]
+        
+        let operandStr = op1Str + "," + op2Str
+        
+        opcodeStr, operandStr
+
+
+    [<Tests>]
+    let testCompParse = 
+        let makeTestLineData wa opcode op1 op2 = 
+            
+            let opcodeStr, operandStr = makeCompInstrString opcode op1 op2
+  
+            {
+                LoadAddr = wa;
+                Label = None;
+                SymTab = None;
+                OpCode = opcodeStr;
+                Operands = operandStr
+            }
+
+        testPropertyWithConfig config "Test Comp Parse" <| 
+        fun wa opcode op1 op2 ->
+            let ls = makeTestLineData wa opcode op1 op2
+
+            let expected = match opcode with
+                           | _ -> Some (Ok {
+                                        PInstr = CompI
+                                            {
+                                            InstrType = Some opcode;
+                                            Op1 = op1;
+                                            Op2 = op2;
+                                            } 
+                                        PLabel = None;
+                                        PSize = 4u;
+                                        PCond = Cal;
+                                     })
+
+            
+            let result = parse ls
+            Expect.equal result expected "Parse Comp Test"
+
+
 
     //[<Tests>]
     let testArithExec =
         let makeTestExecStr opcode suffix target op1 op2 = 
-            let opcodeStr, suffixStr, operandStr = makeInstrString opcode suffix target op1 op2
+            let opcodeStr, suffixStr, operandStr = makeArithInstrString opcode suffix target op1 op2
             //Return full instruction string of opcode + suffix + operands
             opcodeStr + suffixStr + " " + operandStr
 
