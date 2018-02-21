@@ -48,8 +48,10 @@ module ParseExpr
                 // convert the remaining characters into a string
                 chrLst |> List.toArray |> System.String |> 
                 function
-                // match if the only thing remaining is a number
+                // match if the only thing remaining is a number 
                 | Match1 @"^([0-9]+)$" x -> [Num (uint32 x)]
+                // match if the only thing remaining is a label
+                | Match1 @"^([a-zA-Z0-9]+)$" x -> [Num symTab.[x]]
                 // otherwise, match the label/number up to the next operator
                 | MatchGroups @"^([a-zA-Z0-9]+)(.+)$" (txt :: [rest]) ->
                     match txt with
