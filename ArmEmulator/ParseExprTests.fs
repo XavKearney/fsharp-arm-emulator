@@ -38,4 +38,8 @@ module ParseExprTests
                 "(test1*(6+test2)*5)+(test1*4)-3", (10u*(6u+23u)*5u)+(10u*4u)-3u
                 // test hex expressions
                 "0x55*3-0xAF", 0x55u*3u-0xAFu
+                "0x01-3*0xFFFFFFFF", 0x01u-3u*0xFFFFFFFFu
+                "&D1+1*0xFFFFFFFF", 0xD1u+1u*0xFFFFFFFFu
+                "&A4*0xABCDEF", 0xA4u*0xABCDEFu
+                "&A4-&ABCDEF", 0xA4u-0xABCDEFu
             ]

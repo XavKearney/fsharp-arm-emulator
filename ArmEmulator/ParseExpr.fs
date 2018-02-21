@@ -25,7 +25,7 @@ module ParseExpr
     let (|Literal|_|) (symTab:SymbolTable) (inp:string) =
         match inp with
         | Match1 @"^(0x[a-fA-F0-9]+)$" x -> uint32 x |> Some
-        | Match1 @"^(&[a-fA-F0-9]+)$" x -> "0x"+x.[1..(x.Length-1)] |> uint32 |> Some
+        | Match1 @"^(&[a-fA-F0-9]+)$" x -> "0x"+x.[1..] |> uint32 |> Some
         | Match1 @"^(0b[0-1]+)$" x -> uint32 x |> Some
         | Match1 @"^([0-9]+)$" x -> uint32 x |> Some
         | label -> symTab.TryFind label
@@ -59,15 +59,15 @@ module ParseExpr
                 chrLst |> List.toArray |> System.String |> 
                 function
                 // match if the only thing remaining is a literal
-                | Match1 @"^([a-zA-Z0-9]+)$" x -> 
+                | Match1 @"^([&a-zA-Z0-9]+)$" x -> 
                     match x with
                     | Literal symTab n -> [Num n]
-                    | _ -> failwithf "Incorrect  literal input."
+                    | _ -> failwithf "Incorrect literal input."
                 // otherwise, match the label/number up to the next operator
-                | MatchGroups @"^([a-zA-Z0-9]+)(.+)$" (txt :: [rest]) ->
+                | MatchGroups @"^([&a-zA-Z0-9]+)(.+)$" (txt :: [rest]) ->
                     match txt with
                     | Literal symTab n -> Num n :: tok' (Seq.toList rest)
-                    | _ -> failwithf "Incorrect input."
+                    | _ -> failwithf "Incorrect pre-finish literal input."
                 | _ -> failwithf "Incorrect input."
 
         tok' (Seq.toList expr)
@@ -101,21 +101,28 @@ module ParseExpr
                     | [], [] -> eval' rest (0u::nums) (Op op::ops)
                     // otherwise just add the operator to the stack
                     | _ -> eval' rest nums (Op op::ops)
+            // open a bracketed expression
             | LBra :: rest -> eval' rest nums (LBra::ops)
+            // close a bracketed expression
             | RBra :: rest ->
                 match ops with
+                // evaluate what was in the brackets
                 | Op op :: restOps ->
                     let first, second, remaining = first2 nums
                     doOp (Op op) first second
                     |> fun res -> eval' toks (res::remaining) restOps
-                | LBra :: _ -> eval' rest nums ops.Tail
+                // handle nested brackets
+                | LBra :: restOps -> eval' rest nums restOps
                 | _ -> failwithf "Invalid tokenized input."
+            // if nothing left
             | [] -> 
                 match ops with
+                // perform any remaining operations
                 | Op op :: restOps ->
                     let first, second, remaining = first2 nums
                     doOp (Op op) first second
                     |> fun res -> eval' [] (res::remaining) restOps
+                // otherwise return the result
                 | [] -> nums.Head
                 | _ -> failwithf "Should never happen."
         eval' tokInput [] []
