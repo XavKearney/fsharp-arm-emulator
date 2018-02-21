@@ -4,7 +4,6 @@ module MultMem
     
     open CommonData
     open CommonLex
-    open System.Text.RegularExpressions
     open ParseExpr
 
     type MultMemInstrType = LDM | STM
@@ -123,7 +122,7 @@ module MultMem
                     |> Ok
                 | _ -> Error "Invalid list of registers."
                 // check the final list is valid and return
-            | _ -> Error ("Incorrectly formatted operands.")
+            | _ -> Error "Incorrectly formatted operands."
             |> Result.bind (
                 fun lst -> 
                 match List.contains None lst with
@@ -135,7 +134,7 @@ module MultMem
         | Some t -> 
             matchRegLst
             |> Result.map (fun regLst -> (t, wb, regLst))
-        | None -> Error ("Target register not found.")
+        | None -> Error "Target register not found."
 
     /// check that the result after parsing MultMemInstr conforms to ARM spec
     let checkValid ins =
