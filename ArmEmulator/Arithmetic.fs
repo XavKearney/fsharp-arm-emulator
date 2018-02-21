@@ -185,7 +185,7 @@ module Arithmetic
             | false -> Error ("Invalid 32 bit number")
 
 
-    let recursiveSplit expression =
+    let recursiveSplit expression (symTable:SymbolTable option) =
         let lift op a b =
             match a,b with
             | Ok x, Ok y -> Ok (op x y)
@@ -256,12 +256,18 @@ module Arithmetic
                             match check32BitBound numStr with
                             | Ok numInt -> Ok (numInt)
                             | _ -> Error ("Invalid 32 bit number")
-                    | _ -> Error ("Invalid op2 expression")
+                    | _ -> 
+                        match symTable with
+                        | Some symMap -> 
+                            match symMap.TryFind expression with
+                            | Some sym -> Ok (int64 sym)
+                            | _ -> Error ("Symbol does not exist")
+                        | _ -> Error ("Invalid op2 expression")
 
             recursiveSplit' expression
 
 
-    let parseCompLine (line:string) = 
+    let parseCompLine (line:string) (symTable:SymbolTable option) = 
         
         let opList = line.Split(',') |> Array.map (fun s-> s.Trim()) |> Array.toList
 
@@ -274,7 +280,7 @@ module Arithmetic
             | Some op1 -> 
                 match op2Str with
                 | Prefix "#" op2Num -> 
-                    let op2 = recursiveSplit op2Num
+                    let op2 = recursiveSplit op2Num symTable
                     match op2 with
                     | Ok op2Out -> Ok (op1, Literal (uint32 op2Out))
                     | Error err -> Error (err) 
@@ -300,7 +306,7 @@ module Arithmetic
                         | Some shiftOp ->
                             match regLitStr.Trim() with
                             | Prefix "#" op2Num -> 
-                                let op2 = recursiveSplit op2Num
+                                let op2 = recursiveSplit op2Num symTable
                                 match op2 with
                                 | Ok op2Out -> Ok (destOrOp1, RegisterShift (op1OrOp2, shiftOp, int32 op2Out))
                                 | Error err -> Error (err) 
@@ -314,7 +320,7 @@ module Arithmetic
             | _ -> Error ("Op1 or destination is an invalid register")
         | _ -> Error ("Invalid compare instruction")
 
-    let parseArithLine (line:string) = 
+    let parseArithLine (line:string) symTable = 
 
         let opList = line.Split(',') |> Array.map (fun s-> s.Trim()) |> Array.toList
 
@@ -330,7 +336,7 @@ module Arithmetic
                 | Some op1 ->
                     match op2Str with
                     | Prefix "#" op2Str ->
-                        let op2Int = recursiveSplit op2Str
+                        let op2Int = recursiveSplit op2Str symTable
                         match op2Int with
                         | Ok op2Val -> Ok (dest, op1, Literal (uint32 op2Val))
                         | Error err -> Error (err) 
@@ -361,7 +367,7 @@ module Arithmetic
                             | Some shiftOp ->
                                 match regLitStr with
                                 | Prefix "#" shiftNumStr -> 
-                                    let shiftInt = recursiveSplit shiftNumStr
+                                    let shiftInt = recursiveSplit shiftNumStr symTable
                                     match shiftInt with
                                     | Ok shiftVal -> Ok (dest, op1, RegisterShift (op2, shiftOp, int32 shiftVal))
                                     | Error err -> Error (err) 
@@ -378,12 +384,12 @@ module Arithmetic
         | _ -> Error ("Invalid arithmetic instruction")
         
 
-    let makeArithInstr root (suffix:string) operands =
+    let makeArithInstr root (suffix:string) operands symTable =
         // Makes final instruction from baseInstr
         let makeInstr ins = 
             Ok(ins)
         
-        match parseArithLine operands with
+        match parseArithLine operands symTable with
         | Ok (dest, op1, op2) -> 
             // Converts suffix string into bool option
             let suffType = suffix.EndsWith('S') 
@@ -409,11 +415,11 @@ module Arithmetic
         | Error err -> Error err
 
 
-    let makeCompInstr root operands = 
+    let makeCompInstr root operands symTable = 
         let makeInstr ins = 
             Ok(ins)
 
-        match parseCompLine operands with
+        match parseCompLine operands symTable with
         | Ok (op1, op2) -> 
             let baseCompInstr = {
                 InstrType = None;
@@ -439,9 +445,10 @@ module Arithmetic
     let parse ls =
         let parse' (instrC, (root,suffix,pCond)) =
             let (WA la) = ls.LoadAddr
+            let symTable = ls.SymTab
             match instrC with
             | ARITH -> 
-                match makeArithInstr root suffix ls.Operands with
+                match makeArithInstr root suffix ls.Operands symTable with
                 | Ok (pinstr) -> Ok {
                         PInstr = ArithI pinstr;
                         PLabel = ls.Label |> Option.map (fun lab -> lab, la); 
@@ -450,7 +457,7 @@ module Arithmetic
                     }
                 | Error s -> Error s
             | COMP ->
-                match makeCompInstr root ls.Operands with
+                match makeCompInstr root ls.Operands symTable with
                 | Ok (pinstr) -> Ok {
                         PInstr = CompI pinstr;
                         PLabel = ls.Label |> Option.map (fun lab -> lab, la); 

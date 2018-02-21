@@ -12,11 +12,11 @@ module MultMemTests
     /// and list of (input, output) tuples
     /// create an Expecto testList
     /// with unit tests, testing each case
-    let makeTestList testFun name testVals =
+    let makeTestList testFun symTable name testVals =
         let makeTest inp outp =
             let testName = (sprintf "%s: %A" name inp)
             testCase testName <| fun () ->
-                Expect.equal (testFun inp) outp testName
+                Expect.equal (testFun inp symTable) outp testName
         List.map (fun (input, output) -> makeTest input output) testVals
         |> testList (sprintf "%s Test List" name)
 
@@ -30,7 +30,8 @@ module MultMemTests
 
     [<Tests>]
     let testParseOpsLine = 
-        makeTestList parseArithLine "parseArithLine Unit Tests" 
+        let symTable = Some (["test", uint32 2] |> Map.ofList)
+        makeTestList parseArithLine symTable "parseArithLine Unit Tests" 
             [
                 ("R7,R3,R9", Ok (R7, R3, Register R9));
                 ("R0, R12, R1", Ok (R0, R12, Register R1));
@@ -45,9 +46,9 @@ module MultMemTests
                 ("R7,,R3", Error "Op1 is not a valid register");
                 ("R7,R3,", Error "Op2 is not a valid register or expression");
                 (",R7,R3", Error "Destination is not a valid register");
-                ("R7,R3,#0b12", Error ("Invalid op2 expression"));
+                ("R7,R3,#0b12", Error ("Symbol does not exist"));
                 ("R7,R3,#11111111111111111111", Error ("Op2 is not a valid 32 bit number"));
-                ("R7,R3,#abc", Error ("Invalid op2 expression"));
+                ("R7,R3,#abc", Error ("Symbol does not exist"));
                 ("R7,R3,#0xFFFFFFFF2", Error ("Invalid 32 bit number"));
                 ("R7,R3,#2, LSL #1", Error ("Invalid op2 register"));
                 ("R7,R3,R0, LSL #1", Ok (R7,R3, RegisterShift (R0, LSL, 1)));
@@ -67,7 +68,10 @@ module MultMemTests
                 ("R7,R3,#0b1111111100", Ok (R7, R3, Literal (uint32 1020)));
                 ("R0, R12, #+1", Ok (R0, R12, Literal (uint32 1)));
                 ("R0, R12, #*6", Error ("Invalid expression")); 
-                ("R0, R12, #&F", Ok (R0, R12, Literal (uint32 15)));                  
+                ("R0, R12, #&F", Ok (R0, R12, Literal (uint32 15)));
+                ("R0, R12, #-97  +   1", Ok (R0, R12, Literal (uint32 -96)));     
+                ("R0, R12, #2*-3", Error ("Invalid expression")); 
+                ("R0, R12, #test", Ok (R0, R12, Literal (uint32 2)));             
             ]
 
 
