@@ -68,7 +68,10 @@ module MultMem
     }
 
     /// return type to allow parse to return multiple instruction types
-    type ReturnInstr = | MemI of MultMemInstr | BranchI of BranchInstr
+    type ReturnInstr = 
+        | MemI of MultMemInstr 
+        | BranchI of BranchInstr
+        | EndI of EndInstr
 
     /// maps of all possible opcodes recognised
     let multMemOpCodes = opCodeExpand multMemSpec
@@ -225,6 +228,7 @@ module MultMem
             | MISC -> 
                 match root with
                 | "B" -> makeBranchInstr (suffix, ls.Operands, ls.LoadAddr, ls.SymTab)
+                | "END" -> Ok (EndI END)
                 | _ -> Error "Invalid instruction root."
             | _ -> Error "Instruction class not supported."
             // if valid instruction, wrap in Parse type
@@ -303,7 +307,10 @@ module MultMem
                     | false -> Ok cpu
                 | Error s -> Error s
 
-        let instr = parsed.PInstr
+        let instr = 
+            match parsed.PInstr with
+            | MemI x -> x
+            | _ -> failwithf "Should never happen."
         let dir, targ, wb, rlst = instr.Direction, instr.Target, instr.WriteBack, instr.RegList
         checkValid instr
         |> Result.bind (fun _ ->
@@ -315,7 +322,10 @@ module MultMem
     /// executes a parsed branch instruction
     /// given cpuData        
     let execBranchInstr parsed cpuData =
-        let instr = parsed.PInstr
+        let instr = 
+            match parsed.PInstr with
+            | BranchI x -> x
+            | _ -> failwithf "Should never happen."
         match instr.BranchAddr, instr.LinkAddr with
         | Some bAddr, None ->
             // set PC to branch address
@@ -326,7 +336,18 @@ module MultMem
             // and set LR to link address
             Ok {branchedCpu with Regs = cpuData.Regs.Add (R14, lAddr)}
         | _ -> Error "Invalid branch instruction."
-            
+
+    /// execution function to take result of parse
+    /// and return the correct execution function        
+    let execInstr cpuData parsed =
+        parsed |> Option.map (
+            fun r -> r |> Result.bind (fun x ->
+                match x.PInstr with
+                | BranchI _ -> execBranchInstr x cpuData
+                | MemI _ -> execMultMem x cpuData
+                | EndI _ -> Error "Cannot execute an END instruction."
+            )
+        )
 
     /// Parse Active Pattern used by top-level code
     let (|IMatch|_|)  = parse

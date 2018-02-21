@@ -175,6 +175,26 @@ module MultMemTests
                 {ls with OpCode = "BLX"; Operands = "testLabel";}, 
                     None
             ]
+
+    /// test that the parse function returns correctly
+    /// when the input is an END instruction
+    let testParseUnitEnd = 
+        // define test LineData default
+        let ls = { LoadAddr = WA 0u; Label = None; SymTab = None;
+                OpCode = ""; Operands = ""; }
+        // default result
+        let res = {PInstr = EndI END; 
+                    PLabel = None; PSize = 4u; PCond = Cal;}
+        makeUnitTestList parse "parse Unit-End" 
+            [
+                // test valid input
+                {ls with OpCode = "END"; Operands = "";}, 
+                    Some(Ok res)
+                // test invalid input
+                {ls with OpCode = "ENDL"; Operands = "";}, 
+                    None
+            ]
+
     let config = { FsCheckConfig.defaultConfig with maxTest = 1 }
 
     /// property-based testing of parse function
@@ -182,7 +202,7 @@ module MultMemTests
     [<Tests>]
     let testExecBranchInsr = 
         testPropertyWithConfig config "Property Test execBranchInstr" <| 
-        fun flags memMap label branchAddr linkAddr->
+        fun flags memMap branchAddr linkAddr->
             // generate random values for registers R0-R15
             let regVals = genRandomUint32List (-0x7FFFFFFF, 0xFFFFFFFF) 16
             // create randomised cpuData
@@ -193,7 +213,7 @@ module MultMemTests
             }
             // create randomised parsed branch instruction
             let parsed = {
-                PInstr = {BranchAddr = branchAddr; LinkAddr = linkAddr;}; 
+                PInstr = BranchI {BranchAddr = branchAddr; LinkAddr = linkAddr;}; 
                     PLabel = None; PSize = 4u; PCond = Cal;}
             let result = execBranchInstr parsed cpuData
             // determine the correct result given randomised data
@@ -388,7 +408,7 @@ module MultMemTests
                     }
                 // create the parsed MultMemInstr
                 let parsed = {
-                        PInstr =  { 
+                        PInstr =  MemI { 
                                     InsType = Some(opcode); 
                                     Direction = Some(direction);
                                     Target = target; 
@@ -450,3 +470,41 @@ module MultMemTests
                     // check that the flags in VisUAL = flags after execution
                     Expect.equal flags flagsExp "Flags"
                 | Error _ -> ()
+
+    /// tests the generic execution function execInstr
+    /// checks valid delegation of execution to
+    /// instruction-specific functions
+    [<Tests>]
+    let testExecInstr =   
+        let regVals = 
+                genRandomUint32List (-0x7FFFFFFF, 0xFFFFFFFF) 12
+                |> fun lst -> List.concat [lst; [0u; 0u; 0u;]]
+        let parsedBranchI = Some ( Ok {
+                PInstr = BranchI {BranchAddr = Some 111u; LinkAddr = None;}; 
+                    PLabel = None; PSize = 4u; PCond = Cal;})
+        let parsedMemI = Some ( Ok {
+                        PInstr = MemI { 
+                                    InsType = Some(LDM); 
+                                    Direction = Some(FA);
+                                    Target = R4; 
+                                    WriteBack = false; 
+                                    RegList = [R0;]
+                                };
+                        PLabel = None; PSize = 4u; PCond = Cal;
+                    })
+        let parsedEndI = Some ( Ok {PInstr = EndI END; 
+                            PLabel = None; PSize = 4u; PCond = Cal;})
+        let cpuData = {
+                Fl = {N=false;C=true;V=false;Z=false;};
+                Regs = [(R0,0u);(R1,0u);(R2,0u);(R3,0u);(R4,0u);(R5,0u);
+                        (R6,0u);(R7,0u);(R8,0u);(R9,0u);(R10,0u);(R11,0u);
+                        (R12,0u);(R13,0u);(R14,0u);(R15,0u);] |> Map.ofList
+                MM = [(WA 0u, DataLoc 1u);] |> Map.ofList;
+            }
+        makeUnitTestList (execInstr cpuData) "execInstr Unit" 
+            [
+                // test valid input
+                parsedBranchI, Some (Ok {cpuData with Regs=cpuData.Regs.Add (R15, 111u)})
+                parsedMemI, Some (Ok {cpuData with Regs=cpuData.Regs.Add (R0, 1u)})
+                parsedEndI, Some (Error "Cannot execute an END instruction.")
+            ]
