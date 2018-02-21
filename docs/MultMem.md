@@ -1,5 +1,6 @@
 # MultMem
-This documentation covers how the `MultMem.fs` and `MultMemTests.fs` files work, what instructions they cover, and how these are tested.
+This documentation covers how the `MultMem` module works. It includes the main source file `MultMem.fs`, as well as the corresponding tests in `MultMemTests.fs`. It also includes some comments on the general purpose expression parser implemented in the `ParseExpr` module, as well as the `VisualTesting` framework which has been modified to allow for property-based testing of memory instructions against [VisUAL](https://salmanarif.bitbucket.io/visual/). 
+
 _Author: Xav Kearney_
 
 ## Instructions
@@ -7,12 +8,15 @@ The instructions covered are:
 - `LDM`
 - `STM`
 - `B/BL`
+- `END`
 
-(`END` is to be added)
 ### LDM - Load Multiple Registers
 `LDM` is ARM's _Load Multiple Registers_ instruction. It has the syntax:
+
 ```LDM[dir]{cond} source[!], {list of registers}```
-An example command would be: `LDM R0, {R3,R7,R9}`
+
+An example command would be: `LDM R0, {R3,R7,R9}`. As in VisUAL, contiguous register ranges can be supplied with the shorthand form e.g. `{R0-R9}`.
+
 The registers in the `{list of registers}` are loaded with the word values of memory addresses based on the value of the `source` register. The optional `!` indicates whether to write-back the value of the final memory location to the source. The `dir` (direction) optional suffix indicates how the source memory addresses are calculated based on this value, and takes one of following forms:
 
 | Direction | Aliases       | Effect                             |
@@ -23,17 +27,23 @@ The registers in the `{list of registers}` are loaded with the word values of me
 | `"ED"`    | None          | Empty Descending                   |
 
 _Ascending_ instructions decrease the memory address with each load. _Descending_ does the opposite.
-_Empty_ instructions increment the memory address in the `source` register before any data is loaded. `Full` instructions do the opposite. The register list is always accessed in order of increasing register numbers (i.e. `R0` before `R1`).
-The following restrictions apply:
+_Empty_ instructions increment the memory address in the `source` register before any data is loaded. `Full` instructions do the opposite. The register list is **always** accessed in order of increasing register numbers (i.e. `R0` before `R1`).
+
+The following restrictions apply to `LDM` instructions:
 - The `source` register must not be `PC`.
 - The register list must not contain `SP`.
 - The register list must not contain `PC` if it contains `LR`.
 - If write-back is specified, the register list must not contain the `source` register.
 ### STM - Store Multiple Registers
 `STM` is ARM's _Store Multiple Registers_ instruction, essentially the opposite to `LDM`. It has the syntax:
+
 ```STM[dir]{cond} dest[!], {list of registers}```
-An example command would be: `STM R0, {R3,R7,R9}`
-The word values of the registers in the `{list of registers}` are stored in the memory addresses based on the value of the `dest` (destination) register. The optional `!` indicates whether to write-back the value of the final memory location to the destination register. The `dir` (direction) optional suffix indicates how the source memory addresses are calculated based on this value, and takes one of following forms (NB: different to `LDM`):
+
+An example command would be: `STM R0, {R3,R7,R9}`. As in VisUAL, contiguous register ranges can be supplied with the shorthand form e.g. `{R0-R9}`.
+
+The word values of the registers in the `{list of registers}` are stored in the memory addresses based on the value of the `dest` (destination) register. The optional `!` indicates whether to write-back the value of the final memory location to the destination register. 
+
+The `dir` (direction) optional suffix indicates how the source memory addresses are calculated based on this value, and takes one of following forms (NB: different to `LDM`):
 
 | Direction | Aliases       | Effect                             |
 | --------- | :-----------: | :--------------------------------: | 
@@ -45,32 +55,70 @@ The word values of the registers in the `{list of registers}` are stored in the 
  _Ascending_ instructions increase the memory address with each load. _Descending_ does the opposite.
 _Empty_ instructions increment the memory address in the `dest` register after data is loaded. `Full` instructions do the opposite. The register list is always accessed in order of increasing register numbers (i.e. `R0` before `R1`).
 
-The following restrictions apply:
+The following restrictions apply for `STM` instructions:
 - The `dest` register must not be `PC`.
 - The register list must not contain `SP` or `PC`.
 - If write-back is specified, the register list must not contain the `dest` register.
 
+### B/BL - Branch/Branch with Link
+Branch instructions change the program counter, allowing program execution to jump immediately to any given memory address (which normally represents an instruction). They have the syntax:
+
+```B[L]{cond} target```
+
+The optional `L` suffix is used to indicate whether to write the address of the next instruction (after the branch instruction) to the link register (`LR`).
+
+The `target` can be any expression involving numeric literals, which can be any of:
+- Standard integer numbers of the form `[0-9]+`
+- Hexadecimal numbers of the forms `0x[a-fA-F0-9]+` or `&[a-fA-F0-9]+`
+- Binary numbers of the form `0b[0-1]+`
+
+The expression can also include labels which correspond to addresses, the mapping of which is stored in the `SymTab` record of the `LineData`. The elements in the expression can be combined with any valid mathematical combination of brackets, multiplication, addition and subtraction. The result conforms to the standard `BODMAS` rules.
+
+### END
+The `END` instruction is used to (conditionally) terminate program execution. It has the simple syntax:
+
+`END{cond}`
+
+No other information is encoded, and its 'execution' is handled by the top-level code so is not covered further here. 
+
 ## Implementation
 The following details how the above instructions are implemented in the `MultMem` module.
+
+The expected entry-point to the module code is the `parse` function which first determines whether some given `LineData` corresponds to an opcode that the `MultMem` module handles. These are determined from a combination of the `multMemSpec`, `branchSpec` and `endSpec`, which together define the roots and possible suffixes of all the opcodes handled.
 ### LDM & STM
 #### Parsing
-The `parse` function first determines whether some given `LineData` corresponds to an opcode that the `MultMem` module handles. These are determined from the `multMemSpec`, which defines the roots and possible suffixes of all the opcodes handled. If an instruction is handled by `MultMem` and is of instruction class `MEM` (in this context, either an `LDM` or `STM` instruction) then the root, suffix and operands of the instruction are processed by the `makeMultMemInstr` function.
+ If an instruction is handled by `MultMem` and is of instruction class `MEM` (in this context, either an `LDM` or `STM` instruction) then the root, suffix and operands of the instruction are processed by the `makeMultMemInstr` function.
 
-`makeMultMemInstr` first calls a `parseOps` function to convert the operands string into a target register (either source or destination), a boolean for whether to write-back, and a list of `RName`s corresponding to the register list. This is achieved by first splitting the operands string by `,` to determine the target register, and then checking to see if the string ends with `!` (indicating a write-back suffix). The register list is then recombined and processed into a list of `RName`s.
+`makeMultMemInstr` first calls a `parseMemOps` function to convert the operands string into a target register (either source or destination), a boolean for whether to write-back, and a list of `RName`s corresponding to the register list. This is achieved by first splitting the operands string by `,` to determine the target register, and then checking to see if the string ends with `!` (indicating a write-back suffix). The register list is then recombined and processed into a list of `RName`s using regular expression-based active pattern matching.
 
 The `MultMemInstr` type includes all parameters required to execute any valid `LDM/STM` instruction, given CPU state in the form of a `DataPath`.
 
-An error at any stage has a corresponding error message which bubbles up to the original call. A function `checkValid` ensures that the resulting parsed `MultMemInstr` adheres to the restrictions detailed above. If valid, the `parse` function returns a `Result<MultMemInstr,string>`.
+An error at any stage has a corresponding error message which bubbles up to the original call. A function `checkValid` ensures that the resulting parsed `MultMemInstr` adheres to the restrictions detailed above before returning the `MultMemInstr` wrapped in a `Result` monad.
 
 #### Execution
 Execution is performed by the `execMultMem` function, which is passed a parsed `MultMemInstr` as a parameter, along with CPU state in the form of a `DataPath`. 
 
-First, the relevant data from the `MultMemInstr` is extracted and the `checkValid` instruction is used again to ensure validity. The register list is sorted, the initial memory address determined and the direction embedded into a function `dirOp` which performs either addition or subtraction. The list of registers is then recursively traversed and adjusts the given `DataPath` accordingly. The result is either an Error (string), or the modified `cpuData` wrapped in a Result monad.
+First, the relevant data from the `MultMemInstr` is extracted and the `checkValid` instruction is used again to ensure validity. The register list is sorted, the initial memory address determined and the direction embedded into a function `dirOp` which performs either addition or subtraction. The list of registers is then recursively traversed and adjusts the given `DataPath` accordingly. The result is either an `Error (string)`, or the modified `cpuData` wrapped in a `Result` monad.
+
+### B/BL
+### Parsing
+Parsing the `B/BL` instructions requires a `SymbolTable` to correctly determine the addresses corresponding to labels in the given expression. If the `makeBranchInstr` is called without a `SymbolTable`, the result is a `BranchInstr` with both fields (`BranchAddr` and `LinkAddr`) set to `None`.
+
+Given a `SymbolTable`, the `makeBranchInstr` uses the `ParseExpr` module's `evalExpr` function to evaluate the expression included in the operands. If the expression is valid, the result is returned in the `branchAddr` field of the result. If not valid, an `Error` is returned.
+
+If the `L` suffix is supplied, the `linkAddr` field is set to the current instruction's `LoadAddr+4`. If not, the field is `None`.
+
+### Execution
+The `execBranchInstr` takes a parsed `BranchInstr` and valid `DataPath`, returning a modified `DataPath` corresponding to the instruction execution's effect.
+
+If the `LinkAddr` is not set, the returned `DataPath` simply has its `PC` (`R15`) register set to the value of `branchAddr`. If it is set, then in addition to this, the `LR` (`R14`) register is set to the value of `LinkAddr`.
+
+In any other case, an error is returned.
 
 ## Testing
 ### LDM & STM
 #### Parsing
-The `parseOps` function is tested with a series of unit tests (`parseOps Unit`) to determine correct operation both for simple, valid instructions and also for invalid instructions where the expected output is the correct error message.
+The `parseMemOps` function is tested with a series of unit tests (`parseOps Unit`) to determine correct operation both for simple, valid instructions and also for invalid instructions where the expected output is the correct error message.
 
 A number of unit tests (`parse Unit-MultMem`) are also used to check that the `parse` function correctly returns errors when the input corresponds to ARM restrictions.
 
@@ -79,11 +127,22 @@ The more thorough testing occurs in the completely randomised property-based tes
 #### Execution
 Initially, manually tests were performed to confirm that the `execMultMem` function correctly modifies CPU state according to the ARM specification.
 
-However, for maximum robustness, a property-based test is used to compare the effect of a random instruction on CPU state with the CPU state after the same instruction is processed by [VisUAL](https://salmanarif.bitbucket.io/visual/). This is achieved with the help of a `VisualTesting` framework, written by [Dr. Tom Clarke](https://intranet.ee.ic.ac.uk/electricalengineering/eepeople/person.asp?s=NIL&id=75) and adapted into a package, with some minor modifications to allow initialised memory, by me (Xav Kearney).
+However, for maximum robustness, a property-based test is used to compare the effect of a random instruction on CPU state with the CPU state after the same instruction is processed by VisUAL. This is achieved with the help of a `VisualTesting` framework, written by [Dr. Tom Clarke](https://intranet.ee.ic.ac.uk/electricalengineering/eepeople/person.asp?s=NIL&id=75) and adapted into a package, with some minor modifications to allow initialised memory based on a `Map`, by me (Xav Kearney).
 
 This property-based test randomly generates both initial CPU state (registers, memory and flags) and also the instruction parameters. The random parameters are first checked to see if they conform to the restrictions set both by ARM (as above) and VisUAL (see below). If not, the test is skipped. If the parameters are valid they are converted into the forms used by both `MultMem.fs` and VisUAL (which differ slightly due to types), and the results are compared. Some sorting is required to transform the resulting VisUAL register & memory state into the same form as the result of `execMultMem`.
 
 If no errors are returned, the register contents, memory address data and flags are all checked for equality to consider a test passed. By default 10,000 tests are run (although the actual test number is much lower given the validity constraints). Increasing this to 500,000 takes over an hour to run and results in a 100% pass rate.
+
+### B & BL
+#### Parsing
+The parsing of the `B/BL` instructions is tested with a series of unit tests, of both the `makeBranchInstr` function and the top-level `parse` function.
+
+There is no randomised testing of these instructions as randomly generating valid mathematical expressions involving arbitrary labels is non-trivial and provides little extra benefit given that the `evalExpr` function is separately tested.
+
+#### Execution
+Execution of the `B/BL` instructions is tested using a property-based test with randomised `cpuData` (registers, flags and memory) and also randomised `branchAddr` and `linkAddr` fields. 
+
+This cannot be tested against VisUAL because branching to a random instruction location would break in the test code. As a result, the returned modified `cpuData` is checked to ensure its registers, memory and flags equal the expected values in the case of both `B` and `BL`.
 
 #### Differences from VisUAL
 In testing, a number of differences from VisUAL were discovered:
@@ -97,10 +156,7 @@ In testing, a number of differences from VisUAL were discovered:
 4. VisUAL requires memory addresses to be divisible by 4.
     - This is not a restriction used by the `MultMem` module, but the module does incremement addresses by 4 so that the addresses can be considered as referring to bytes, to maximise compatibility with VisUAL. This memory model may change during the group phase if it allows for better error checking.
 4. It is not possible to test with register lists larger than 12 registers as a result of the `VisualTesting` framework. This is because the memory addresses are loaded into registers.
-5. It is not possible to test when `R15` is within the register list against VisUAL because loading a value into `R15` causes the test code to branch to an unwanted instruction location.
+5. It is not possible to test when `R15` is modified by an `LDM/STM` instruction against VisUAL because loading a value into `R15` causes the test code to branch to an unwanted instruction location.
 6. VisUAL instructions are case-insensitive. This module assumes upper-case instructions, and the intention is that the top-level code in the group phase of the project will convert instructions to upper-case to allow case insensitivity.
 7. VisUAL throws a Java exception if a reverse-ordered register list is given, e.g. `LDM R0, {R5-R1}`. The `MultMem` module handles this case, returning an Error within a Result monad.
 
-
-## TODO
-- [ ] Add support for `B/BL/END` instructions
