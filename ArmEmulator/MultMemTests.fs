@@ -8,6 +8,8 @@ module MultMemTests
     open VisualTest.VTest
     open VisualTest.VCommon
 
+    /// generates a random list of uint32 between min & max
+    /// of length count
     let genRandomUint32List (min,max) count =
         let rnd = System.Random()
         List.init count (fun _ -> rnd.Next (min, max))
@@ -60,30 +62,50 @@ module MultMemTests
                 "R7, R3,R9,R1}", Error "Incorrectly formatted operands."
                 "R7 {R3,R9,R1}", Error "Target register not found."
             ]
+
+    /// unit tests for makeBranch function
+    /// takes suffix, operands, load address and symbol table
+    /// returns a branch instruction
     [<Tests>]
     let testMakeBranchInstrUnit = 
         let testSymTab = [("testLab", 37u); ("otherLab", 94u)] |> Map.ofList
         makeUnitTestList makeBranchInstr "makeBranchInstr Unit" 
             [
-                // test valid input without symbol table
-                ("", "someLabel", (WA 0u), None), 
-                    Ok (BranchI {Label = "someLabel"; BranchAddr = None; Link = None;})
-                ("L", "anotherLABEL", (WA 0u), None),
-                    Ok (BranchI {Label = "anotherLABEL"; BranchAddr = None; Link = Some(WA 4u);})
-                ("L", " aLabel ", (WA 0u), None), 
-                    Ok (BranchI {Label = "aLabel"; BranchAddr = None; Link = Some(WA 4u);})
                 // test valid input with symbol table (2nd pass)
-                ("L", "testLab", (WA 0u), Some(testSymTab)), 
-                    Ok (BranchI {Label = "testLab"; BranchAddr = Some(37u); Link = Some(WA 4u);})
-                ("", "otherLab", (WA 0u), Some(testSymTab)), 
-                    Ok (BranchI {Label = "otherLab"; BranchAddr = Some(94u); Link = None;})
+                ("", "testLab", (WA 0u), Some testSymTab), 
+                    Ok (BranchI {BranchAddr = Some(37u); LinkAddr = None;})
+                ("L", "testLab", (WA 0u), Some testSymTab), 
+                    Ok (BranchI {BranchAddr = Some(37u); LinkAddr = Some(WA 4u);})
+                ("", "otherLab", (WA 0u), Some testSymTab), 
+                    Ok (BranchI {BranchAddr = Some(94u); LinkAddr = None;})
+                ("L", "otherLab", (WA 0u), Some testSymTab), 
+                    Ok (BranchI {BranchAddr = Some(94u); LinkAddr = Some(WA 4u);})
+                ("", "testLab*2-1", (WA 0u), Some testSymTab), 
+                    Ok (BranchI {BranchAddr = Some(37u*2u-1u); LinkAddr = None;})
+                ("", "testLab+otherLab*2", (WA 0u), Some testSymTab), 
+                    Ok (BranchI {BranchAddr = Some(37u+94u*2u); LinkAddr = None;})
+                ("", "29*0xFF", (WA 0u), Some testSymTab), 
+                    Ok (BranchI {BranchAddr = Some(29u*0xFFu); LinkAddr = None;})
+                ("", "otherLab*0xF*&F*0b11", (WA 0u), Some testSymTab), 
+                    Ok (BranchI {BranchAddr = Some(94u*0xFu*0xFu*0b11u); LinkAddr = None;})
+                    
+                // test valid input but no symbol table (1st pass)
+                ("", "testLab", (WA 0u), None), 
+                    Ok (BranchI {BranchAddr = None; LinkAddr = None;})
+                ("L", "testLab", (WA 0u), None), 
+                    Ok (BranchI {BranchAddr = None; LinkAddr = None;})
+                ("", "otherLab", (WA 0u), None), 
+                    Ok (BranchI {BranchAddr = None; LinkAddr = None;})
+                ("L", "otherLab", (WA 0u), None), 
+                    Ok (BranchI {BranchAddr = None; LinkAddr = None;})
+
                 // test invalid input
-                ("", "unknownLab", (WA 0u), Some(testSymTab)), Error "Branch label not found."
-                ("K", "yetAnotherLabel", (WA 0u), None), Error "Invalid branch instruction."
-                ("L", "label with spaces", (WA 0u), None), Error "Invalid branch instruction."
-                ("", "", (WA 0u), None), Error "Invalid branch instruction."
-                ("L", "", (WA 0u), None), Error "Invalid branch instruction."
-                ("", " ", (WA 0u), None), Error "Invalid branch instruction."
+                ("", "unknownLab", (WA 0u), Some(testSymTab)), Error "Invalid literal at end of expression."
+                ("K", "yetAnotherLabel", (WA 0u), Some testSymTab), Error "Invalid literal at end of expression."
+                ("L", "label with spaces", (WA 0u), Some testSymTab), Error "Invalid literal in expression."
+                ("", "", (WA 0u), Some testSymTab), Error "No input expression supplied."
+                ("L", "", (WA 0u), Some testSymTab), Error "No input expression supplied."
+                ("", " ", (WA 0u), Some testSymTab), Error "No input expression supplied."
             ]
     // unit tests for parse function
     // with input corresponding to LDM/STM instructions
@@ -108,49 +130,52 @@ module MultMemTests
                     Some(Error "Register list cannot contain target reg if writeback is enabled.")
                 {ls with OpCode = "STM"; Operands = "R9!, {R4,R1,R9}";}, 
                     Some(Error "Register list cannot contain target reg if writeback is enabled.")
+                
                 // test invalid and unsupported opcodes return None
                 {ls with OpCode = "STMEF"; Operands = "R15, {R1,R3}";}, 
                     None
                 {ls with OpCode = "ADD"; Operands = "R15, R15, #5";}, 
                     None
             ]
-    // unit tests for parse function
-    // with input corresponding to B/BL/END instructions
+    
+    /// unit tests for parse function
+    /// with input corresponding to B/BL instructions
     [<Tests>]
     let testParseUnitBranch = 
         let testSymTab = [("testLab", 37u); ("otherLab", 94u)] |> Map.ofList
         // define test LineData default
-        let ls = { LoadAddr = WA 0u; Label = None; SymTab = None;
+        let ls = { LoadAddr = WA 0u; Label = None; SymTab = Some testSymTab;
                 OpCode = ""; Operands = ""; }
-        // also define test LineData default with a SymbolTable
-        let lsSymTab = {ls with SymTab = Some testSymTab}
         // default result
-        let res = {PInstr = BranchI {Label = ""; BranchAddr = None; Link = None;}; 
+        let res = {PInstr = BranchI {BranchAddr = None; LinkAddr = None;}; 
                     PLabel = None; PSize = 4u; PCond = Cal;}
         makeUnitTestList parse "parse Unit-Branch" 
             [
                 // test valid input
-                {ls with OpCode = "B"; Operands = "testLabel";}, 
-                    Some(Ok {res with PInstr = BranchI {Label = "testLabel"; BranchAddr = None; Link = None;}})
-                {ls with OpCode = "BL"; Operands = "testLabel";}, 
-                    Some(Ok {res with PInstr = BranchI {Label = "testLabel"; BranchAddr = None; Link = Some (WA 4u);}})
-                {lsSymTab with OpCode = "B"; Operands = "testLab";}, 
-                    Some(Ok {res with PInstr = BranchI {Label = "testLab"; BranchAddr = Some 37u; Link = None;}})
-                {lsSymTab with OpCode = "BL"; Operands = "otherLab";}, 
-                    Some(Ok {res with PInstr = BranchI {Label = "otherLab"; BranchAddr = Some 94u; Link = Some (WA 4u);}})
-                {ls with OpCode = "BL"; Operands = "   Testwhitespace    ";}, 
-                    Some(Ok {res with PInstr = BranchI {Label = "Testwhitespace"; BranchAddr = None; Link = Some (WA 4u);}})
+                {ls with OpCode = "B"; Operands = "testLab";}, 
+                    Some(Ok {res with PInstr = BranchI {BranchAddr = Some 37u; LinkAddr = None;}})
+                {ls with OpCode = "BL"; Operands = "testLab";}, 
+                    Some(Ok {res with PInstr = BranchI {BranchAddr = Some 37u; LinkAddr = Some (WA 4u);}})
+                {ls with OpCode = "BL"; Operands = "otherLab";}, 
+                    Some(Ok {res with PInstr = BranchI {BranchAddr = Some 94u; LinkAddr = Some (WA 4u);}})
+                {ls with OpCode = "BL"; Operands = "otherLab*2-1";}, 
+                    Some(Ok {res with PInstr = BranchI {BranchAddr = Some (94u*2u-1u); LinkAddr = Some (WA 4u);}})
+                {ls with OpCode = "B"; Operands = "otherLab*2-9*testLab";}, 
+                    Some(Ok {res with PInstr = BranchI {BranchAddr = Some (94u*2u-9u*37u); LinkAddr = None;}})
+                
                 // test invalid input
+                {ls with OpCode = "BL"; Operands = "   Testwhitespace    ";}, 
+                    Some(Error "Invalid literal in expression.")
                 {ls with OpCode = "BL"; Operands = "multiple words";}, 
-                    Some(Error "Invalid branch instruction.")
-                {lsSymTab with OpCode = "B"; Operands = "wrongLabel";}, 
-                    Some(Error "Branch label not found.")
-                {lsSymTab with OpCode = "BL"; Operands = "wrongLabel";}, 
-                    Some(Error "Branch label not found.")
+                    Some(Error "Invalid literal in expression.")
+                {ls with OpCode = "B"; Operands = "wrongLabel";}, 
+                    Some(Error "Invalid literal at end of expression.")
+                {ls with OpCode = "BL"; Operands = "wrongLabel";}, 
+                    Some(Error "Invalid literal at end of expression.")
                 {ls with OpCode = "BLX"; Operands = "testLabel";}, 
                     None
             ]
-    let config = { FsCheckConfig.defaultConfig with maxTest = 10000 }
+    let config = { FsCheckConfig.defaultConfig with maxTest = 1 }
 
     /// property-based testing of parse function
     /// for randomly generated branch instructions
@@ -168,7 +193,7 @@ module MultMemTests
             }
             // create randomised parsed branch instruction
             let parsed = {
-                PInstr = {Label = label; BranchAddr = branchAddr; Link = linkAddr;}; 
+                PInstr = {BranchAddr = branchAddr; LinkAddr = linkAddr;}; 
                     PLabel = None; PSize = 4u; PCond = Cal;}
             let result = execBranchInstr parsed cpuData
             // determine the correct result given randomised data
@@ -251,6 +276,8 @@ module MultMemTests
             let res = parse ls
             Expect.equal res expected "cpuData"
     
+    /// property-based testing against VisUAL
+    /// for LDM/STM instructions
     [<Tests>]
     let testExecMultMem = 
         let makeInstrString opcode direction target wb rLst =

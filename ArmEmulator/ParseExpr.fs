@@ -130,7 +130,9 @@ module ParseExpr
                 // otherwise return the result
                 | [] -> Ok nums.Head
                 | _ -> Error "Invalid expression."
-        eval' tokInput [] []
+        match tokInput with
+        | [] -> Error "No input expression supplied."
+        | _ -> eval' tokInput [] []
 
     let evalExpr symTab expr = 
         tokenize expr symTab

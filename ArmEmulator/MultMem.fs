@@ -5,6 +5,7 @@ module MultMem
     open CommonData
     open CommonLex
     open System.Text.RegularExpressions
+    open ParseExpr
 
     type MultMemInstrType = LDM | STM
     type MultMemDirection = FD | FA | ED | EA 
@@ -28,13 +29,12 @@ module MultMem
     /// branch instruction type
     type BranchInstr = 
         {   
-            // label string to branch to
-            Label: string;
-            // label string to branch to
-            BranchAddr: uint32 option ;
-            // optional link "L" suffix
-            // requires address of next instruction
-            Link: WAddr option;
+            // address to branch to
+            // optional because it can require 2nd pass
+            BranchAddr: uint32 option;
+            // if optional link "L" suffix set
+            // this stores the address of the next instruction
+            LinkAddr: WAddr option;
         }
 
     /// parse error (dummy, but will do)
@@ -81,6 +81,13 @@ module MultMem
         then Some (str.[1..String.length str - 2])
         else None
 
+    /// checks if a string contains a character
+    /// if so, split at that character and return list
+    let (|SplitAt|_|) (c:string) (str:string) =
+        if str.Contains(c) 
+        then Some(str.Split(c) |> Seq.toList)
+        else None
+
     /// matches a string with regex pattern
     /// returns a list of all of the matches
     let (|Matches|_|) (pat:string) (inp:string) =
@@ -90,7 +97,7 @@ module MultMem
         else None
 
     /// matches a string with regex pattern
-    /// returns a list of the matches
+    /// if there is a single match, it is returned
     let (|Match1|_|) (pat:string) (inp:string) =
         let m = Regex.Matches(inp, pat) in
         if m.Count = 1
@@ -219,35 +226,31 @@ module MultMem
             | _ -> Error "Opcode not supported."
         )
 
+
     /// takes a suffix and operands as strings
     /// determines whether the branch corresponds to a link ("L")
     /// and gets the label from the operands
     /// provided it contains no whitespace
     /// argument is a tuple for easier testing
-    let makeBranchInstr (suffix, operands:string, WA loadaddr, symtab:Map<string,uint32> option) =
-        // get link and label
-        match suffix, operands with
-        // link address is address of next instruction (current address + 4)
-        | "L", Match1 @"(\S+)" label -> Ok (label, Some (WA (loadaddr+4u)))
-        | "", Match1 @"(\S+)" label -> Ok(label, None)
-        | _ -> Error "Invalid branch instruction."
-        // if valid, and symtable not none, try find address of label
-        |> Result.bind (fun (label, link) ->
-            match symtab with
-            | None -> Ok (label, None, link)
-            | Some (symtab) ->
-                symtab.TryFind label
-                |> function
-                | Some (addr) -> Ok (label, Some(addr), link)
-                | None -> Error "Branch label not found.")
-        // if valid, return branch instruction
-        |> Result.map (fun (label, addr, link) ->
-            BranchI {
-                Label = label;
-                BranchAddr = addr;
-                Link = link;
-            }
-        )
+    let makeBranchInstr (suffix, operands:string, WA loadaddr, symTab:Map<string,uint32> option) =
+        match symTab with
+        | Some syms ->
+            let branchAddr = evalExpr syms operands
+            let linkAddr = 
+                match suffix with
+                // link address is address of next instruction (current address + 4)
+                | "L" -> Some(WA (loadaddr + 4u))
+                | _ -> None
+            // if valid, and symtable not none, try find address of label
+            branchAddr
+            // if valid, return branch instruction
+            |> Result.map (fun bAddr ->
+                BranchI {
+                    BranchAddr = Some (bAddr);
+                    LinkAddr = linkAddr;
+                }
+            )
+        | None -> BranchI { BranchAddr = None; LinkAddr = None;} |> Ok
 
     /// main function to parse a line of assembler
     /// ls contains the line input
@@ -353,7 +356,7 @@ module MultMem
     /// given cpuData        
     let execBranchInstr parsed cpuData =
         let instr = parsed.PInstr
-        match instr.BranchAddr, instr.Link with
+        match instr.BranchAddr, instr.LinkAddr with
         | Some bAddr, None ->
             // set PC to branch address
             Ok {cpuData with Regs = cpuData.Regs.Add (R15, bAddr)}
