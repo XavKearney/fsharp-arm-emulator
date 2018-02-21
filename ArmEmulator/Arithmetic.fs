@@ -197,6 +197,9 @@ module Arithmetic
         
         | FlexParse "([+*-])$" _ ->
             Error ("Invalid expression")
+
+        | FlexParse "^([*])" _ ->
+            Error ("Invalid expression")
             
         | _ ->   
             let rec recursiveSplit' expression = 
@@ -218,7 +221,7 @@ module Arithmetic
                     expression.Split('*')
                     |> Array.map (fun s-> s.Trim()) 
                     |> Array.toList
-                    |> List.map ((fun s -> if s = "" then "1" else s) >> recursiveSplit')
+                    |> List.map recursiveSplit'
                     |> List.reduce (lift (*))
 
                 else
@@ -231,7 +234,7 @@ module Arithmetic
                             | Ok binInt -> Ok (binInt)
                             | _ -> Error ("Op2 is not a valid 32 bit number")  
 
-                    | FlexParse "^(-?0x[0-9A-F]+)$" [hexStr] -> 
+                    | FlexParse "^(-?0x[0-9A-F]+|-?&[0-9A-F]+)$" [hexStr] -> 
                         match hexStr.Length with
                         | x when x > 14 -> Error ("Op2 is not a valid 32 bit number")
                         | _ -> 
