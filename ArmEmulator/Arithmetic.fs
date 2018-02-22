@@ -4,7 +4,6 @@ module Arithmetic
     open System.Text.RegularExpressions
     open System.Linq.Expressions
     open VisualTest
-    open VisualTest
     open Microsoft.VisualBasic.CompilerServices
     open System.Threading
 
@@ -494,9 +493,10 @@ module Arithmetic
                     | Register reg -> regMap.TryFind reg
                     | RegisterShift (op2, shift, num) -> Some (flexOp2 (RegisterShift (op2, shift, num)) cpuData)
                     | RegisterRegisterShift (op2, shift, num) -> Some (flexOp2 (RegisterRegisterShift(op2, shift, num)) cpuData)
-            let carryVal = match cpuData.Fl.C with
-                           | true -> 1u
-                           | false -> 0u
+            let carryVal = 
+                match cpuData.Fl.C with
+                | true -> 1u
+                | false -> 0u
 
             let logicOp = 
                 match targetVal, op1Val, op2Val with
