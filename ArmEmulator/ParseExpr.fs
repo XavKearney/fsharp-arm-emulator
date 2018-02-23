@@ -37,6 +37,7 @@ module ParseExpr
         if m.Count = 1
         then Some (m.[0].Value)
         else None
+
     /// matches a string with regex pattern
     /// returns list of the matched groups (excluding the whole match)
     let (|MatchGroups|_|) (pat:string) (inp:string) =
@@ -54,7 +55,7 @@ module ParseExpr
     /// if no match, try and find the string in the SymbolTable
     let (|Literal|_|) (symTab:SymbolTable) (inp:string) =
         match inp with
-        | Match1 @"^(0x[a-fA-F0-9]+)$" x -> uint32 x |> Some
+        | Match1 @"^(0[xX][a-fA-F0-9]+)$" x -> uint32 x |> Some
         | Match1 @"^(&[a-fA-F0-9]+)$" x -> "0x"+x.[1..] |> uint32 |> Some
         | Match1 @"^(0b[0-1]+)$" x -> uint32 x |> Some
         | Match1 @"^([0-9]+)$" x -> uint32 x |> Some

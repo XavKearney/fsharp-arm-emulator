@@ -195,7 +195,7 @@ module MultMemTests
                     None
             ]
 
-    let config = { FsCheckConfig.defaultConfig with maxTest = 1 }
+    let config = { FsCheckConfig.defaultConfig with maxTest = 100 }
 
     /// property-based testing of parse function
     /// for randomly generated branch instructions
@@ -328,10 +328,8 @@ module MultMemTests
 
         testPropertyWithConfig config "Property Test ExecMultMem" <| 
         fun opcode direction (target: RName) wb (rLst: RName list) (flags: CommonData.Flags)->
-            // generate random values for registers R0-R11, set R12-R14 to 0
-            let regVals = 
-                genRandomUint32List (-0x7FFFFFFF, 0xFFFFFFFF) 12
-                |> fun lst -> List.concat [lst; [0u; 0u; 0u;]]
+            // generate random values for registers R0-R14, set R12-R14 to 0
+            let regVals = genRandomUint32List (-0x7FFFFFFF, 0xFFFFFFFF) 15
             // create the instruction as a string, and get other necessary params
             let instrString, dirOp, initialN, suffixStr = 
                 makeInstrString opcode direction target wb rLst
@@ -476,13 +474,11 @@ module MultMemTests
     /// instruction-specific functions
     [<Tests>]
     let testExecInstr =   
-        let regVals = 
-                genRandomUint32List (-0x7FFFFFFF, 0xFFFFFFFF) 12
-                |> fun lst -> List.concat [lst; [0u; 0u; 0u;]]
         let parsedBranchI = Some ( Ok {
                 PInstr = BranchI {BranchAddr = Some 111u; LinkAddr = None;}; 
                     PLabel = None; PSize = 4u; PCond = Cal;})
-        let parsedMemI = Some ( Ok {
+        let parsedMemI = 
+            Some ( Ok {
                         PInstr = MemI { 
                                     InsType = Some(LDM); 
                                     Direction = Some(FA);
@@ -503,7 +499,6 @@ module MultMemTests
             }
         makeUnitTestList (execInstr cpuData) "execInstr Unit" 
             [
-                // test valid input
                 parsedBranchI, Some (Ok {cpuData with Regs=cpuData.Regs.Add (R15, 111u)})
                 parsedMemI, Some (Ok {cpuData with Regs=cpuData.Regs.Add (R0, 1u)})
                 parsedEndI, Some (Error "Cannot execute an END instruction.")

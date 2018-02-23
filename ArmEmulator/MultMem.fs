@@ -36,6 +36,7 @@ module MultMem
             LinkAddr: WAddr option;
         }
 
+    /// Defines the (trivial) END instruction.
     type EndInstr = END
 
     /// parse error (dummy, but will do)
@@ -54,7 +55,7 @@ module MultMem
         Suffixes = [""; "EA"; "ED"; "IA"; "FA"; "FD"; "DB"]
     }
 
-    /// --------- MISC INSTRUCTIONS -----------
+    /// --------- MISC INSTRUCTION SPECS -----------
     let branchSpec = {
         InstrC = MISC
         Roots = ["B"]
@@ -66,6 +67,7 @@ module MultMem
         Roots = ["END"]
         Suffixes = [""]
     }
+    /// --------------------------------------------
 
     /// return type to allow parse to return multiple instruction types
     type ReturnInstr = 
@@ -132,7 +134,6 @@ module MultMem
                 | true -> Error "Invalid list of registers."
                 | false -> Ok(List.choose id lst)
             )
-            
         match target with
         | Some t -> 
             matchRegLst
@@ -290,7 +291,7 @@ module MultMem
                     match cpu.MM.TryFind (WA addr) with
                     | Some(DataLoc d) -> 
                         { cpu with Regs = cpu.Regs.Add (reg, d); }
-                        |> fun newCpu -> exec' rest newAddr newCpu
+                        |> exec' rest newAddr
                     | _ -> Error "Invalid memory address."
                 | STM, reg :: rest -> 
                     cpu.Regs.[reg]
