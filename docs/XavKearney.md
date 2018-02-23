@@ -79,6 +79,8 @@ In testing, a number of differences from VisUAL were discovered:
 5. It is not possible to test when `R15` is modified by an `LDM/STM` instruction against VisUAL because loading a value into `R15` causes the test code to branch to an unwanted instruction location.
 6. VisUAL instructions are case-insensitive. This module assumes upper-case instructions, and the intention is that the top-level code in the group phase of the project will convert instructions to upper-case to allow case insensitivity.
 7. VisUAL throws a Java exception if a reverse-ordered register list is given, e.g. `LDM R0, {R5-R1}`. The `MultMem` module handles this case, returning an Error within a Result monad.
+8. VisUAL does not allow brackets in literal expressions. The `ParseExpr` code does allow brackets, which can also be nested.
+9. Not a difference, but notable: VisUAL does not limit the `B/BL` instruction literals to rotated 8-bit numbers, as it does in other instructions. This code does not limit them either.
 
 # Module Implementation Specifics
 ## Instruction Operation
