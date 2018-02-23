@@ -40,7 +40,7 @@ module memInstructionsTests
                                                                                     EQUExpr = (Some 1u); DCDValueList = None;
                                                                                     FillN = None}
                     makeTest "EQU" (ldFunc "labelT" "5-4*3-1*1+2*2*2") "EQU All" {InstructionType = EQU; Name = (StrLabelL (Some "labelT"));
-                                                                                    EQUExpr = (Some 24u); DCDValueList = None;
+                                                                                    EQUExpr = (Some 0u); DCDValueList = None;
                                                                                     FillN = None}
                     makeTest "FILL" (ldFunc "labelT" "4") "FILL 4" {InstructionType = FILL; Name = (StrLabelL (Some "labelT"));
                                                                                     EQUExpr = None; DCDValueList = None;
@@ -101,22 +101,23 @@ module memInstructionsTests
                     makeevalExpTest "Mult Only" "1*2*3*4" 24u
                     makeevalExpTest "Add Only" "1+2" 3u
                     makeevalExpTest "Subtract Only" "3-1" 2u
-                    makeevalExpTest "All" "1*2*3*4+5*3-2" 54u
-                    makeevalExpTest "All2" "5-4*3-1*1+2*2*2" 24u
+                    makeevalExpTest "All" "1*2*3*4+5*3-2" 37u
+                    makeevalExpTest "All2" "5-4*3-1*1+2*2*2" 0u
                     makeevalExpTest "Num Only" "3" 3u
                     makeevalExpTest "Label Only" "testL" 256u
                     makeevalExpTest "Label + 2" "testL + 2" 258u
-                    makeevalExpTest "Label Right Multiply" "testL + 2*2" 516u
-                    makeevalExpTest "Label Left Multiply" "2*2 + testL" 516u
+                    makeevalExpTest "Label Right Multiply" "testL + 2*2" 260u
+                    makeevalExpTest "Label Left Multiply" "2*2 + testL" 260u
                     makeevalExpTest "Label Add Hex" "testL + 0x4" 260u
                     makeevalExpTest "Label Add Hex&" "testL + &4" 260u
                     makeevalExpTest "Label Add Bin" "testL + 0b100" 260u
                     makeevalExpTest "Brackets1" "(4*2)+3" 11u
                     makeevalExpTest "Brackets2" "testL + (2*2)" 260u
-                    // makeevalExpTest "Label Right Left Multiply" "4*2 + testL + 2*2" 532u
-
-
-
+                    makeevalExpTest "Label Right Left Multiply" "4*2 + testL + 2*2" 268u
+                    makeevalExpTest "* first character" "*3+7" 10u
+                    makeevalExpTest "+ first character" "+3+7" 10u
+                    makeevalExpTest "- first character" "-3+7" 4u
+                    // makeevalExpTest "NumLabel Only" "testL2" 260u
 
                 ]
 

@@ -231,17 +231,18 @@ module MemInstructions
     let opCodesMem = opCodeExpand memSpec
     let opCodesLabel = opCodeExpand labelSpec
             
-    // let testS = "abcdefghij"
-    // let t = testS.[1..(testS.Length-2)]
-    // let testS2 = " efgh"
-    // let testL = [testS; testS2; testS; testS2]
-    // let testTail = List.tail testL
-    // let testC = List.reduce (fun a b -> a+b) testL
 
-    // let Numbers = (0x9F, 0o77, 0b1010)
-    // let dec = byte testBin
+    // let (|BitRotatable|_|) num =
+    //     match num with
+    //     | None -> None
+    //     | Error(x) -> Error(x)
+    //     | _    ->   
 
-
+    let test = "-4*3"
+    let testMin = test.Split('-') |> Seq.toList
+    let testLst = ["1";"2";"3";"4"]
+    let concat = List.append ["0"] testLst.[1..(List.length testLst)-1]
+    
     let evalExpression (exp0: string) (symTab0: SymbolTable) =
         let rec evalExpression' (exp: string) (symTab: SymbolTable) = 
             if String.exists (fun c -> (c ='(')||(c =')')) exp then
@@ -252,28 +253,46 @@ module MemInstructions
                                                                 |> List.map (fun x -> if (String.exists (fun c -> (c ='(')||(c =')')) x) then ((evalExpression' x.[1..(x.Length-2)] symTab)|>string) else x)
                                                                 |> List.reduce (fun a b -> a+b)
                                                         evalExpression' bracketsEvaled symTab
-            elif String.exists (fun c -> (c ='*')) exp then
-                exp.Split('*') 
-                |> Seq.toList
-                |> List.map (fun x -> evalExpression' x symTab)
-                |> List.reduce (fun a b -> a*b)
             elif String.exists (fun c -> (c ='+')) exp then
-                exp.Split('+') 
-                |> Seq.toList
+                let list = exp.Split('+') |> Seq.toList
+                if ((list.[0]="")&&((List.last list)="")) 
+                then list.[1..(List.length list)-2]
+                elif (list.[0]="")
+                then list.[1..(List.length list)-1]
+                elif ((List.last list)="")
+                then list.[0..(List.length list)-2]
+                else list //Should return an error monad above here
                 |> List.map (fun x -> evalExpression' x symTab)
                 |> List.reduce (fun a b -> a+b)
             elif String.exists (fun c -> (c ='-')) exp then
-                exp.Split('-') 
-                |> Seq.toList
+                let list = exp.Split('-') |> Seq.toList
+                if ((list.[0]="")&&((List.last list)="")) 
+                then List.append ["0"] list.[1..(List.length list)-2]
+                elif (list.[0]="")
+                then List.append ["0"] list.[1..(List.length list)-1]
+                elif ((List.last list)="")
+                then list.[0..(List.length list)-2]
+                else list //Should return an error monad above here
                 |> List.map (fun x -> evalExpression' x symTab)
                 |> List.reduce (fun a b -> a-b)
+            elif String.exists (fun c -> (c ='*')) exp then
+                let list = exp.Split('*') |> Seq.toList
+                if ((list.[0]="")&&((List.last list)="")) 
+                then list.[1..(List.length list)-2]
+                elif (list.[0]="")
+                then list.[1..(List.length list)-1]
+                elif ((List.last list)="")
+                then list.[0..(List.length list)-2]
+                else list //Should return an error monad above here
+                |> List.map (fun x -> evalExpression' x symTab)
+                |> List.reduce (fun a b -> a*b)
             else 
                 match exp with 
-                | Match @"(0x[0-9]+)" [_; ex] -> ex.Value |> uint32
-                | Match @"(&[0-9]+)" [_; ex] -> ("0x"+(ex.Value).[1..(ex.Length-1)]) |> uint32
-                | Match @"(0b[0-1]+)" [_; ex] -> ex.Value |> uint32
-                | Match @"([0-9]+)" [_; ex] -> ex.Value |> uint32
-                | Match @"(\w+)" [_; lab] -> symTab.[lab.Value]
+                | Match @"(0x[0-9]+)" [_; ex] -> ex.Value |> uint32 //Matching a hex number, Eg 0x5
+                | Match @"(&[0-9]+)" [_; ex] -> ("0x"+(ex.Value).[1..(ex.Length-1)]) |> uint32 //Matching a hex number, Eg &5
+                | Match @"(0b[0-1]+)" [_; ex] -> ex.Value |> uint32 //Matching binary number, Eg 0b11
+                | Match @"([0-9]+)" [_; ex] -> ex.Value |> uint32 //Matching a decimal number 
+                | Match @"(\w+)" [_; lab] -> symTab.[lab.Value] //Matching a word, Eg testLabel
         evalExpression' exp0 symTab0
 
 

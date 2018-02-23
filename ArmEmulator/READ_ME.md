@@ -1,6 +1,5 @@
 # ARM Assembler Instructions - APSW
 
-[![N|Solid](https://cldup.com/dTxpPi9lDf.thumb.png)](https://nodesource.com/products/nsolid)
 
 This section covers six instructions seperated into three groups:
 
