@@ -216,7 +216,7 @@ module MultMemTests
 
 
 
-    //[<Tests>]
+    [<Tests>]
     let testArithExec =
         let makeTestExecStr opcode suffix target op1 op2 = 
             let opcodeStr, suffixStr, operandStr = makeArithInstrString opcode suffix target op1 op2
@@ -291,6 +291,6 @@ module MultMemTests
                     |> Map.toList
                     |> List.map (fun (_, i) -> uint32 i)
 
-                Expect.equal regsActual localRegs "Registers"
+                Expect.equal regsActual.[..regsActual.Length - 2] localRegs.[..localRegs.Length - 1] "Registers"
         
 

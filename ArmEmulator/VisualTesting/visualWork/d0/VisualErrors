@@ -1,0 +1,113 @@
+ line="57">Invalid first operand.syntax error in
+:[|"<?xml version="1.0" encoding="UTF-8" standalone="no"?>";
+  "<VisUAL xmlns="http://bitbucket.org/salmanarif/visual">";
+  "    <syntax-error line="57">Invalid first operand.</syntax-error>";
+  "</VisUAL>"|]
+ line="56">Invalid first operand.syntax error in
+:[|"<?xml version="1.0" encoding="UTF-8" standalone="no"?>";
+  "<VisUAL xmlns="http://bitbucket.org/salmanarif/visual">";
+  "    <syntax-error line="56">Invalid first operand.</syntax-error>";
+  "</VisUAL>"|]
+ line="57">There is no instruction with the address 1455311090runtime error in
+[|"<?xml version="1.0" encoding="UTF-8" standalone="no"?>";
+  "<VisUAL xmlns="http://bitbucket.org/salmanarif/visual">"; "    <line id="1">";
+  "        <code>MOV R0, #0</code>";
+  "        <register name="R0">0x0</register>";
+  "        <register name="R1">0x0</register>";
+  "        <register name="R2">0x0</register>";
+  "        <register name="R3">0x0</register>";
+  "        <register name="R4">0x0</register>";
+  "        <register name="R5">0x0</register>";
+  "        <register name="R6">0x0</register>";
+  "        <register name="R7">0x0</register>";
+  "        <register name="R8">0x0</register>";
+  "        <register name="R9">0x0</register>";
+  "        <register name="R10">0x0</register>";
+  "        <register name="R11">0x0</register>";
+  "        <register name="R12">0x0</register>";
+  "        <register name="R13">0xFF000000</register>";
+  "        <register name="R14">0x0</register>";
+  "        <register name="R15">0x8</register>"; "        <cycles>1</cycles>";
+  "    </line>"; "    <line id="2">"; "        <code>ADDS R0, R0, R0</code>";
+  "        <register name="R0">0x0</register>";
+  "        <register name="R1">0x0</register>";
+  "        <register name="R2">0x0</register>";
+  "        <register name="R3">0x0</register>";
+  "        <register name="R4">0x0</register>";
+  "        <register name="R5">0x0</register>";
+  "        <register name="R6">0x0</register>";
+  "        <register name="R7">0x0</register>";
+  "        <register name="R8">0x0</register>";
+  "        <register name="R9">0x0</register>";
+  "        <register name="R10">0x0</register>";
+  "        <register name="R11">0x0</register>";
+  "        <register name="R12">0x0</register>";
+  "        <register name="R13">0xFF000000</register>";
+  "        <register name="R14">0x0</register>";
+  "        <register name="R15">0xC</register>"; "        <cycles>1</cycles>";
+  "    </line>"; "    <line id="3">"; "        <code>MOVS R0, #0</code>";
+  "        <register name="R0">0x0</register>";
+  "        <register name="R1">0x0</register>";
+  "        <register name="R2">0x0</register>";
+  "        <register name="R3">0x0</register>";
+  "        <register name="R4">0x0</register>";
+  "        <register name="R5">0x0</register>";
+  "        <register name="R6">0x0</register>";
+  "        <register name="R7">0x0</register>";
+  "        <register name="R8">0x0</register>";
+  "        <register name="R9">0x0</register>";
+  "        <register name="R10">0x0</register>";
+  "        <register name="R11">0x0</register>";
+  "        <register name="R12">0x0</register>";
+  "        <register name="R13">0xFF000000</register>";
+  "        <register name="R14">0x0</register>";
+  "        <register name="R15">0x10</register>"; "        <cycles>1</cycles>";
+  "    </line>"; "    <line id="4">"; "        <code>MOV R0, #0x30</code>";
+  "        <register name="R0">0x30</register>";
+  "        <register name="R1">0x0</register>";
+  "        <register name="R2">0x0</register>";
+  "        <register name="R3">0x0</register>";
+  "        <register name="R4">0x0</register>";
+  "        <register name="R5">0x0</register>";
+  "        <register name="R6">0x0</register>";
+  "        <register name="R7">0x0</register>";
+  "        <register name="R8">0x0</register>";
+  "        <register name="R9">0x0</register>";
+  "        <register name="R10">0x0</register>";
+  "        <register name="R11">0x0</register>";
+  "        <register name="R12">0x0</register>";
+  "        <register name="R13">0xFF000000</register>";
+  "        <register name="R14">0x0</register>";
+  "        <register name="R15">0x14</register>"; "        <cycles>1</cycles>";
+  "    </line>"; "    <line id="5">"; "        <code>ADD R0, R0, #0x8f00</code>";
+  "        <register name="R0">0x8F30</register>";
+  "        <register name="R1">0x0</register>";
+  "        <register name="R2">0x0</register>";
+  "        <register name="R3">0x0</register>";
+  "        <register name="R4">0x0</register>";
+  "        <register name="R5">0x0</register>";
+  "        <register name="R6">0x0</register>";
+  "        <register name="R7">0x0</register>";
+  "        <register name="R8">0x0</register>";
+  "        <register name="R9">0x0</register>";
+  "        <register name="R10">0x0</register>";
+  "        <register name="R11">0x0</register>";
+  "        <register name="R12">0x0</register>";
+  "        <register name="R13">0xFF000000</register>";
+  "        <register name="R14">0x0</register>";
+  "        <register name="R15">0x18</register>"; ...|]
+ line="57">Invalid first operand.syntax error in
+:[|"<?xml version="1.0" encoding="UTF-8" standalone="no"?>";
+  "<VisUAL xmlns="http://bitbucket.org/salmanarif/visual">";
+  "    <syntax-error line="57">Invalid first operand.</syntax-error>";
+  "</VisUAL>"|]
+ line="57">Invalid first operand.syntax error in
+:[|"<?xml version="1.0" encoding="UTF-8" standalone="no"?>";
+  "<VisUAL xmlns="http://bitbucket.org/salmanarif/visual">";
+  "    <syntax-error line="57">Invalid first operand.</syntax-error>";
+  "</VisUAL>"|]
+ line="57">Invalid first operand.syntax error in
+:[|"<?xml version="1.0" encoding="UTF-8" standalone="no"?>";
+  "<VisUAL xmlns="http://bitbucket.org/salmanarif/visual">";
+  "    <syntax-error line="57">Invalid first operand.</syntax-error>";
+  "</VisUAL>"|]

@@ -38,6 +38,7 @@ module VCommon =
         InitFlags: Flags
         InitMem: Map<uint32, uint32> // Initial map of memory addr: data
         MemReadBase: uint32 //Read locations MemReadBase...MemReadBase+14 into registers R0
+        MemReadDirection: string //which direction to read memory from, into registers, e.g. "IA"
         /// temporary data used to construct assembler
         Prelude: string
         Postlude: string
@@ -156,16 +157,16 @@ module VData =
               ADDCS R0, R0, #2
               ADDVS R0, R0, #1
 """
-    /// Read memBase..memBase+13 into R1..R14
+    /// Read memBase..memBase+12 into R1..R12
     /// uses R13 as temporary register
-    let READMEMORY (memBase:uint32) =
+    let READMEMORY (memBase:uint32) memDir =
         SETREG 13 memBase +
-        "LDMIA R13, {R0-R12}\n"
+        sprintf "LDM%s R13, {R1-R12}\n" memDir
 
     /// Construct postlude assembly code
     /// memBase: base addr of memory locs read by postlude
-    let POSTLUDE memBase =
-        READMEMORY memBase + READFLAGSINTOR0
+    let POSTLUDE memBase memDir =
+        READMEMORY memBase memDir + READFLAGSINTOR0
 
 
     /// Construct wrapper code for simulation
@@ -175,13 +176,13 @@ module VData =
     /// asm: assembly code to test
     /// returns (n, maincode, postlude)
     /// n is length of postlude
-    let GETWRAPPER regs flags memBase initMem =
+    let GETWRAPPER regs flags memBase initMem memDir =
         let main =
             SETMEM initMem +
             SETFLAGS flags +
             SETALLREGS regs +
             "\r\n"
-        let post = POSTLUDE memBase
+        let post = POSTLUDE memBase memDir
         main, post
             
     /// processes after-postlude registers to extract additional state info
@@ -495,7 +496,9 @@ module Visual =
     /// Adds postlude to assembly code to detect flags values.
     /// Returns flags , registers (before flag detection code)
     let RunVisualWithFlagsOut paras src =
-        let main, post = VData.GETWRAPPER paras.InitRegs paras.InitFlags paras.MemReadBase paras.InitMem
+        let main, post = 
+            VData.GETWRAPPER 
+                paras.InitRegs paras.InitFlags paras.MemReadBase paras.InitMem paras.MemReadDirection
         let res = RunVisual {paras with Prelude=main; Postlude=post} src
         match res with
         | Error e -> failwithf "Error reading Visual Log %A" e
@@ -546,16 +549,17 @@ module VTest =
         Cached = true                // true if results are stored in a cache on disk and reused to speed 
                                      // up future repeat simulations
         VisualPath =  
-            @"/Applications/VisUAL.app/Contents/MacOS/visual_headless.jar"  // the directory in which the downloaded VisUAL.exe can be found
+            @"\Users\dirkj\Desktop\fsharp-arm-emulator\ArmEmulator\VisualTesting\visualapp\visual\"  // the directory in which the downloaded VisUAL.exe can be found
         WorkFileDir = 
-            @".\ArmEmulator\VisualTesting\visualWork\"        // the directory in which both temporary files and the persistent cache file are put
+            @"\Users\dirkj\Desktop\fsharp-arm-emulator\ArmEmulator\VisualTesting\visualWork\"        // the directory in which both temporary files and the persistent cache file are put
         CacheFileName = 
-            @".\ArmEmulator\VisualTesting\visualWork\Cache"   // the file name of the global cache
+            @"\Users\dirkj\Desktop\fsharp-arm-emulator\ArmEmulator\VisualTesting\visualWork\Cache"   // the file name of the global cache
         CacheLimit = 10               // the number of results before adding to global cache
         InitFlags = {FN=false;FZ=false; FC=false;FV=false}
         InitRegs = [0u..10u..140u]          // initial values of registers R0..R14
         InitMem = Map.empty // initial values of memory
         MemReadBase = 0x1000u          // locations read from memory (currently 13 consecutive words are read)
+        MemReadDirection = "IA"
         Postlude = ""                 // this is overwritten by code
         Prelude = ""                  // this is overwritten by code
     } 
