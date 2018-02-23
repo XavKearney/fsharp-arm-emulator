@@ -3,6 +3,8 @@ module BitArithmetic
 
     open CommonLex
     open CommonData
+    open System.Text.RegularExpressions
+    //open System.Linq.Expressions
 
     /// instruction
     type InstRoots =  MOV | MVN | AND | ORR | EOR | BIC | LSL | LSR | ASR
@@ -53,7 +55,7 @@ module BitArithmetic
             "LSR",LSR ; "ASR",ASR ; "ROR",ROR ; "RRX",RRX ; "TST",TST ; "TEQ",TEQ ]
 
     /// Map of allowed literals
-    let allowedLiterals = 
+    let extraLiterals = 
         [0..2..30] 
         |> List.allPairs [0u..255u] 
         |> List.map (fun (lit,n) -> (lit >>> n) + (lit <<< 32-n), {K=lit; R=n/2})
@@ -62,6 +64,20 @@ module BitArithmetic
     /// Map of allowed shifts
     let allowedShifts = 
         Map.ofList ["LSL",LSL ; "ASR",ASR ; "LSE",LSR ; "ROR",ROR ; "RRX",RRX]
+
+    let (|FirstM|_|) pattern input =
+        let m = Regex.Match(input,pattern)
+        match m.Success with
+        | true -> Some (m.Value)
+        | false -> None
+
+    let (|CLit|_|) input = 
+        match input with
+        | FirstM @"^(0[xX][a-fA-F0-9]+)$" x -> Some (uint32 x)
+        | FirstM @"^(&[a-fA-F0-9]+)$" x -> Some (uint32 ("0x"+x.[1..])) 
+        | FirstM @"^(0b[0-1]+)$" x -> Some (uint32 x)
+        | FirstM @"^([0-9]+)$" x -> Some (uint32 x)
+        | _ -> None
 
     /// returns the instruction line parsed into its seprate components given 
     /// the root, operands and suffix 
@@ -74,9 +90,16 @@ module BitArithmetic
         // need to deal with hex and bin numbers
         /// converts string to some litteral or none
         /// string number must start with #
-        let toLit (str : string) =
-            match str.[0],System.UInt32.TryParse str.[1..] with
-            | '#',(true,n) -> Map.tryFind n allowedLiterals
+        let toLit (str : string) = 
+            let checkValidLit n = 
+                match n < 256u with
+                | true -> Some {K=n ; R=0}
+                | false -> Map.tryFind n extraLiterals   
+            match str.[0] with
+            | '#' -> 
+                match str.[1..] with
+                | CLit n -> checkValidLit n
+                | _ -> None
             | _ -> None
             
         /// converts string to some valid register or none
