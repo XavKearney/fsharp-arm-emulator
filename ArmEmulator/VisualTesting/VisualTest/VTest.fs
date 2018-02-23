@@ -549,11 +549,11 @@ module VTest =
         Cached = true                // true if results are stored in a cache on disk and reused to speed 
                                      // up future repeat simulations
         VisualPath =  
-            @".\ArmEmulator\VisualTesting\visualapp\visual\"  // the directory in which the downloaded VisUAL.exe can be found
+            @"\Users\dirkj\Desktop\fsharp-arm-emulator\ArmEmulator\VisualTesting\visualapp\visual\"  // the directory in which the downloaded VisUAL.exe can be found
         WorkFileDir = 
-            @".\ArmEmulator\VisualTesting\visualWork\"        // the directory in which both temporary files and the persistent cache file are put
+            @"\Users\dirkj\Desktop\fsharp-arm-emulator\ArmEmulator\VisualTesting\visualWork\"        // the directory in which both temporary files and the persistent cache file are put
         CacheFileName = 
-            @".\ArmEmulator\VisualTesting\visualWork\Cache"   // the file name of the global cache
+            @"\Users\dirkj\Desktop\fsharp-arm-emulator\ArmEmulator\VisualTesting\visualWork\Cache"   // the file name of the global cache
         CacheLimit = 10               // the number of results before adding to global cache
         InitFlags = {FN=false;FZ=false; FC=false;FV=false}
         InitRegs = [0u..10u..140u]          // initial values of registers R0..R14
