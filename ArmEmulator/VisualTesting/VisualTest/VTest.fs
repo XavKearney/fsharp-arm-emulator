@@ -415,7 +415,17 @@ module Visual =
         //printfn "%s" cmdArgs
         File.WriteAllText(paras.WorkFileDir + "comstr.txt", cmdArgs)
         try 
-            let proc = System.Diagnostics.Process.Start("cmd", cmdArgs)
+            let procStartInfo = 
+                // silence output
+                System.Diagnostics.ProcessStartInfo(
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    FileName = "cmd",
+                    Arguments = cmdArgs
+                )
+            let proc = new System.Diagnostics.Process(StartInfo = procStartInfo)
+            proc.Start() |> ignore
             proc.WaitForExit()
         with e -> ()//printfn "%s" e.Message
         let visLog = File.ReadAllLines outputF
@@ -590,7 +600,7 @@ module VTest =
                 |> List.indexed
                 |> List.map (fun (n,v) -> R n, int v)
 
-            let flagsActual, outActual, memActual = RunVisualWithFlagsOut paras ""
+            let flagsActual, outActual, _ = RunVisualWithFlagsOut paras ""
             let outSorted = 
                 outActual.Regs
                 |> List.sort
@@ -621,7 +631,7 @@ module VTest =
                 |> List.indexed
                 |> List.map (fun (n,v) -> R n, int v)
 
-            let flagsActual, outActual, memActual = 
+            let flagsActual, outActual, _ = 
                     RunVisualWithFlagsOut { 
                         defaultParas with 
                             InitFlags=flags;
