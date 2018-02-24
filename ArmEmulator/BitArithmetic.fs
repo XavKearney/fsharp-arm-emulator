@@ -11,7 +11,9 @@ module BitArithmetic
 
 
 
+
 // Types //
+
 
 
 
@@ -46,7 +48,9 @@ module BitArithmetic
 
 
 
+
 // Maps
+
 
 
 
@@ -76,8 +80,10 @@ module BitArithmetic
 
 
 
+
 // check litteral 
 // need to include expressions i.e * + - ()
+
 
 
 
@@ -104,8 +110,8 @@ module BitArithmetic
             |> List.map (fun (n,r) -> (n >>> r) ||| (n <<< (32-r)))
             |> List.collect (fun n -> [n < 256u])
             |> List.contains true
-        match int64 num with
-        | x when ((x < 2147483647L) && (x > -2147483648L)) ->
+        match num with
+        | x when ((x <= 2147483647) && (x >= -2147483648)) ->
             match valid with 
             | true -> Some (uint32 num)
             | false -> None
@@ -136,6 +142,7 @@ module BitArithmetic
 
 
 // parse instruction
+
 
 
 
@@ -224,8 +231,6 @@ module BitArithmetic
 
         | _ -> Error "Not valid input"
 
-
-
     // need to deal with upper and lower case
     /// main function to parse a line of assembler
     /// ls contains the line input
@@ -249,3 +254,73 @@ module BitArithmetic
 
     /// Parse Active Pattern used by top-level code
     let (|IMatch|_|) = parse
+
+
+
+
+
+// executing instructions
+
+    
+
+    // can do extra check i.e make sure reg, lit, shift is allowed
+    /// evaluates flexible operator 
+    let flexEval (flexOp : FlexOp) cpuData =  
+        let regContent r =  Map.tryFind r (cpuData.Regs)
+        let carryNum = System.Convert.ToUInt32(cpuData.Fl.C)
+        let litRegNum litOrReg = 
+            match litOrReg with
+            | Nm num -> Some num
+            | Rg reg -> regContent reg
+        match flexOp with
+        | Num n -> Some n
+        | RegShiftOp (r,None) -> regContent r
+        | RegShiftOp (r,Some (instroot,None)) when instroot = RRX -> 
+            match regContent r with
+            | Some regCont -> Some ((regCont >>> 1) + (carryNum <<< 31))
+            | _ -> None
+        | RegShiftOp (r,Some (instroot,Some litOrReg)) ->
+            match regContent r with
+            | Some regCont -> 
+                match instroot with
+                | LSL -> 
+                    match litRegNum litOrReg with           
+                    | Some num -> Some (regCont <<< (int32 num))
+                    | _ -> None
+                | LSR ->
+                    match litRegNum litOrReg with           
+                    | Some num -> Some (regCont >>> (int32 num))
+                    | _ -> None
+                | ASR ->
+                    match litRegNum litOrReg with           
+                    | Some num -> Some (uint32 (int32 regCont >>> int32 num))   
+                    | _ -> None
+                | ROR ->
+                    match litRegNum litOrReg with           
+                    | Some num -> Some (uint32 ( regCont >>> int32 num) ||| ( regCont <<< (32 - int32 num)))  
+                    | _ -> None                                   
+                | _ -> None
+            | _ -> None
+        | _ -> None
+        
+
+(*   (cpuState.Regs.[r] >>> int32 number) ||| (cpuState.Regs.[r] <<< (32- int32 number)) 
+    type LitOrReg = Nm of uint32 | Rg of RName
+
+    let flexOp2 (op2 : Op2) (cpuData : DataPath) = 
+    match op2,cpuData with
+        | Num n,_ -> n                          
+        | Reg r,cpuState -> cpuState.Regs.[r]   
+        | RegWithShift (r,LSL,number),cpuState -> cpuState.Regs.[r] <<< int32 number                    
+        | RegWithShift (r,ASR,number),cpuState -> uint32 ((int32 cpuState.Regs.[r]) >>> int32 number)   
+        | RegWithShift (r,LSR,number),cpuState -> cpuState.Regs.[r] >>> int32 number                    
+        | RegWithShift (r,ROR,number),cpuState -> (cpuState.Regs.[r] >>> int32 number) ||| (cpuState.Regs.[r] <<< (32- int32 number)) 
+        | RegWithShift (_,RRX,_),_ -> failwithf "Invalid, can't use RRX with a number"
+        | RegWithRegShift (r,LSL,rShifter),cpuState -> cpuState.Regs.[r] <<< int32 cpuState.Regs.[rShifter]
+        | RegWithRegShift (r,ASR,rShifter),cpuState -> uint32 ((int32 cpuState.Regs.[r]) >>> int32 cpuState.Regs.[rShifter]) 
+        | RegWithRegShift (r,LSR,rShifter),cpuState -> cpuState.Regs.[r] <<< int32 cpuState.Regs.[rShifter]
+        | RegWithRegShift (r,ROR,rShifter),cpuState -> (cpuState.Regs.[r] >>> int32 cpuState.Regs.[rShifter]) ||| (cpuState.Regs.[r] <<< (32- int32 cpuState.Regs.[rShifter]))
+        | RegWithRegShift (_,RRX,_),_ -> failwithf "Invalid, can't use RRX with a register"
+        | RegWithRRX (r,RRX),cpuState -> (cpuState.Regs.[r] >>> 1) + (System.Convert.ToUInt32(cpuState.Fl.C) * (uint32 0x80000000))
+        | RegWithRRX (_),_ -> failwithf "Invalid"
+*)
