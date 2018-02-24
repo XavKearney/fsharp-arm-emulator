@@ -71,13 +71,13 @@ module BitArithmetic
 
     /// Map of allowed shifts
     let allowedShifts = 
-        Map.ofList ["LSL",LSL ; "ASR",ASR ; "LSE",LSR ; "ROR",ROR ; "RRX",RRX]
+        Map.ofList ["LSL",LSL ; "ASR",ASR ; "LSR",LSR ; "ROR",ROR ; "RRX",RRX]
 
 
 
 
 // check litteral 
-// need to include expressions
+// need to include expressions i.e * + - ()
 
 
 
@@ -114,19 +114,22 @@ module BitArithmetic
     // need to deal with hex and bin numbers
     /// converts string to some litteral or none
     /// string number must start with #
-    let toLit (str : string) =   
-        match str.[0] with
-        | '#' -> 
-            match str.[1..] with
-            | CheckLit n -> 
-                match n >= 0 with
-                | true -> allowedLiterals n
-                | false ->
-                    match allowedLiterals (-n) with
-                    | Some _ -> Some (uint32 n)
-                    | _ -> None
+    let toLit (str : string) =  
+        match str.Length=0 with 
+        | false -> 
+            match str.[0] with
+            | '#' -> 
+                match str.[1..] with
+                | CheckLit n -> 
+                    match n >= 0 with
+                    | true -> allowedLiterals n
+                    | false ->
+                        match allowedLiterals (-n) with
+                        | Some _ -> Some (uint32 n)
+                        | _ -> None
+                | _ -> None
             | _ -> None
-        | _ -> None
+        | true -> None
 
 
 
@@ -140,11 +143,15 @@ module BitArithmetic
     /// returns the instruction line parsed into its seprate components given 
     /// the root, operands and suffix 
     let parseInstr (root : string) (operands : string) (suffix : string) =
+ 
+        let ops = 
+            let splitOps = 
+                operands.Split(',') 
+                |> Array.map (fun str -> str.Trim())
+            match Array.contains "" splitOps with 
+            | true -> [|"Not valid input"|]
+            | false -> splitOps            
 
-        let ops = operands.Split(',') 
-                    |> Array.map (fun str -> str.Trim())
-                    |> Array.filter (fun str -> str <> "")
-            
         /// converts string to some valid register or none
         let toReg str = Map.tryFind str regNames
 
@@ -215,7 +222,7 @@ module BitArithmetic
         | RRX when ops.Length = 2
             -> Ok {baseInstr with opA = toReg ops.[0] ; opB = Some(Reg (toReg ops.[1]))}
 
-        | _ -> Error "Should not happen"
+        | _ -> Error "Not valid input"
 
 
 
