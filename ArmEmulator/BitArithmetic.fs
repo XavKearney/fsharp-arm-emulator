@@ -1,28 +1,34 @@
 // lex/parse and execute a given subset of instructions
+// subset is some data processing instructions
 module BitArithmetic
+
+
 
     open CommonLex
     open CommonData
     open System.Text.RegularExpressions
-    //open System.Linq.Expressions
 
-    /// instruction
+
+
+
+// Types //
+
+
+
+
+    /// instructions
     type InstRoots =  MOV | MVN | AND | ORR | EOR | BIC | LSL | LSR | ASR
                     | ROR | RRX | TST | TEQ 
 
     /// parse error
     type ErrInstr = string
 
-    /// literal value = (K % 256) rotated right by (R &&& 0xF)*2. 
-    type Literal = {K: uint32; R: int}
+    type LitOrReg = Nm of uint32 | Rg of RName
 
-    /// shift value
-    type LitOrReg = Nm of Literal | Rg of RName
-
-    /// Flexible opperator can either be a number or a register with an optional shift
+    /// Flexible opperator, can either be a number or a register with an optional shift
     type FlexOp = 
-        | Num of Literal
-        | RegWithShift of RName*(InstRoots*LitOrReg Option) Option
+        | Num of uint32
+        | RegShiftOp of RName*(InstRoots*LitOrReg Option) Option
 
     type RegOrFlexOp =
         | Reg of RName option
@@ -37,47 +43,99 @@ module BitArithmetic
                         opC: RegOrFlexOp Option
                         }
 
-    /// sample specification for set of instructions
-    let dPSpec = {
-        InstrC = BITARITH
-        Roots = ["MOV" ; "MVN" ; "AND" ; "ORR" ; "EOR" ; "BIC" ; "LSL" ; "LSR" ; "ASR" ;
-                "ROR" ; "RRX" ; "TST" ; "TEQ"]
-        Suffixes = [""; "S"]
-    }
+
+
+
+// Maps
+
+
+
 
     /// map of all possible opcodes recognised
-    let opCodes = opCodeExpand dPSpec
+    let opCodes = 
+        /// sample specification for set of instructions
+        let dPSpec = {
+            InstrC = BITARITH
+            Roots = ["MOV" ; "MVN" ; "AND" ; "ORR" ; "EOR" ; "BIC" ;
+                    "LSL" ; "LSR" ; "ASR" ; "ROR" ; "RRX" ; "TST" ; "TEQ"]
 
-    /// map used to convert strings into instruction values, 
+            Suffixes = [""; "S"]
+        }
+        opCodeExpand dPSpec
+
+    /// map used to convert strings into instruction values 
     let instrNames = 
         Map.ofList [ 
             "MOV",MOV ; "MVN",MVN ; "AND",AND ; "ORR",ORR ; "BIC",BIC ; "LSL",LSL
             "LSR",LSR ; "ASR",ASR ; "ROR",ROR ; "RRX",RRX ; "TST",TST ; "TEQ",TEQ ]
 
-    /// Map of allowed literals
-    let extraLiterals = 
-        [0..2..30] 
-        |> List.allPairs [0u..255u] 
-        |> List.map (fun (lit,n) -> (lit >>> n) + (lit <<< 32-n), {K=lit; R=n/2})
-        |> Map.ofList
-
     /// Map of allowed shifts
     let allowedShifts = 
         Map.ofList ["LSL",LSL ; "ASR",ASR ; "LSE",LSR ; "ROR",ROR ; "RRX",RRX]
 
-    let (|FirstM|_|) pattern input =
+
+
+
+// check litteral 
+// need to include expressions
+
+
+
+
+    let (|FirstMatch|_|) pattern input =
         let m = Regex.Match(input,pattern)
         match m.Success with
         | true -> Some (m.Value)
         | false -> None
 
-    let (|CLit|_|) input = 
+    let (|CheckLit|_|) input = 
         match input with
-        | FirstM @"^(0[xX][a-fA-F0-9]+)$" x -> Some (uint32 x)
-        | FirstM @"^(&[a-fA-F0-9]+)$" x -> Some (uint32 ("0x"+x.[1..])) 
-        | FirstM @"^(0b[0-1]+)$" x -> Some (uint32 x)
-        | FirstM @"^([0-9]+)$" x -> Some (uint32 x)
+        | FirstMatch @"^(-?0[xX][a-fA-F0-9]+)$" x -> Some (int x)
+        | FirstMatch @"^(-?&[a-fA-F0-9]+)$" x -> Some (int ("0x"+x.[1..])) 
+        | FirstMatch @"^(-?0[bB][0-1]+)$" x -> Some (int x)
+        | FirstMatch @"^(-?[0-9]+)$" x -> Some (int x)
         | _ -> None
+
+    /// checks if an integer can be created by rotating an 8 bit number in a 32 bit word 
+    let allowedLiterals num =
+        let valid =
+            [0..2..30] 
+            |> List.allPairs [(uint32 num)] 
+            |> List.map (fun (n,r) -> (n >>> r) ||| (n <<< (32-r)))
+            |> List.collect (fun n -> [n < 256u])
+            |> List.contains true
+        match int64 num with
+        | x when ((x < 2147483647L) && (x > -2147483648L)) ->
+            match valid with 
+            | true -> Some (uint32 num)
+            | false -> None
+        | _ -> None
+
+    // need to deal with hex and bin numbers
+    /// converts string to some litteral or none
+    /// string number must start with #
+    let toLit (str : string) =   
+        match str.[0] with
+        | '#' -> 
+            match str.[1..] with
+            | CheckLit n -> 
+                match n >= 0 with
+                | true -> allowedLiterals n
+                | false ->
+                    match allowedLiterals (-n) with
+                    | Some _ -> Some (uint32 n)
+                    | _ -> None
+            | _ -> None
+        | _ -> None
+
+
+
+
+
+// parse instruction
+
+
+
 
     /// returns the instruction line parsed into its seprate components given 
     /// the root, operands and suffix 
@@ -86,21 +144,6 @@ module BitArithmetic
         let ops = operands.Split(',') 
                     |> Array.map (fun str -> str.Trim())
                     |> Array.filter (fun str -> str <> "")
-
-        // need to deal with hex and bin numbers
-        /// converts string to some litteral or none
-        /// string number must start with #
-        let toLit (str : string) = 
-            let checkValidLit n = 
-                match n < 256u with
-                | true -> Some {K=n ; R=0}
-                | false -> Map.tryFind n extraLiterals   
-            match str.[0] with
-            | '#' -> 
-                match str.[1..] with
-                | CLit n -> checkValidLit n
-                | _ -> None
-            | _ -> None
             
         /// converts string to some valid register or none
         let toReg str = Map.tryFind str regNames
@@ -142,12 +185,12 @@ module BitArithmetic
             match strArr with
             | [|reg ; shift|] -> 
                 match toReg reg, toShift shift with
-                | Some r, Some s -> Some (RegWithShift (r,Some s))
+                | Some r, Some s -> Some (RegShiftOp (r,Some s))
                 | _ -> None
             | [|regOrLit|] ->
                 match toLitReg regOrLit with
                 | Some (Nm lit) -> Some (Num lit)
-                | Some (Rg r) -> Some (RegWithShift (r,None))
+                | Some (Rg r) -> Some (RegShiftOp (r,None))
                 | _ -> None
             | _ -> None
 
