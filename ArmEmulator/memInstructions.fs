@@ -69,8 +69,8 @@ module MemInstructions
                         Post: bool; Rc: RName option;
                         Shift: int option}
 
-    let (|GreaterThanZero|Error|) x = if (x>=0) then GreaterThanZero else Error
-    let isPos (x: Group) (y: Group) = match (x.Value|>int) with GreaterThanZero -> (Some (x.Value|>int),(Some regNames.[y.Value])) | Error -> (None,None)
+    let (|GreaterThanZero|ErrorGZ|) x = if (x>=0) then GreaterThanZero else ErrorGZ
+    let isPos (x: Group) (y: Group) = match (x.Value|>int) with GreaterThanZero -> (Some (x.Value|>int),(Some regNames.[y.Value])) | ErrorGZ -> (None,None)
 
     ///Parse function for Memory instructions such as LDR and
     /// STR. Returns a record with all the information needed
@@ -201,7 +201,7 @@ module MemInstructions
         {
             InstructionType: LabelInstrType;
             Name: LabelL;
-            EQUExpr: EquExpr option;
+            EQUExpr: Result<uint32,String> option;
             DCDValueList: ValueList option;            //What to fill the memory with
             FillN: uint32 option;
         }
@@ -238,23 +238,51 @@ module MemInstructions
     //     | Error(x) -> Error(x)
     //     | _    ->   
 
-    let test = "-4*3"
-    let testMin = test.Split('-') |> Seq.toList
-    let testLst = ["1";"2";"3";"4"]
-    let concat = List.append ["0"] testLst.[1..(List.length testLst)-1]
-    
-    let evalExpression (exp0: string) (symTab0: SymbolTable) =
-        let rec evalExpression' (exp: string) (symTab: SymbolTable) = 
+    // let makeOkResult inp = (Ok inp)
+    let test = "-5-2-"
+    let removed = String.filter (fun x -> x<>'-') test
+    let split = test.Split('-') |> Seq.toList
+    let test2 = "5"
+
+
+    ///Evaluates an expression involving +-* and labels
+    /// which evaluate to the addresses they represent
+    ///NEEDS DOING:
+    /// - Labels with numbers in them maybe make number 
+    ///   match statement (^[0-9]+^)?
+    /// - Add monads to carry errors through
+    let evalExpression (exp0: string) (symTab: SymbolTable) =
+        let rec evalExpression' (exp: string) = 
             if String.exists (fun c -> (c ='(')||(c =')')) exp then
+                let mapFunction (x: string) = 
+                    if (String.exists (fun c -> (c ='(')||(c =')')) x) then 
+                    match ((evalExpression' x.[1..(x.Length-2)])) with
+                    | (Ok y) -> Ok (y|>string)
+                    | Error m -> Error m
+                    else (Ok x)   
+                let resultStringConcat (aIn: Result<string,String>) (bIn: Result<string,String>) = 
+                    match (aIn, bIn) with
+                    | ((Ok x), (Ok y)) -> (Ok (x+y))
+                    | ((Error x), (Error y)) -> Error (x+y)
+                    | (Error x, _) -> Error x 
+                    | (_, Error y) -> Error y 
                 match exp with 
                 | Matches @"((\([^)]*\)*)|[^()]*)" tl -> 
                                                         let bracketsEvaled = 
-                                                                tl
-                                                                |> List.map (fun x -> if (String.exists (fun c -> (c ='(')||(c =')')) x) then ((evalExpression' x.[1..(x.Length-2)] symTab)|>string) else x)
-                                                                |> List.reduce (fun a b -> a+b)
-                                                        evalExpression' bracketsEvaled symTab
+                                                            tl
+                                                            |> List.map (mapFunction)
+                                                            |> List.reduce (resultStringConcat)
+                                                        match bracketsEvaled with
+                                                        | (Ok x) -> evalExpression' x
+                                                        | Error m -> Error m
             elif String.exists (fun c -> (c ='+')) exp then
                 let list = exp.Split('+') |> Seq.toList
+                let resultAdd (aIn: Result<uint32,String>) (bIn: Result<uint32,String>) = 
+                    match (aIn, bIn) with
+                    | ((Ok x), (Ok y)) -> (Ok (x+y))
+                    | ((Error x), (Error y)) -> Error (x+y)
+                    | (Error x, _) -> Error x 
+                    | (_, Error y) -> Error y 
                 if ((list.[0]="")&&((List.last list)="")) 
                 then list.[1..(List.length list)-2]
                 elif (list.[0]="")
@@ -262,10 +290,16 @@ module MemInstructions
                 elif ((List.last list)="")
                 then list.[0..(List.length list)-2]
                 else list //Should return an error monad above here
-                |> List.map (fun x -> evalExpression' x symTab)
-                |> List.reduce (fun a b -> a+b)
+                |> List.map (fun x -> evalExpression' x)
+                |> List.reduce (resultAdd)
             elif String.exists (fun c -> (c ='-')) exp then
                 let list = exp.Split('-') |> Seq.toList
+                let resultMinus (aIn: Result<uint32,String>) (bIn: Result<uint32,String>) = 
+                    match (aIn, bIn) with
+                    | ((Ok x), (Ok y)) -> (Ok (x-y))
+                    | ((Error x), (Error y)) -> Error (x+y)
+                    | (Error x, _) -> Error x 
+                    | (_, Error y) -> Error y 
                 if ((list.[0]="")&&((List.last list)="")) 
                 then List.append ["0"] list.[1..(List.length list)-2]
                 elif (list.[0]="")
@@ -273,10 +307,16 @@ module MemInstructions
                 elif ((List.last list)="")
                 then list.[0..(List.length list)-2]
                 else list //Should return an error monad above here
-                |> List.map (fun x -> evalExpression' x symTab)
-                |> List.reduce (fun a b -> a-b)
+                |> List.map (fun x -> evalExpression' x)
+                |> List.reduce (resultMinus)
             elif String.exists (fun c -> (c ='*')) exp then
                 let list = exp.Split('*') |> Seq.toList
+                let resultMult (aIn: Result<uint32,String>) (bIn: Result<uint32,String>) = 
+                    match (aIn, bIn) with
+                    | ((Ok x), (Ok y)) -> (Ok (x*y))
+                    | ((Error x), (Error y)) -> Error (x+y)
+                    | (Error x, _) -> Error x 
+                    | (_, Error y) -> Error y 
                 if ((list.[0]="")&&((List.last list)="")) 
                 then list.[1..(List.length list)-2]
                 elif (list.[0]="")
@@ -284,16 +324,17 @@ module MemInstructions
                 elif ((List.last list)="")
                 then list.[0..(List.length list)-2]
                 else list //Should return an error monad above here
-                |> List.map (fun x -> evalExpression' x symTab)
-                |> List.reduce (fun a b -> a*b)
+                |> List.map (fun x -> evalExpression' x)
+                |> List.reduce (resultMult)
             else 
                 match exp with 
-                | Match @"(0x[0-9]+)" [_; ex] -> ex.Value |> uint32 //Matching a hex number, Eg 0x5
-                | Match @"(&[0-9]+)" [_; ex] -> ("0x"+(ex.Value).[1..(ex.Length-1)]) |> uint32 //Matching a hex number, Eg &5
-                | Match @"(0b[0-1]+)" [_; ex] -> ex.Value |> uint32 //Matching binary number, Eg 0b11
-                | Match @"([0-9]+)" [_; ex] -> ex.Value |> uint32 //Matching a decimal number 
-                | Match @"(\w+)" [_; lab] -> symTab.[lab.Value] //Matching a word, Eg testLabel
-        evalExpression' exp0 symTab0
+                | Match @"(0x[0-9]+)" [_; ex] -> ex.Value |> uint32 |> Ok //Matching a hex number, Eg 0x5
+                | Match @"(&[0-9]+)" [_; ex] -> ("0x"+(ex.Value).[1..(ex.Length-1)]) |> uint32 |> Ok //Matching a hex number, Eg &5
+                | Match @"(0b[0-1]+)" [_; ex] -> ex.Value |> uint32 |> Ok //Matching binary number, Eg 0b11
+                | Match @"([0-9]+)" [_; ex] -> ex.Value |> uint32 |> Ok //Matching a decimal number 
+                | Match @"(\w+)" [_; lab] -> symTab.[lab.Value] |> string |> uint32 |> Ok  //Matching a word, Eg testLabel
+                | _ -> Error "Did not match and of the evalExpression end case options"
+        evalExpression' exp0
 
 
 
