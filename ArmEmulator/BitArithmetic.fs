@@ -66,8 +66,8 @@ module BitArithmetic
     /// map used to convert strings into instruction values 
     let instrNames = 
         Map.ofList [ 
-            "MOV",MOV ; "MVN",MVN ; "AND",AND ; "ORR",ORR ; "BIC",BIC ; "LSL",LSL
-            "LSR",LSR ; "ASR",ASR ; "ROR",ROR ; "RRX",RRX ; "TST",TST ; "TEQ",TEQ ]
+            "MOV",MOV ; "MVN",MVN ; "AND",AND ; "ORR",ORR ; "EOR",EOR ; "BIC",BIC ;
+            "LSL",LSL ; "LSR",LSR ; "ASR",ASR ; "ROR",ROR ; "RRX",RRX ; "TST",TST ; "TEQ",TEQ ]
 
     /// Map of allowed shifts
     let allowedShifts = 
@@ -216,7 +216,7 @@ module BitArithmetic
         | AND | ORR | EOR | BIC when (ops.Length = 3) || (ops.Length = 4) 
             -> Ok {baseInstr with opA = toReg ops.[0] ; opB = Some (Reg (toReg ops.[1])) ; opC = Some (Flex (toFlexOp ops.[2..]))}
 
-        | LSL | LSR | ASR | ROR when ops.Length = 2
+        | LSL | LSR | ASR | ROR when ops.Length = 3
             -> Ok {baseInstr with opA = toReg ops.[0] ; opB = Some (Reg (toReg ops.[1])) ; opC = Some (Reg (toReg ops.[2]))}
 
         | RRX when ops.Length = 2
