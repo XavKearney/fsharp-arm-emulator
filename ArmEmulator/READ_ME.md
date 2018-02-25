@@ -63,6 +63,21 @@ Note from the examples above that the visUAL does not parse the expression for t
   - This seems to be a left accumulate addition method.
 
 2. 
+Instead of this I have decided to evalute the expressions using BIDMAS as it seems a more logical way to do it.
+
+
+### evalExpression Function explanation
+This is the function that evaluates the expressions used in ADR and the EQU. 
+The function calls a recursive sub function which step by step seperates the string input, first by brackets, then +, - and * operators respectively. It splits the string around these operators and then evaluates the expressions either side. 
+At some point it will reach and end case which could be one of the following: 
+  - A decimal number, Eg 5
+  - A hex number in form 1, Eg 0x5
+  - A hex number in form 2, Eg &5
+  - A binary number, Eg 0b101
+  - A label which will evaluate to either an address or a value depending on whether it was initialised using DCD or EQU. Eg testLabel or testLabel2 
+
+CREDIT: I have used and adapted Tom Clarke's makeAndCheckLiteral function (https://intranet.ee.ic.ac.uk/t.clarke/hlp/T3fback53.html) in order to check that the expression can be made by rotating an 8-bit literal right by an even number of bits.
+
 ### How I've Tested it 
 
 
