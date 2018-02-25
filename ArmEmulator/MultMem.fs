@@ -205,7 +205,7 @@ module MultMem
             // if valid, return branch instruction
             |> Result.map (fun bAddr ->
                 BranchI {
-                    BranchAddr = Some (bAddr);
+                    BranchAddr = Some (bAddr + 8u); // +8 to account for pipelining
                     LinkAddr = linkAddr;
                 }
             )
@@ -329,7 +329,7 @@ module MultMem
             // set PC to branch address
             Ok {cpuData with Regs = cpuData.Regs.Add (R15, bAddr)}
         | Some bAddr, Some (WA lAddr) ->
-            // set PC to branch address
+            // set PC to branch address 
             let branchedCpu = {cpuData with Regs = cpuData.Regs.Add (R15, bAddr)}
             // and set LR to link address
             Ok {branchedCpu with Regs = cpuData.Regs.Add (R14, lAddr)}

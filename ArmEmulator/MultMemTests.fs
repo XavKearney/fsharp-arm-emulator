@@ -73,21 +73,21 @@ module MultMemTests
             [
                 // test valid input with symbol table (2nd pass)
                 ("", "testLab", (WA 0u), Some testSymTab), 
-                    Ok (BranchI {BranchAddr = Some(37u); LinkAddr = None;})
+                    Ok (BranchI {BranchAddr = Some(45u); LinkAddr = None;})
                 ("L", "testLab", (WA 0u), Some testSymTab), 
-                    Ok (BranchI {BranchAddr = Some(37u); LinkAddr = Some(WA 4u);})
+                    Ok (BranchI {BranchAddr = Some(45u); LinkAddr = Some(WA 4u);})
                 ("", "otherLab", (WA 0u), Some testSymTab), 
-                    Ok (BranchI {BranchAddr = Some(94u); LinkAddr = None;})
+                    Ok (BranchI {BranchAddr = Some(102u); LinkAddr = None;})
                 ("L", "otherLab", (WA 0u), Some testSymTab), 
-                    Ok (BranchI {BranchAddr = Some(94u); LinkAddr = Some(WA 4u);})
+                    Ok (BranchI {BranchAddr = Some(102u); LinkAddr = Some(WA 4u);})
                 ("", "testLab*2-1", (WA 0u), Some testSymTab), 
-                    Ok (BranchI {BranchAddr = Some(37u*2u-1u); LinkAddr = None;})
+                    Ok (BranchI {BranchAddr = Some(37u*2u-1u+8u); LinkAddr = None;})
                 ("", "testLab+otherLab*2", (WA 0u), Some testSymTab), 
-                    Ok (BranchI {BranchAddr = Some(37u+94u*2u); LinkAddr = None;})
+                    Ok (BranchI {BranchAddr = Some(45u+94u*2u); LinkAddr = None;})
                 ("", "29*0xFF", (WA 0u), Some testSymTab), 
-                    Ok (BranchI {BranchAddr = Some(29u*0xFFu); LinkAddr = None;})
+                    Ok (BranchI {BranchAddr = Some(29u*0xFFu+8u); LinkAddr = None;})
                 ("", "otherLab*0xF*&F*0b11", (WA 0u), Some testSymTab), 
-                    Ok (BranchI {BranchAddr = Some(94u*0xFu*0xFu*0b11u); LinkAddr = None;})
+                    Ok (BranchI {BranchAddr = Some(94u*0xFu*0xFu*0b11u+8u); LinkAddr = None;})
                     
                 // test valid input but no symbol table (1st pass)
                 ("", "testLab", (WA 0u), None), 
@@ -153,15 +153,15 @@ module MultMemTests
             [
                 // test valid input
                 {ls with OpCode = "B"; Operands = "testLab";}, 
-                    Some(Ok {res with PInstr = BranchI {BranchAddr = Some 37u; LinkAddr = None;}})
+                    Some(Ok {res with PInstr = BranchI {BranchAddr = Some 45u; LinkAddr = None;}})
                 {ls with OpCode = "BL"; Operands = "testLab";}, 
-                    Some(Ok {res with PInstr = BranchI {BranchAddr = Some 37u; LinkAddr = Some (WA 4u);}})
+                    Some(Ok {res with PInstr = BranchI {BranchAddr = Some 45u; LinkAddr = Some (WA 4u);}})
                 {ls with OpCode = "BL"; Operands = "otherLab";}, 
-                    Some(Ok {res with PInstr = BranchI {BranchAddr = Some 94u; LinkAddr = Some (WA 4u);}})
+                    Some(Ok {res with PInstr = BranchI {BranchAddr = Some 102u; LinkAddr = Some (WA 4u);}})
                 {ls with OpCode = "BL"; Operands = "otherLab*2-1";}, 
-                    Some(Ok {res with PInstr = BranchI {BranchAddr = Some (94u*2u-1u); LinkAddr = Some (WA 4u);}})
+                    Some(Ok {res with PInstr = BranchI {BranchAddr = Some (94u*2u-1u+8u); LinkAddr = Some (WA 4u);}})
                 {ls with OpCode = "B"; Operands = "otherLab*2-9*testLab";}, 
-                    Some(Ok {res with PInstr = BranchI {BranchAddr = Some (94u*2u-9u*37u); LinkAddr = None;}})
+                    Some(Ok {res with PInstr = BranchI {BranchAddr = Some (94u*2u-9u*37u+8u); LinkAddr = None;}})
                 
                 // test invalid input
                 {ls with OpCode = "BL"; Operands = "   Testwhitespace    ";}, 
@@ -195,7 +195,7 @@ module MultMemTests
                     None
             ]
 
-    let config = { FsCheckConfig.defaultConfig with maxTest = 10000 }
+    let config = { FsCheckConfig.defaultConfig with maxTest = 1 }
 
     /// property-based testing of parse function
     /// for randomly generated branch instructions
