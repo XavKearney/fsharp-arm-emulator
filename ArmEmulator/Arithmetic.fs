@@ -482,8 +482,37 @@ module Arithmetic
         // Register map
         let regMap = cpuData.Regs
 
+        let setFlags result op1Num op2Num flags opcode = 
+            result 
+            |> function
+            | x when x = uint64 0 ->
+                let newFlags = {flags with Z = true}
+                x, newFlags
+            | x ->
+                x, flags
+            |> function
+            | (x, flags) when int32 x < int32 0 ->
+                let newFlags = {flags with N = true}
+                x, newFlags
+            | (x, flags) -> 
+                x, flags
+            |> function 
+            | (x, flags) when uint32 x < op1Num && uint32 x < op2Num ->
+                let newFlags = {flags with V = true}
+                x, newFlags
+            | (x, flags) ->
+                x, flags
+            |> function
+            | (x, flags) when x > uint64 4294967296L -> 
+                let newFlags = {flags with C = true}                           
+                x, newFlags
+            | (x, flags) -> 
+                x, flags
+            |> Ok
+
+
         // Actual logic that performs the instruction
-        let arithLogic opcode target op1 op2 = 
+        let arithLogic opcode suffix target op1 op2 (flags:Flags)= 
             // Register target
             let targetVal = regMap.TryFind target
             let op1Val = regMap.TryFind op1
@@ -502,16 +531,54 @@ module Arithmetic
                 match targetVal, op1Val, op2Val with
                     | Some _, Some op1Num, Some op2Num -> 
                         match opcode with
-                        | ADD -> Ok (op1Num + op2Num)
-                        | ADC -> Ok (op1Num + op2Num + carryVal)
-                        | SUB -> Ok (op1Num - op2Num)
-                        | SBC -> Ok (op1Num - op2Num + (carryVal - 1u))
-                        | RSB -> Ok (op2Num - op1Num)
-                        | RSC -> Ok (op2Num - op1Num + (carryVal - 1u))
+                        | ADD -> 
+                            let result = (uint64 op1Num + uint64 op2Num)
+                            match suffix with
+                            | true -> 
+                                setFlags result op1Num op2Num flags ADD
+                            | false ->
+                                Ok (result, flags)
+                        | ADC -> 
+                            let result = (uint64 op1Num + uint64 op2Num + uint64 carryVal)
+                            match suffix with
+                            | true -> 
+                                setFlags result op1Num op2Num flags ADC
+                            | false ->
+                                Ok (result, flags)
+                        | SUB -> 
+                            let result = (uint64 op1Num - uint64 op2Num)
+                            match suffix with
+                            | true -> 
+                                setFlags result op1Num op2Num flags SUB
+                            | false ->
+                                Ok (result, flags)
+                        | SBC -> 
+                            let result = (uint64 op1Num - uint64 op2Num + uint64 (carryVal - 1u))
+                            match suffix with
+                            | true -> 
+                                setFlags result op1Num op2Num flags SBC
+                            | false ->
+                                Ok (result, flags)
+                        | RSB -> 
+                            let result = (uint64 op2Num - uint64 op1Num)
+                            match suffix with
+                            | true -> 
+                                setFlags result op1Num op2Num flags RSB
+                            | false ->
+                                Ok (result, flags)
+                        | RSC -> 
+                            let result = (uint64 op2Num - uint64 op1Num + uint64 (carryVal - 1u))
+                            match suffix with
+                            | true -> 
+                                setFlags result op1Num op2Num flags ADD
+                            | false ->
+                                Ok (result, flags)
                     | _ -> Error ("The instruction is invalid")
 
             match logicOp with
-            | Ok regVal -> Map.add target regVal regMap
+            | Ok regVal -> 
+                let outVal, outFlags = regVal
+                Map.add target (uint32 outVal) regMap, outFlags
             | Error _ -> failwithf "The instruction is invalid"
 
         let instr = input.PInstr
@@ -523,9 +590,10 @@ module Arithmetic
             let target = instr.Target
             let op1 = instr.Op1
             let op2 = instr.Op2
+            let flags = cpuData.Fl
 
             match arithInstr with
-            | Some(ins) -> arithLogic ins target op1 op2
+            | Some(ins) -> arithLogic ins suffix target op1 op2 flags
             | None -> failwithf "No instruction specified"
         | _ -> 
             failwithf "Not completed comp instruction"

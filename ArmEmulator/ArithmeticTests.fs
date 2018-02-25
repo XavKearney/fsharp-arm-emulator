@@ -121,7 +121,7 @@ module MultMemTests
         opcodeStr, suffixStr, operandStr
 
     
-    [<Tests>]
+    //[<Tests>]
     let testArithParse = 
         let makeTestLineData wa opcode suffix target op1 op2 = 
             
@@ -179,7 +179,7 @@ module MultMemTests
         opcodeStr, operandStr
 
 
-    [<Tests>]
+    //[<Tests>]
     let testCompParse = 
         let makeTestLineData wa opcode op1 op2 = 
             
@@ -216,7 +216,7 @@ module MultMemTests
 
 
 
-    [<Tests>]
+    //[<Tests>]
     let testArithExec =
         let makeTestExecStr opcode suffix target op1 op2 = 
             let opcodeStr, suffixStr, operandStr = makeArithInstrString opcode suffix target op1 op2
@@ -284,7 +284,9 @@ module MultMemTests
                     MM = Map.empty;
                 }
 
-                let resCpu = doArithmetic parsed cpuData
+                let results = doArithmetic parsed cpuData
+
+                let resCpu, resFlags = results
 
                 let localRegs = 
                     resCpu
