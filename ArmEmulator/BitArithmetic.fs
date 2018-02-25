@@ -260,8 +260,7 @@ module BitArithmetic
 
 
 
-    let Mov a _ = a
-    let Mvn a _ = ~~~ a
+
     let AndTst a b = a &&& b
     let Orr a b = a ||| b
     let EorTeq a b = a ^^^ b
@@ -367,8 +366,23 @@ module BitArithmetic
         | Cnv -> true
         | Cal -> false
 
+    /// updates N Z C flags
+    let updateNZC flgs result carry =
+        let isNeg = int32 result < 0 
+        let isZero = result = 0u
+        let convCarry = 
+            match carry with
+            | 0u -> false
+            | 1u -> true
+        match isNeg,isZero with 
+        | true,false -> Ok {flgs with N = true ; Z=false ; C=convCarry}
+        | false,true -> Ok {flgs with N = false ; Z=true ; C=convCarry}
+        | _ -> Error "can't be both negative and zero"
+
+
     /// 
     let exeInstr cpuData parseOut =
+
         match parseOut with
         | Some (Ok exeInfo) ->
             let instrRoot = exeInfo.PInstr.instruction
@@ -378,52 +392,163 @@ module BitArithmetic
             let opc = exeInfo.PInstr.opC
             let regContent r =  Map.tryFind r (cpuData.Regs)
             let carryNum = System.Convert.ToUInt32(cpuData.Fl.C)
+
+            /// Returns a 2 tuple of (evaluated flexible opperator,carry) given an Opperand
             let evalRegOrFlexOps op = 
                 match op with
                 | Some (Reg (Some rName)) -> Some ((regContent rName),carryNum)
                 | Some (Flex (Some flexOp)) -> Some (flexEval cpuData suffix flexOp)
                 | _ -> None
+            let evalCarry op =
+                match op with 
+                | Some (_,c) -> Some c
+                | _ -> None
             let evalOp op = 
                 match op with
                 | Some (n, _) -> n
                 | _ -> None
+            let calcCarry = evalRegOrFlexOps >> evalCarry      
             let calcOp = evalRegOrFlexOps >> evalOp
-            let impInstr operation =
-                match calcOp opb,calcOp opc with 
-                | Some n1,Some n2 -> Some (operation n1 n2)
-                | Some n1,None -> Some (operation n1 1u)
-                | _ -> None
-            match exeCond cpuData.Fl exeInfo.PCond with
-            | true ->
-                match instrRoot with
-                | AND -> impInstr AndTst
-                | ORR -> impInstr Orr
-                | EOR -> impInstr EorTeq                
-                | BIC -> impInstr Bic              
-                | LSL -> impInstr Lsl                 
-                | LSR -> impInstr Lsr
-                | ROR -> impInstr Ror
-                | ASR -> impInstr Asr
-                | MOV -> impInstr Mov
-                | MVN -> impInstr Mvn                
-                | TST -> 
-                    match opa,calcOp opb with
-                    | Some r,Some n -> 
-                        match regContent r with 
-                        | Some rCont -> Some (AndTst rCont n)
+            let evalInstruction =    
+                match exeCond cpuData.Fl exeInfo.PCond with
+                | true ->
+                    match instrRoot with
+                    | AND -> 
+                        let impInstr =
+                            match calcOp opb,calcOp opc with 
+                            | Some n1,Some n2 -> Some (AndTst n1 n2)
+                            | _ -> None
+                        match impInstr,calcCarry opc,suffix with    
+                        | Some n,_,"" -> Some (n,carryNum)
+                        | Some n,Some c,"S" -> Some (n,c)
+                        | _ -> None  
+                    | ORR -> 
+                        let impInstr =
+                            match calcOp opb,calcOp opc with 
+                            | Some n1,Some n2 -> Some (Orr n1 n2)
+                            | _ -> None
+                        match impInstr,calcCarry opc,suffix with
+                        | Some n,_,"" -> Some (n,carryNum)    
+                        | Some n,Some c,"S" -> Some (n,c)
+                        | _ -> None                          
+                    | EOR -> 
+                        let impInstr =
+                            match calcOp opb,calcOp opc with 
+                            | Some n1,Some n2 -> Some (EorTeq n1 n2)
+                            | _ -> None
+                        match impInstr,calcCarry opc,suffix with
+                        | Some n,_,"" -> Some (n,carryNum)    
+                        | Some n,Some c,"S" -> Some (n,c)
+                        | _ -> None                                    
+                    | BIC -> 
+                        let impInstr =
+                            match calcOp opb,calcOp opc with 
+                            | Some n1,Some n2 -> Some (Bic n1 n2)
+                            | _ -> None
+                        match impInstr,calcCarry opc,suffix with
+                        | Some n,_,"" -> Some (n,carryNum)    
+                        | Some n,Some c,"S" -> Some (n,c)
+                        | _ -> None                                                              
+                    | LSL -> 
+                        match calcOp opb,calcOp opc,suffix with
+                        | Some n1,Some n2,"" -> Some (Lsl n1 n2,carryNum) 
+                        | Some n1,Some n2,"S" -> Some (Lsl n1 n2,shiftCarry n1 n2 Lsl selectMSB)
+                        | _ -> None                                      
+                    | LSR -> 
+                        match calcOp opb,calcOp opc,suffix with 
+                        | Some n1,Some n2,"" -> Some (Lsl n1 n2,carryNum) 
+                        | Some n1,Some n2,"S" -> Some (Lsl n1 n2,shiftCarry n1 n2 Lsr selectLSB)
+                        | _ -> None                          
+                    | ROR -> 
+                        match calcOp opb,calcOp opc,suffix with
+                        | Some n1,Some n2,"" -> Some (Lsl n1 n2,carryNum)  
+                        | Some n1,Some n2,"S" -> Some (Lsl n1 n2,shiftCarry n1 n2 Ror selectLSB)
+                        | _ -> None                       
+                    | ASR -> 
+                        match calcOp opb,calcOp opc,suffix with
+                        | Some n1,Some n2,"" -> Some (Lsl n1 n2,carryNum)  
+                        | Some n1,Some n2,"S" -> Some (Lsl n1 n2,shiftCarry n1 n2 Asr selectLSB)
+                        | _ -> None                      
+                    | MOV -> 
+                        match calcOp opb,calcCarry opb,suffix with
+                        | Some n,_,"" -> Some (n,carryNum)
+                        | Some n,Some c,"S" -> Some (n,c)
+                        | _ -> None  
+                    | MVN ->
+                        match calcOp opb,calcCarry opb,suffix with
+                        | Some n,_,"" -> Some (~~~ n,carryNum)
+                        | Some n,Some c,"S" -> Some (~~~ n,c)
+                        | _ -> None                                    
+                    | TST -> 
+                        match opa,calcOp opb with
+                        | Some r,Some n -> 
+                            match regContent r,calcCarry opb with 
+                            | Some rCont,Some c -> Some (AndTst rCont n,c)
+                            | _ -> None
                         | _ -> None
-                    | _ -> None
-                | TEQ -> 
-                    match opa,calcOp opb with
-                    | Some r,Some n -> 
-                        match regContent r with 
-                        | Some rCont -> Some (EorTeq rCont n)
-                        | _ -> None
-                    | _ -> None                
-                | RRX -> 
-                    match calcOp opb with
-                    | Some n -> Some (Rrx n carryNum)
-                    | _ -> None
-                | _ -> None                
-            | false -> None
-        | _ -> None
+                    | TEQ -> 
+                        match opa,calcOp opb with
+                        | Some r,Some n -> 
+                            match regContent r,calcCarry opb with 
+                            | Some rCont,Some c -> Some (EorTeq rCont n,c)
+                            | _ -> None
+                        | _ -> None                
+                    | RRX -> 
+                        match calcOp opb,suffix with
+                        | Some n,"" -> Some (Rrx n carryNum,carryNum)
+                        | Some n,"S" -> Some (Rrx n carryNum,selectLSB n)
+                        | _ -> None               
+                | false -> None
+
+            match instrRoot with 
+            | TST | TEQ -> //"cpuData with flags updated on result - no destination"
+                match evalInstruction with 
+                | Some (num,c) ->
+                    match updateNZC cpuData.Fl num c with 
+                    | Ok flgs -> Ok {cpuData with Fl = flgs}
+                    | _ -> Error "failed when updating flags in TST or TEQ"
+                | _ -> Error "Could not evaluate instruction"
+            | _ -> 
+                match evalInstruction,opa with
+                | Some (num,c),Some reg ->
+                    let regsUpdate = Map.add reg num cpuData.Regs
+                    match suffix with
+                    | "S" -> 
+                        match updateNZC cpuData.Fl num c with
+                        | Ok flgs -> Ok {cpuData with Regs = regsUpdate ; Fl = flgs}
+                        | _ -> Error "failed when updating flags in TST or TEQ" 
+                    | "" -> Ok {cpuData with Regs = regsUpdate}
+                    | _ -> Error ""
+                | _ -> Error ""
+
+        | _ -> Error ""
+
+
+(*
+
+        flags that are updated by each instruction:
+
+            N,Z,C   TST, TEQ, MOV, MVN, AND, ORR, EOR, BIC
+
+            If S is specified, these instructions:
+
+            update the N and Z flags according to the result
+
+            can update the C flag during the calculation of Operand2
+
+            do not affect the V flag.
+
+
+
+        	N,Z,C	ASR, LSL, LSR, ROR, and RRX
+
+            If S is specified:
+
+            these instructions update the N and Z flags according to the result
+
+            the C flag is updated to the last bit shifted out, except when the shift length is 0, see Shift Operations.
+
+
+        }
+
+*)
