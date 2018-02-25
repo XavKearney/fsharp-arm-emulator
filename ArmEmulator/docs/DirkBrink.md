@@ -33,3 +33,14 @@ There are also automated parsing tests for the `parse` function.  `testArithPars
 
 #### Execution
 The execution tests 
+
+
+
+ADC, RSB and RSC second operand cannot be SP or PC -> Different from visUAL
+ADC, RSB and RSC first operand cannot be label, SP or PC -> Different from visUAL
+Op1 cannot be PC when op2 is register controlled shift - > Different from visUAL
+Target register can only be R13 is op2 is a literal -> Different from visUAL
+Op1 can only be PC if op2 is a Literal -> Different from visUAL
+Op1 cannot be PC when op2 is register controlled shift -> Different from visUAL
+SUB instruction first operand cannot be R15
+SUB instruction second operand cannot be R15

@@ -301,20 +301,32 @@ module Arithmetic
                 match regNames.TryFind op2Str with
                 | Some op2 -> 
                     match flexStr with
-                    | FlexParse "^([A-Z]+)\s+(.*)$" [shiftOpStr; regLitStr] ->
+                    | FlexParse "^([A-Z]+)\s+(.*)?$" [shiftOpStr; regLitStr] ->
                         match operationNames.TryFind shiftOpStr with
                         | Some shiftOp ->
-                            match regLitStr.Trim() with
-                            | Prefix "#" op2Num -> 
-                                let flexVal = recursiveSplit op2Num symTable
-                                match flexVal with
-                                | Ok flexOut -> Ok (op1, RegisterShift (op2, shiftOp, int32 flexOut))
-                                | Error err -> Error (err) 
+                            match shiftOp with
+                            | RRX ->
+                                Error ("RRX always has a shift of 1")
                             | _ ->
-                                match regNames.TryFind regLitStr with
-                                | Some flexOut -> Ok (op1, RegisterRegisterShift (op2, shiftOp, flexOut))                 
-                                | _ -> Error ("Flex is not a valid register or expression")
+                                match regLitStr.Trim() with
+                                | Prefix "#" op2Num -> 
+                                    let flexVal = recursiveSplit op2Num symTable
+                                    match flexVal with
+                                    | Ok flexOut -> Ok (op1, RegisterShift (op2, shiftOp, int32 flexOut))
+                                    | Error err -> Error (err) 
+                                | _ ->
+                                    match regNames.TryFind regLitStr with
+                                    | Some flexOut -> Ok (op1, RegisterRegisterShift (op2, shiftOp, flexOut))                 
+                                    | _ -> Error ("Flex is not a valid register or expression")
                         | _ -> Error ("Shift op is invalid")
+                    | FlexParse "^(RRX)\s*$" [shiftOpStr] ->
+                        match operationNames.TryFind shiftOpStr with
+                        | Some shiftOp -> 
+                            let flexVal = recursiveSplit "1" symTable
+                            match flexVal with
+                            | Ok flexOut -> Ok (op1, RegisterShift (op2, shiftOp, int32 flexOut))
+                            | Error err -> Error (err)
+                        | _ -> Error ("Shfit op invalid")
                     | _ -> Error ("Flex is invalid")        
                 | _ -> Error ("Op2 is an invalid register")
             | _ -> Error ("Op1 is an invalid register")
@@ -365,18 +377,30 @@ module Arithmetic
                         | FlexParse "^([A-Z]+)\s+(R[0-9]+|#-?0b[0-1]+|#-?0x[0-9A-F]+|#-?&[0-9A-F]+|#-?[0-9]+)$" [shiftOpStr;regLitStr] ->
                             match operationNames.TryFind shiftOpStr with
                             | Some shiftOp ->
-                                match regLitStr with
-                                | Prefix "#" shiftNumStr -> 
-                                    let shiftInt = recursiveSplit shiftNumStr symTable
-                                    match shiftInt with
-                                    | Ok shiftVal -> Ok (dest, op1, RegisterShift (op2, shiftOp, int32 shiftVal))
-                                    | Error err -> Error (err) 
+                                match shiftOp with
+                                | RRX ->
+                                    Error ("RRX always has a shift of 1")
                                 | _ ->
-                                    match regNames.TryFind regLitStr with
-                                    | Some shiftReg -> Ok (dest, op1, RegisterRegisterShift (op2, shiftOp, shiftReg))               
-                                    | _ -> Error ("Op2 is not a valid register or expression")
+                                    match regLitStr.Trim() with
+                                    | Prefix "#" shiftNumStr -> 
+                                        let shiftInt = recursiveSplit shiftNumStr symTable
+                                        match shiftInt with
+                                        | Ok shiftVal -> Ok (dest, op1, RegisterShift (op2, shiftOp, int32 shiftVal))
+                                        | Error err -> Error (err) 
+                                    | _ ->
+                                        match regNames.TryFind regLitStr with
+                                        | Some shiftReg -> Ok (dest, op1, RegisterRegisterShift (op2, shiftOp, shiftReg))               
+                                        | _ -> Error ("Op2 is not a valid register or expression")
 
                             | _ -> Error ("Invalid shift operation")
+                        | FlexParse "^(RRX)\s*$" [shiftOpStr] ->
+                            match operationNames.TryFind shiftOpStr with
+                            | Some shiftOp -> 
+                                let flexVal = recursiveSplit "1" symTable
+                                match flexVal with
+                                | Ok flexOut -> Ok (dest, op1, RegisterShift (op2, shiftOp, int32 flexOut))
+                                | Error err -> Error (err)
+                            | _ -> Error ("Shfit op invalid")
                         | _ -> Error ("Invalid flex op 2")
                     | _ -> Error ("Invalid op2 register")
                 | _ -> Error ("Invalid op1 register") 
@@ -388,45 +412,9 @@ module Arithmetic
         // Makes final instruction from baseInstr
         let makeInstr (ins:ArithInstr) = 
             match ins.InstrType, ins.Target, ins.Op1, ins.Op2 with
-            | _, R15, _, _ ->
-                Error ("Target register cannot be PC")
-            | _, _, R15, RegisterRegisterShift _ -> 
-                Error ("Op1 cannot be PC when op2 is register controlled shift")
-            | Some (ADC), _, R15, _ ->
-                Error ("ADC, RSB and RSC first operand cannot be label, SP or PC")
-            | Some (RSB), _, R15, _ ->
-                Error ("ADC, RSB and RSC first operand cannot be label, SP or PC")
-            | Some (RSC), _, R15, _ ->
-                Error ("ADC, RSB and RSC first operand cannot be label, SP or PC")
-            | Some (ADC), _, R13, _ ->
-                Error ("ADC, RSB and RSC first operand cannot be label, SP or PC")
-            | Some (RSB), _, R13, _ ->
-                Error ("ADC, RSB and RSC first operand cannot be label, SP or PC")
-            | Some (RSC), _, R13, _ ->
-                Error ("ADC, RSB and RSC first operand cannot be label, SP or PC")
-            | Some (ADC), R13, _, _ ->
-                Error ("ADC, RSB and RSC first operand cannot be label, SP or PC")
-            | Some (RSB), R13, _, _ ->
-                Error ("ADC, RSB and RSC first operand cannot be label, SP or PC")
-            | Some (RSC), R13, _, _ ->
-                Error ("ADC, RSB and RSC first operand cannot be label, SP or PC")
-            // ADC, RSB, RSC second operand cannot be SP or PC
-            | Some (ADC), _, _, Register R15 ->
-                Error ("ADC, RSB and RSC second operand cannot be SP or PC")
-            | Some (RSB), _, _, Register R15 ->
-                Error ("ADC, RSB and RSC second operand cannot be SP or PC")
-            | Some (RSC), _, _, Register R15 ->
-                Error ("ADC, RSB and RSC second operand cannot be SP or PC")
-            | Some (ADC), _, _, Register R13 ->
-                Error ("ADC, RSB and RSC second operand cannot be SP or PC")
-            | Some (RSB), _, _, Register R13 ->
-                Error ("ADC, RSB and RSC second operand cannot be SP or PC")
-            | Some (RSC), _, _, Register R13 ->
-                Error ("ADC, RSB and RSC second operand cannot be SP or PC")
-            | Some (SUB), _, R15, _ ->
-                Error ("SUB instruction first operand cannot be R15")
-            | Some (SUB), _, _, RegisterShift(R15, _, _) ->
-                Error ("SUB instruction second operand cannot be R15")
+            // ADD target can only be R15 if both op1 and op2 are not R13
+            | Some (ADD), R15, R13, _ | Some (ADD), R15, _, Register R13->
+                Error ("Target register cannot be PC if op1 or op2 is R13")
             | _ ->
                  Ok(ins)
         

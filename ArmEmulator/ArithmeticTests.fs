@@ -55,6 +55,8 @@ module MultMemTests
                 ("R7,R3,R0, LSP #1", Error ("Invalid shift operation"));
                 ("R7,R3,R0, ASR R8", Ok (R7,R3, RegisterRegisterShift (R0, ASR, R8)));
                 ("R7,R3,R0, LSL R30", Error ("Op2 is not a valid register or expression"));
+                ("R7,R3,R0, RRX R30", Error ("RRX always has a shift of 1"));
+                
 
                 ("R0, R12, #3*6-1", Ok (R0, R12, Literal (uint32 17)));
                 ("R0, R12, #3+6*2", Ok (R0, R12, Literal (uint32 15)));
@@ -71,7 +73,10 @@ module MultMemTests
                 ("R0, R12, #&F", Ok (R0, R12, Literal (uint32 15)));
                 ("R0, R12, #-97  +   1", Ok (R0, R12, Literal (uint32 -96)));     
                 ("R0, R12, #2*-3", Error ("Invalid expression")); 
-                ("R0, R12, #test", Ok (R0, R12, Literal (uint32 2)));             
+                ("R0, R12, #test", Ok (R0, R12, Literal (uint32 2)));
+                ("R0, R12, R0, RRX", Ok (R0, R12, RegisterShift (R0, RRX, int32 1)));
+                ("R0, R12, R0, RRX #1", Error ("RRX always has a shift of 1"));
+
             ]
 
     [<Tests>]
@@ -90,6 +95,8 @@ module MultMemTests
                 ("R7,R1, LSL #1", Ok (R7, RegisterShift (R1, LSL, int32 1)));
                 ("R7,R1, LSP #5", Error ("Shift op is invalid"));
                 ("R7,R1, LSL R8", Ok (R7, RegisterRegisterShift (R1, LSL, R8)));
+                ("R0, R0, RRX", Ok (R0, RegisterShift (R0, RRX, int32 1)));
+                ("R0, R0, RRX #100", Error ("RRX always has a shift of 1"));
             ]
 
     let config = { FsCheckConfig.defaultConfig with maxTest = 10000 }
@@ -112,16 +119,24 @@ module MultMemTests
                      | Literal num -> "#" + string num
                      | Register reg -> regStrings.[reg]
                      | RegisterShift (op2, shift, num) -> 
-                        regStrings.[op2] + "," + operationStrings.[shift] + " #" + string num
+                        match shift with
+                        | RRX ->
+                            regStrings.[op2] + "," + operationStrings.[shift]
+                        | _ ->
+                            regStrings.[op2] + "," + operationStrings.[shift] + " #" + string num
                      | RegisterRegisterShift (op2, shift, reg) -> 
-                        regStrings.[op2] + "," + operationStrings.[shift] + " " + regStrings.[reg]
+                        match shift with
+                        | RRX ->
+                            regStrings.[op2] + "," + operationStrings.[shift]
+                        | _ ->
+                            regStrings.[op2] + "," + operationStrings.[shift] + " " + regStrings.[reg]
         
         let operandStr = targetStr + "," + op1Str + "," + op2Str
         
         opcodeStr, suffixStr, operandStr
 
     
-    [<Tests>]
+    //[<Tests>]
     let testArithParse = 
         let makeTestLineData wa opcode suffix target op1 op2 = 
             
@@ -141,45 +156,9 @@ module MultMemTests
 
             let expected = 
                 match opcode, target, op1, op2 with
-                | _, R15, _, _ ->
-                    Some (Error ("Target register cannot be PC"))
-                | _, _, R15, RegisterRegisterShift _ ->
-                    Some (Error ("Op1 cannot be PC when op2 is register controlled shift"))
-                | ADC, _, R15, _ ->
-                    Some (Error ("ADC, RSB and RSC first operand cannot be label, SP or PC"))
-                | RSB, _, R15, _ ->
-                    Some (Error ("ADC, RSB and RSC first operand cannot be label, SP or PC"))
-                | RSC, _, R15, _ ->
-                    Some (Error ("ADC, RSB and RSC first operand cannot be label, SP or PC"))
-                | ADC, _, R13, _ ->
-                    Some (Error ("ADC, RSB and RSC first operand cannot be label, SP or PC"))
-                | RSB, _, R13, _ ->
-                    Some (Error ("ADC, RSB and RSC first operand cannot be label, SP or PC"))
-                | RSC, _, R13, _ ->
-                    Some (Error ("ADC, RSB and RSC first operand cannot be label, SP or PC"))
-                | ADC, R13, _, _ ->
-                    Some (Error ("ADC, RSB and RSC first operand cannot be label, SP or PC"))
-                | RSB, R13, _, _ ->
-                    Some (Error ("ADC, RSB and RSC first operand cannot be label, SP or PC"))
-                | RSC, R13, _, _ ->
-                    Some (Error ("ADC, RSB and RSC first operand cannot be label, SP or PC"))
-                // ADC, RSB, RSC second operand cannot be SP or PC    
-                | ADC, _, _, Register R15 ->
-                    Some (Error ("ADC, RSB and RSC second operand cannot be SP or PC"))
-                | RSB, _, _, Register R15 ->
-                    Some (Error ("ADC, RSB and RSC second operand cannot be SP or PC"))
-                | RSC, _, _, Register R15 ->
-                    Some (Error ("ADC, RSB and RSC second operand cannot be SP or PC"))
-                | ADC, _, _, Register R13 ->
-                    Some (Error ("ADC, RSB and RSC second operand cannot be SP or PC"))
-                | RSB, _, _, Register R13 ->
-                    Some (Error ("ADC, RSB and RSC second operand cannot be SP or PC"))
-                | RSC, _, _, Register R13 ->
-                    Some (Error ("ADC, RSB and RSC second operand cannot be SP or PC"))
-                | SUB, _, R15, _ ->
-                    Some (Error ("SUB instruction first operand cannot be R15"))
-                | SUB, _, _, RegisterShift(R15, _, _) ->
-                    Some (Error ("SUB instruction second operand cannot be R15"))
+                // ADD target can only be R15 if both op1 and op2 are not R13
+                | ADD, R15, R13, _ | ADD, R15, _, Register R13->
+                    Some (Error ("Target register cannot be PC if op1 or op2 is R13"))
                 | _ -> 
                     Some (Ok {
                         PInstr = ArithI
@@ -210,10 +189,18 @@ module MultMemTests
         let op2Str = match op2 with
                      | Literal num -> "#" + string num
                      | Register reg -> regStrings.[reg]
-                     | RegisterShift (op2, shift, num) -> 
-                        regStrings.[op2] + "," + operationStrings.[shift] + " #" + string num
+                     | RegisterShift (op2, shift, num) ->
+                        match shift with
+                        | RRX ->
+                            regStrings.[op2] + "," + operationStrings.[shift]
+                        | _ -> 
+                            regStrings.[op2] + "," + operationStrings.[shift] + " #" + string num
                      | RegisterRegisterShift (op2, shift, reg) -> 
-                        regStrings.[op2] + "," + operationStrings.[shift] + " " + regStrings.[reg]
+                        match shift with
+                        | RRX ->
+                            regStrings.[op2] + "," + operationStrings.[shift]
+                        | _ ->
+                            regStrings.[op2] + "," + operationStrings.[shift] + " " + regStrings.[reg]
         
         let operandStr = op1Str + "," + op2Str
         
@@ -257,7 +244,7 @@ module MultMemTests
 
 
 
-    [<Tests>]
+    //[<Tests>]
     let testArithExec =
         let makeTestExecStr opcode suffix target op1 op2 = 
             let opcodeStr, suffixStr, operandStr = makeArithInstrString opcode suffix target op1 op2
@@ -272,7 +259,9 @@ module MultMemTests
             let valid = 
                 match opcode, target, op1, op2, flags with
                 | _, _, _, _, f when f.N && f.Z -> false
-                | _, R15, _, _, _ -> false
+                | ADD, R15, R13, _, _ | ADD, R15, _, Register R13, _ -> false
+                | SUB, R13, _, Register(_), _ -> false
+                | SUB, _, R15, Register(_), _ -> false
                 | _, _, R15, RegisterRegisterShift _, _ -> false
                 // ADC, RSB, RSC first operand cannot be SP or PC   
                 | ADC, _, R15, _, _ -> false
@@ -288,6 +277,20 @@ module MultMemTests
                 | ADC, _, _, Register R13, _ -> false
                 | RSB, _, _, Register R13, _ -> false
                 | RSC, _, _, Register R15, _ -> false
+                | ADC, _, _, RegisterShift (R15,_, _), _ -> false
+                | RSB, _, _, RegisterShift (R15,_, _), _ -> false
+                | RSC, _, _, RegisterShift (R15,_, _), _ -> false
+                | ADC, _, _, RegisterShift (R13,_, _), _ -> false
+                | RSB, _, _, RegisterShift (R13,_, _), _ -> false
+                | RSC, _, _, RegisterShift (R13,_, _), _ -> false
+                | ADC, _, _, RegisterRegisterShift (R15,_, _), _ -> false
+                | RSB, _, _, RegisterRegisterShift (R15,_, _), _ -> false
+                | RSC, _, _, RegisterRegisterShift (R15,_, _), _ -> false
+                | ADC, _, _, RegisterRegisterShift (R13,_, _), _ -> false
+                | RSB, _, _, RegisterRegisterShift (R13,_, _), _ -> false
+                | RSC, _, _, RegisterRegisterShift (R13,_, _), _ -> false
+                
+                
                 // ADC, RSB, RSC target cannot be R13
                 | ADC, R13, _, _, _ -> false
                 | RSB, R13, _, _, _ -> false
