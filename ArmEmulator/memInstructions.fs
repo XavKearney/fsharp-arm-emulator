@@ -312,6 +312,7 @@ module MemInstructions
 
     let parseAdrIns root ls =
         let ADRInstrTypeTmp =
+            // printfn "\nparseAdrIns\nroot: %A\nls: %A" root ls
             match root with
             | "ADR" -> Ok ADRm
             | _     -> Error (sprintf "parseAdrIns: root passed to
@@ -445,75 +446,72 @@ module MemInstructions
 
 
 
-    type GeneralParse = LabelO of Result<labelInstr,string> 
-                        | MemO of Result<MemInstr,string> 
-                        | AdrO of Result<ADRInstr,string>
+    type LabelAndMemGeneralParse = LabelO of Result<labelInstr,string> 
+                                                | MemO of Result<MemInstr,string> 
+                                                | AdrO of Result<ADRInstr,string>
+
 
     /// main function to parse a line of assembler
     /// ls contains the line input
     /// and other state needed to generate output
     /// the result is None if the opcode does not match
     /// otherwise it is Ok Parse or Error (parse error string)
-    // let parse (ls: LineData) : Result<Parse<Instr>,string> option =
-    //     let parse' (instrC, (root,suffix,pCond)) =
+    let parse (ls: LineData) = //: Result<Parse<Instr>,string> option =
+        let parse' (instrC, (root,suffix,pCond)) =
 
-    //         let (WA la) = ls.LoadAddr // address this instruction is loaded into memory
-    //         // this does the real work of parsing
-    //         // dummy return for now
+            // printfn "\n\nparse Testing\ninstrC: %A\nroot: %A\nsuffix: %A\npCond: %A\n\n" instrC root suffix pCond
+
+            let (WA la) = ls.LoadAddr // address this instruction is loaded into memory
+            // this does the real work of parsing
+            // dummy return for now
             
 
-    //         // match instrC with
-    //         // | DCD -> PInstrTmp = parseDCD suffix ls
-    //         // | MEM -> PInstrTmp = parseMEM root suffix ls
-    //         // | ADR -> PInstrTmp = parseADR suffix ls
-    //         // | LABEL -> PInstrTmp = parseLabelIns root suffix ls
-                        
-    //         Ok { 
-    //             // Normal (non-error) return from result monad
-    //             // This is the instruction determined from opcode, suffix and parsing
-    //             // the operands. Not done in the sample.
-    //             // Note the record type returned must be written by the module author.
-    //             // PInstr={InstructionType= (); DestSourceReg= (); SecondOp= ();}; 
-    //             PInstr = 
-    //                 match instrC with
-    //                 | LABEL -> LabelO (parseLabelIns root ls)
-    //                 | MEM   -> MemO (parseMemIns root suffix ls)
-    //                 | ADR   -> AdrO (parseAdrIns suffix ls)
+            if 1=1 then           
+            Ok { 
+                // Normal (non-error) return from result monad
+                // This is the instruction determined from opcode, suffix and parsing
+                // the operands. Not done in the sample.
+                // Note the record type returned must be written by the module author.
+                // PInstr={InstructionType= (); DestSourceReg= (); SecondOp= ();}; 
+                PInstr = 
+                    match instrC with
+                    | LABEL -> LabelO (parseLabelIns root ls)
+                    | MEM   -> MemO (parseMemIns root suffix ls)
+                    | ADR   -> AdrO (parseAdrIns root ls)
 
 
-    //             // This is normally the line label as contained in
-    //             // ls together with the label's value which is normally
-    //             // ls.LoadAddr. Some type conversion is needed since the
-    //             // label value is a number and not necessarily a word address
-    //             // it does not have to be div by 4, though it usually is
-    //             PLabel = ls.Label |> Option.map (fun lab -> lab, la) ; 
+                // This is normally the line label as contained in
+                // ls together with the label's value which is normally
+                // ls.LoadAddr. Some type conversion is needed since the
+                // label value is a number and not necessarily a word address
+                // it does not have to be div by 4, though it usually is
+                PLabel = ls.Label |> Option.map (fun lab -> lab, la) ; 
 
 
-    //             // this is the number of bytes taken by the instruction
-    //             // word loaded into memory. For arm instructions it is always 4 bytes. 
-    //             // For data definition DCD etc it is variable.
-    //             //  For EQU (which does not affect memory) it is 0
-    //             PSize = 4u; 
+                // this is the number of bytes taken by the instruction
+                // word loaded into memory. For arm instructions it is always 4 bytes. 
+                // For data definition DCD etc it is variable.
+                //  For EQU (which does not affect memory) it is 0
+                PSize = 4u; 
 
-    //             // the instruction condition is detected in the opcode and opCodeExpand                 
-    //             // has already calculated condition already in the opcode map.
-    //             // this part never changes
-    //             PCond = pCond 
-    //             }
-    //     // Map.tryFind ls.OpCode opCodesDCD // lookup opcode to see if it is known
-    //     // |> Option.map parse' // if unknown keep none, if known parse it.
-    //     // if (Map.tryFind ls.OpCode opCodesLabel |> Option.map parse') <> None then
-    //     //     Map.tryFind ls.OpCode opCodesLabel |> Option.map parse'
-    //     // elif (Map.tryFind ls.OpCode opCodesADR |> Option.map parse') <> None then
-    //     //     Map.tryFind ls.OpCode opCodesADR |> Option.map parse'
-    //     // elif (Map.tryFind ls.OpCode opCodesMem |> Option.map parse') <> None then
-    //     //     Map.tryFind ls.OpCode opCodesMem |> Option.map parse'
-    //     // else 
-    //     //     None
-    //     match instrC with 
-    //     | LABEL -> Map.tryFind ls.OpCode opCodesLabel |> Option.map parse'
-    //     | MEM   -> Map.tryFind ls.OpCode opCodesMem |> Option.map parse'
-    //     | ADR   -> Map.tryFind ls.OpCode opCodesADR |> Option.map parse'
+                // the instruction condition is detected in the opcode and opCodeExpand                 
+                // has already calculated condition already in the opcode map.
+                // this part never changes
+                PCond = pCond 
+                }
+            else Error "parse: Should never happen, just setting the type"
+        let test = Map.tryFind ls.OpCode opCodesLabel // lookup opcode to see if it is known
+        // |> Option.map parse' // if unknown keep none, if known parse it.
+        if (Map.tryFind ls.OpCode opCodesLabel |> Option.map parse') <> None 
+        then (Map.tryFind ls.OpCode opCodesLabel |> Option.map parse')
+        elif (Map.tryFind ls.OpCode opCodesMem |> Option.map parse') <> None 
+        then (Map.tryFind ls.OpCode opCodesMem |> Option.map parse')
+        else 
+        (Map.tryFind ls.OpCode opCodesADR |> Option.map parse')
+        // elif (Map.tryFind ls.OpCode opCodesADR |> Option.map parse') <> None 
+        // then (Map.tryFind ls.OpCode opCodesADR |> Option.map parse')
+        // else Error (sprintf "Could not find the OpCode in any of the possible
+        //      maps\nls.OpCode: %A" ls.OpCode)
 
 
 
@@ -530,7 +528,7 @@ module MemInstructions
 
 
 
-    let LDRexec (inputRecord: GeneralParse) dP = 
+    let LDRexec (inputRecord: LabelAndMemGeneralParse) dP = 
         //insert psuedo code here
         //Eg: LDR r8, [r10]     //Loads r8 with the value 
                                 // from the address in r10
@@ -551,11 +549,11 @@ module MemInstructions
         // for branching.
         0
 
-    let STRexec (inputRecord: GeneralParse) dP = 
+    let STRexec (inputRecord: LabelAndMemGeneralParse) dP = 
         //insert psuedo code here
         0
 
-    let ADRexec (inputRecord: GeneralParse) dP = 
+    let ADRexec (inputRecord: LabelAndMemGeneralParse) dP = 
         //Takes the address of a label and puts it into the 
         // register. 
         //Eg: ADR		R0, BUFFIN1
@@ -566,7 +564,7 @@ module MemInstructions
         
         0
 
-    let DCDexec (inputRecord: GeneralParse) symbolTab dP = 
+    let DCDexec (inputRecord: LabelAndMemGeneralParse) symbolTab dP = 
         //Takes a label and a list of values, it then stores 
         // the values in memory, they can be accessed using
         // the label.
@@ -581,12 +579,12 @@ module MemInstructions
         //Update Symbol Table and update the DataPath.MM
         0
 
-    let checkAndMatchInputRecord inpRec constructor =
-        match inpRec with
-        | constructor m -> 
-        | 
+    // let checkAndMatchInputRecord inpRec constructor =
+    //     match inpRec with
+    //     | constructor m -> 
+    //     | 
 
-    let EQUexec (inputRecord: GeneralParse) symbolTab dP = 
+    let EQUexec (inputRecord: LabelAndMemGeneralParse) symbolTab dP = 
         //insert psuedo code here
         //Assigns a value to a label
         //Eg: abc EQU 2 
@@ -601,13 +599,13 @@ module MemInstructions
             match inputRecord with
             | LabelO m -> Ok m
             | x -> Error (sprintf "EQUexec: Wrong type of 
-                   GeneralParse passed to function (%A)" x)
+                   LabelAndMemGeneralParse passed to function (%A)" x)
         match checkType with
         | Error m -> Error m
         | Ok x -> mainFunctionBody
         0
 
-    let FILLexec (inputRecord: GeneralParse) symbolTab dP = 
+    let FILLexec (inputRecord: LabelAndMemGeneralParse) symbolTab dP = 
         //insert psuedo code here
         //Eg:   data4	Fill		12
         // fills 12 data slots with 0. It basically initialises

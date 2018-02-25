@@ -405,6 +405,9 @@ module memInstructionsTests
                     makeTest "ADR" (ldFunc st "R15, testL") "ADR R15 Test" (Ok {InstructionType= Ok ADRm;
                                                                                 DestReg= Ok R15;
                                                                                 SecondOp= Ok 256u;})
+                    makeTest "ADR" (ldFunc st "R0, 4") "ADR Number Only Exp" (Ok {InstructionType= Ok ADRm;
+                                                                                DestReg= Ok R0;
+                                                                                SecondOp= Ok 4u;})
 
 
                     //ADR Error Message Tests
@@ -441,28 +444,25 @@ module memInstructionsTests
 
 
 
+    [<Tests>]
+    let checkParse = 
+        let st:SymbolTable = ["testL",256u; "testL2",260u] |> Map.ofList
+        let ldFunc symTab opCodeIn ops = 
+                {LoadAddr= WA 100u; 
+                    Label= Some "labelTest"; 
+                    SymTab= Some symTab;
+                    OpCode= opCodeIn;
+                    Operands= ops}
+        let makeTest ls name output =
+            testCase name <| fun () ->
+                Expect.equal (parse ls) output (sprintf "parse Tests\nTest: %A" name)
+        Expecto.Tests.testList "Total Parse Tests"
+                [   
+                    //parse Working Tests
+                    makeTest (ldFunc st "ADR" "R0, 4") "Base Test" (Some (Ok {PInstr = AdrO (Ok {InstructionType= Ok ADRm;
+                                                                                DestReg= Ok R0;
+                                                                                SecondOp= Ok 4u;});
+                                                                    PLabel = Some ("labelTest", 100u);
+                                                                    PSize = 4u; PCond = Cal}))
 
-    // let test = ((Map.add ("blah":string) (5u:uint32)): SymbolTable)  
-    // let test2 = Map<"blah", 97u>
-    // let x:SymbolTable = ["a",uint32 2] |> Map.ofList
-
-    // let ld = {LoadAddr= WA 100u; 
-    //             Label= Some "testlabel"; 
-    //             SymTab= Some x;
-    //             OpCode= "AL";
-    //             Operands= "1,3,5"}
-
-    // let test = parse ld
-
-        // let parseLabelIns root ls
-        // let InstTypeTmp = 
-        //     match root with
-        //     | "EQU" -> Some EQU 
-        //     | "Fill" -> Some Fill
-        //     | "DCD" -> Some DCD
-
-        // ({InstructionType = InstTypeTmp; 
-        //     Name = ls.Label; 
-        //     EquExpr = ; 
-        //     DCDValueList = ; 
-        //     FillN = }: 'INS)
+                ]
