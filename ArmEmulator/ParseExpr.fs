@@ -5,7 +5,10 @@
 module ParseExpr
     open CommonLex
     open System.Text.RegularExpressions
+
     /// ----------- ACTIVE PATTERNS ---------------
+    /// Some of these are used in this module, some are used elsewhere
+    /// As they are general purpose, this is where they live
 
     /// takes a string and ensures it starts and ends with
     /// a given prefix and suffix
@@ -60,6 +63,11 @@ module ParseExpr
         | Match1 @"^(0b[0-1]+)$" x -> uint32 x |> Some
         | Match1 @"^([0-9]+)$" x -> uint32 x |> Some
         | label -> symTab.TryFind label
+
+    let (|Contains|_|) element lst =
+        match List.contains element lst with
+        | true -> Some lst
+        | false -> None
 
     /// ----------- END ACTIVE PATTERNS ---------------
 

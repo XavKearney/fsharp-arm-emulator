@@ -1,4 +1,4 @@
-/// handles LDM/STM instructions
+/// handles LDM/STM instructions + B/BL/END
 /// author: Xav Kearney
 module MultMem
     
@@ -6,6 +6,7 @@ module MultMem
     open CommonLex
     open ParseExpr
 
+    // DUs for items within MultMemInstr
     type MultMemInstrType = LDM | STM
     type MultMemDirection = FD | FA | ED | EA 
     
@@ -39,7 +40,7 @@ module MultMem
     /// Defines the (trivial) END instruction.
     type EndInstr = END
 
-    /// parse error (dummy, but will do)
+    /// parse error (just a string, for now)
     type ErrInstr = string
 
     /// Defines the spec for LDM/STM instructions
@@ -106,10 +107,9 @@ module MultMem
                 | MatchGroups @"^([A-Z0-9]{2,3})(?:-)([A-Z0-9]{2,3})$" (rStart :: [rEnd]) ->
                     // check the start and end registers are valid
                     List.map regNames.TryFind [rStart; rEnd]
-                    |> fun lst -> 
-                        match List.contains None lst with
-                        | true -> Error "Invalid register list range." 
-                        | false ->  Ok (List.choose id lst)
+                    |> function
+                        | Contains None _ -> Error "Invalid register list range." 
+                        | lst ->  Ok (List.choose id lst)
                     // get the range as integers
                     |> Result.bind (
                         function
@@ -117,10 +117,9 @@ module MultMem
                         | _ -> Error "Invalid register list range.")
                     // if list is empty, rNameStart must be a higher reg than rNameEnd
                     // so throw an error
-                    |> Result.bind (fun lst -> 
-                        match List.isEmpty lst with
-                        | true -> Error "Invalid register list range." 
-                        | false ->  Ok (List.map inverseRegNums.TryFind lst))
+                    |> Result.bind (function
+                        | [] -> Error "Invalid register list range." 
+                        | lst ->  Ok (List.map inverseRegNums.TryFind lst))
                 // if not a range, check for register list (e.g. {R1,R3,R5})
                 | Matches @"([A-Z0-9]{2,3})+" (regNameLst)  ->
                     List.map regNames.TryFind regNameLst
@@ -128,11 +127,9 @@ module MultMem
                 | _ -> Error "Invalid list of registers."
                 // check the final list is valid and return
             | _ -> Error "Incorrectly formatted operands."
-            |> Result.bind (
-                fun lst -> 
-                match List.contains None lst with
-                | true -> Error "Invalid list of registers."
-                | false -> Ok(List.choose id lst)
+            |> Result.bind (function
+                | Contains None _ -> Error "Invalid list of registers."
+                | lst -> Ok(List.choose id lst)
             )
         match target with
         | Some t -> 
