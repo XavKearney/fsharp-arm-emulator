@@ -6,6 +6,7 @@ module Arithmetic
     open VisualTest
     open Microsoft.VisualBasic.CompilerServices
     open System.Threading
+    open VisualTest
 
     type ArithInstrType = ADD | ADC | SUB | SBC | RSB | RSC
 
@@ -385,8 +386,49 @@ module Arithmetic
 
     let makeArithInstr root (suffix:string) operands symTable =
         // Makes final instruction from baseInstr
-        let makeInstr ins = 
-            Ok(ins)
+        let makeInstr (ins:ArithInstr) = 
+            match ins.InstrType, ins.Target, ins.Op1, ins.Op2 with
+            | _, R15, _, _ ->
+                Error ("Target register cannot be PC")
+            | _, _, R15, RegisterRegisterShift _ -> 
+                Error ("Op1 cannot be PC when op2 is register controlled shift")
+            | Some (ADC), _, R15, _ ->
+                Error ("ADC, RSB and RSC first operand cannot be label, SP or PC")
+            | Some (RSB), _, R15, _ ->
+                Error ("ADC, RSB and RSC first operand cannot be label, SP or PC")
+            | Some (RSC), _, R15, _ ->
+                Error ("ADC, RSB and RSC first operand cannot be label, SP or PC")
+            | Some (ADC), _, R13, _ ->
+                Error ("ADC, RSB and RSC first operand cannot be label, SP or PC")
+            | Some (RSB), _, R13, _ ->
+                Error ("ADC, RSB and RSC first operand cannot be label, SP or PC")
+            | Some (RSC), _, R13, _ ->
+                Error ("ADC, RSB and RSC first operand cannot be label, SP or PC")
+            | Some (ADC), R13, _, _ ->
+                Error ("ADC, RSB and RSC first operand cannot be label, SP or PC")
+            | Some (RSB), R13, _, _ ->
+                Error ("ADC, RSB and RSC first operand cannot be label, SP or PC")
+            | Some (RSC), R13, _, _ ->
+                Error ("ADC, RSB and RSC first operand cannot be label, SP or PC")
+            // ADC, RSB, RSC second operand cannot be SP or PC
+            | Some (ADC), _, _, Register R15 ->
+                Error ("ADC, RSB and RSC second operand cannot be SP or PC")
+            | Some (RSB), _, _, Register R15 ->
+                Error ("ADC, RSB and RSC second operand cannot be SP or PC")
+            | Some (RSC), _, _, Register R15 ->
+                Error ("ADC, RSB and RSC second operand cannot be SP or PC")
+            | Some (ADC), _, _, Register R13 ->
+                Error ("ADC, RSB and RSC second operand cannot be SP or PC")
+            | Some (RSB), _, _, Register R13 ->
+                Error ("ADC, RSB and RSC second operand cannot be SP or PC")
+            | Some (RSC), _, _, Register R13 ->
+                Error ("ADC, RSB and RSC second operand cannot be SP or PC")
+            | Some (SUB), _, R15, _ ->
+                Error ("SUB instruction first operand cannot be R15")
+            | Some (SUB), _, _, RegisterShift(R15, _, _) ->
+                Error ("SUB instruction second operand cannot be R15")
+            | _ ->
+                 Ok(ins)
         
         match parseArithLine operands symTable with
         | Ok (dest, op1, op2) -> 

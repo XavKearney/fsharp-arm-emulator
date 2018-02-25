@@ -121,7 +121,7 @@ module MultMemTests
         opcodeStr, suffixStr, operandStr
 
     
-    //[<Tests>]
+    [<Tests>]
     let testArithParse = 
         let makeTestLineData wa opcode suffix target op1 op2 = 
             
@@ -139,20 +139,61 @@ module MultMemTests
         fun wa opcode suffix target op1 op2 ->
             let ls = makeTestLineData wa opcode suffix target op1 op2
 
-            let expected = match opcode with
-                           | _ -> Some (Ok {
-                                        PInstr = ArithI
-                                            {
-                                            InstrType = Some opcode;
-                                            SuffixSet = suffix;
-                                            Target = target;
-                                            Op1 = op1;
-                                            Op2 = op2;
-                                            } 
-                                        PLabel = None;
-                                        PSize = 4u;
-                                        PCond = Cal;
-                                     })
+            let expected = 
+                match opcode, target, op1, op2 with
+                | _, R15, _, _ ->
+                    Some (Error ("Target register cannot be PC"))
+                | _, _, R15, RegisterRegisterShift _ ->
+                    Some (Error ("Op1 cannot be PC when op2 is register controlled shift"))
+                | ADC, _, R15, _ ->
+                    Some (Error ("ADC, RSB and RSC first operand cannot be label, SP or PC"))
+                | RSB, _, R15, _ ->
+                    Some (Error ("ADC, RSB and RSC first operand cannot be label, SP or PC"))
+                | RSC, _, R15, _ ->
+                    Some (Error ("ADC, RSB and RSC first operand cannot be label, SP or PC"))
+                | ADC, _, R13, _ ->
+                    Some (Error ("ADC, RSB and RSC first operand cannot be label, SP or PC"))
+                | RSB, _, R13, _ ->
+                    Some (Error ("ADC, RSB and RSC first operand cannot be label, SP or PC"))
+                | RSC, _, R13, _ ->
+                    Some (Error ("ADC, RSB and RSC first operand cannot be label, SP or PC"))
+                | ADC, R13, _, _ ->
+                    Some (Error ("ADC, RSB and RSC first operand cannot be label, SP or PC"))
+                | RSB, R13, _, _ ->
+                    Some (Error ("ADC, RSB and RSC first operand cannot be label, SP or PC"))
+                | RSC, R13, _, _ ->
+                    Some (Error ("ADC, RSB and RSC first operand cannot be label, SP or PC"))
+                // ADC, RSB, RSC second operand cannot be SP or PC    
+                | ADC, _, _, Register R15 ->
+                    Some (Error ("ADC, RSB and RSC second operand cannot be SP or PC"))
+                | RSB, _, _, Register R15 ->
+                    Some (Error ("ADC, RSB and RSC second operand cannot be SP or PC"))
+                | RSC, _, _, Register R15 ->
+                    Some (Error ("ADC, RSB and RSC second operand cannot be SP or PC"))
+                | ADC, _, _, Register R13 ->
+                    Some (Error ("ADC, RSB and RSC second operand cannot be SP or PC"))
+                | RSB, _, _, Register R13 ->
+                    Some (Error ("ADC, RSB and RSC second operand cannot be SP or PC"))
+                | RSC, _, _, Register R13 ->
+                    Some (Error ("ADC, RSB and RSC second operand cannot be SP or PC"))
+                | SUB, _, R15, _ ->
+                    Some (Error ("SUB instruction first operand cannot be R15"))
+                | SUB, _, _, RegisterShift(R15, _, _) ->
+                    Some (Error ("SUB instruction second operand cannot be R15"))
+                | _ -> 
+                    Some (Ok {
+                        PInstr = ArithI
+                            {
+                            InstrType = Some opcode;
+                            SuffixSet = suffix;
+                            Target = target;
+                            Op1 = op1;
+                            Op2 = op2;
+                            } 
+                        PLabel = None;
+                        PSize = 4u;
+                        PCond = Cal;
+                     })
 
             
             let result = parse ls
@@ -216,7 +257,7 @@ module MultMemTests
 
 
 
-    //[<Tests>]
+    [<Tests>]
     let testArithExec =
         let makeTestExecStr opcode suffix target op1 op2 = 
             let opcodeStr, suffixStr, operandStr = makeArithInstrString opcode suffix target op1 op2
@@ -229,15 +270,41 @@ module MultMemTests
             let instrStr = makeTestExecStr opcode suffix target op1 op2
             
             let valid = 
-                match flags with
-                | f when f.N && f.Z -> false
+                match opcode, target, op1, op2, flags with
+                | _, _, _, _, f when f.N && f.Z -> false
+                | _, R15, _, _, _ -> false
+                | _, _, R15, RegisterRegisterShift _, _ -> false
+                // ADC, RSB, RSC first operand cannot be SP or PC   
+                | ADC, _, R15, _, _ -> false
+                | RSB, _, R15, _, _ -> false
+                | RSC, _, R15, _, _ -> false
+                | ADC, _, R13, _, _ -> false
+                | RSB, _, R13, _, _ -> false
+                | RSC, _, R13, _, _ -> false
+                // ADC, RSB, RSC second operand cannot be SP or PC
+                | ADC, _, _, Register R15, _ -> false
+                | RSB, _, _, Register R15, _ -> false
+                | RSC, _, _, Register R15, _ -> false
+                | ADC, _, _, Register R13, _ -> false
+                | RSB, _, _, Register R13, _ -> false
+                | RSC, _, _, Register R15, _ -> false
+                // ADC, RSB, RSC target cannot be R13
+                | ADC, R13, _, _, _ -> false
+                | RSB, R13, _, _, _ -> false
+                | RSC, R13, _, _, _ -> false
+                // TODO
+                | SUB, _, R15, _, _ -> false
+                | SUB, _, _, RegisterShift(R15, _, _), _ -> false
+                // visUAL restriction on ADC with RRX -> This is not in my implementation
+                | ADC, _, _, RegisterShift(_, RRX, _), _ -> false
+                | ADC, _, _, RegisterRegisterShift(_, RRX, _), _ -> false
                 | _ -> true
 
             match valid with
             | false -> ()
             | true -> 
                 let randomRegs = 
-                    genRandomUint32List (-0x7FFFFFFF, 0xFFFFFFFF) 12
+                    genRandomUint32List (0, 10) 12
                     |> fun lst -> List.concat [lst; [0u; 0u; 0u;]]
                 
                 let testParas = {
