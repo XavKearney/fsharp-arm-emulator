@@ -260,7 +260,8 @@ module BitArithmetic
 
 
 
-
+    let Mov a _ = a
+    let Mvn a _ = ~~~ a
     let AndTst a b = a &&& b
     let Orr a b = a ||| b
     let EorTeq a b = a ^^^ b
@@ -275,9 +276,9 @@ module BitArithmetic
 
     /// checks the carry after a shift opperation 
     /// Not used for RRX
-    let shiftCarry n shiftVal shift MsbOrLsb = 
+    let shiftCarry n shiftVal shift msbOrLsb = 
         let penVal = shift n (shiftVal- 1u)
-        MsbOrLsb penVal
+        msbOrLsb penVal
 
     // can do extra check i.e make sure reg, lit, shift is allowed
     /// evaluates flexible operator 
@@ -366,7 +367,63 @@ module BitArithmetic
         | Cnv -> true
         | Cal -> false
 
-    /// applies given function to operands
-    /// used to execute instructions
-    let execute opperation operand1 operand2 =
-        opperation operand1 operand2
+    /// 
+    let exeInstr cpuData parseOut =
+        match parseOut with
+        | Some (Ok exeInfo) ->
+            let instrRoot = exeInfo.PInstr.instruction
+            let suffix = exeInfo.PInstr.suff
+            let opa = exeInfo.PInstr.opA            
+            let opb = exeInfo.PInstr.opB
+            let opc = exeInfo.PInstr.opC
+            let regContent r =  Map.tryFind r (cpuData.Regs)
+            let carryNum = System.Convert.ToUInt32(cpuData.Fl.C)
+            let evalRegOrFlexOps op = 
+                match op with
+                | Some (Reg (Some rName)) -> Some ((regContent rName),carryNum)
+                | Some (Flex (Some flexOp)) -> Some (flexEval cpuData suffix flexOp)
+                | _ -> None
+            let evalOp op = 
+                match op with
+                | Some (n, _) -> n
+                | _ -> None
+            let calcOp = evalRegOrFlexOps >> evalOp
+            let impInstr operation =
+                match calcOp opb,calcOp opc with 
+                | Some n1,Some n2 -> Some (operation n1 n2)
+                | Some n1,None -> Some (operation n1 1u)
+                | _ -> None
+            match exeCond cpuData.Fl exeInfo.PCond with
+            | true ->
+                match instrRoot with
+                | AND -> impInstr AndTst
+                | ORR -> impInstr Orr
+                | EOR -> impInstr EorTeq                
+                | BIC -> impInstr Bic              
+                | LSL -> impInstr Lsl                 
+                | LSR -> impInstr Lsr
+                | ROR -> impInstr Ror
+                | ASR -> impInstr Asr
+                | MOV -> impInstr Mov
+                | MVN -> impInstr Mvn                
+                | TST -> 
+                    match opa,calcOp opb with
+                    | Some r,Some n -> 
+                        match regContent r with 
+                        | Some rCont -> Some (AndTst rCont n)
+                        | _ -> None
+                    | _ -> None
+                | TEQ -> 
+                    match opa,calcOp opb with
+                    | Some r,Some n -> 
+                        match regContent r with 
+                        | Some rCont -> Some (EorTeq rCont n)
+                        | _ -> None
+                    | _ -> None                
+                | RRX -> 
+                    match calcOp opb with
+                    | Some n -> Some (Rrx n carryNum)
+                    | _ -> None
+                | _ -> None                
+            | false -> None
+        | _ -> None
