@@ -243,12 +243,9 @@ module BitArithmetic
                 match ls.Label,ls.LoadAddr with
                 | Some lab, WA addr -> Some (lab,addr)
                 | _ -> None 
-            match Map.containsKey root instrNames with
-            | true -> 
-                match parseInstr root ls.Operands suffix with 
-                | Ok pInst -> Ok { PInstr=pInst; PLabel = pLab; PSize = 4u; PCond = pCond }
-                | _ -> Error "Parse Error"
-            | false -> Error "Parse Error"
+            match parseInstr root ls.Operands suffix with 
+            | Ok pInst -> Ok { PInstr=pInst; PLabel = pLab; PSize = 4u; PCond = pCond }
+            | _ -> Error "Parse Error"
         Map.tryFind ls.OpCode opCodes
         |> Option.map parse'
 
@@ -261,11 +258,31 @@ module BitArithmetic
 
 // executing instructions
 
-    
+
+
+
+    let AndTst a b = a &&& b
+    let Orr a b = a ||| b
+    let EorTeq a b = a ^^^ b
+    let Bic a b = a &&& (~~~ b)
+    let Lsl n shiftVal = n <<< int32 shiftVal
+    let Lsr n shiftVal = uint32 n >>> int32 shiftVal
+    let Ror n rotateVal = (n>>> int32 rotateVal) ||| (n<<<(32- int32 rotateVal))
+    let Asr n shiftVal = uint32 (int32 n >>> int32 shiftVal)
+    let Rrx n carry = (n >>> 1) + (carry <<< 31)
+    let selectMSB n = uint32 n >>> 31
+    let selectLSB n = uint32 n &&& 1u    
+
+    /// checks the carry after a shift opperation 
+    /// Not used for RRX
+    let shiftCarry n shiftVal shift MsbOrLsb = 
+        let penVal = shift n (shiftVal- 1u)
+        MsbOrLsb penVal
 
     // can do extra check i.e make sure reg, lit, shift is allowed
     /// evaluates flexible operator 
-    let flexEval (flexOp : FlexOp) cpuData =  
+    /// if suffix is "S" then update C flag
+    let flexEval cpuData (suffix : string) (flexOp : FlexOp) =  
         let regContent r =  Map.tryFind r (cpuData.Regs)
         let carryNum = System.Convert.ToUInt32(cpuData.Fl.C)
         let litRegNum litOrReg = 
@@ -273,54 +290,83 @@ module BitArithmetic
             | Nm num -> Some num
             | Rg reg -> regContent reg
         match flexOp with
-        | Num n -> Some n
-        | RegShiftOp (r,None) -> regContent r
+        | Num n -> Some n,carryNum
+        | RegShiftOp (r,None) -> regContent r,carryNum
         | RegShiftOp (r,Some (instroot,None)) when instroot = RRX -> 
-            match regContent r with
-            | Some regCont -> Some ((regCont >>> 1) + (carryNum <<< 31))
-            | _ -> None
+            match regContent r,suffix with
+            | Some regCont,"" -> Some (Rrx regCont carryNum),carryNum
+            | Some regCont,"S" -> Some (Rrx regCont carryNum),selectLSB regCont  
+            | _ -> None,carryNum
         | RegShiftOp (r,Some (instroot,Some litOrReg)) ->
             match regContent r with
             | Some regCont -> 
                 match instroot with
                 | LSL -> 
-                    match litRegNum litOrReg with           
-                    | Some num -> Some (regCont <<< (int32 num))
-                    | _ -> None
+                    match litRegNum litOrReg,suffix with           
+                    | Some num,"" -> Some (Lsl regCont num),carryNum
+                    | Some num,"S" -> Some (Lsl regCont num),(shiftCarry regCont num Lsl selectMSB)
+                    | _ -> None,carryNum
                 | LSR ->
-                    match litRegNum litOrReg with           
-                    | Some num -> Some (regCont >>> (int32 num))
-                    | _ -> None
+                    match litRegNum litOrReg,suffix with           
+                    | Some num,"" -> Some (Lsr regCont num),carryNum
+                    | Some num,"S" -> Some (Lsr regCont num),(shiftCarry regCont num Lsr selectLSB)
+                    | _ -> None,carryNum
                 | ASR ->
-                    match litRegNum litOrReg with           
-                    | Some num -> Some (uint32 (int32 regCont >>> int32 num))   
-                    | _ -> None
+                    match litRegNum litOrReg,suffix with           
+                    | Some num,"" -> Some (Asr regCont num),carryNum
+                    | Some num,"S" -> Some (Asr regCont num),(shiftCarry regCont num Asr selectLSB)  
+                    | _ -> None,carryNum
                 | ROR ->
-                    match litRegNum litOrReg with           
-                    | Some num -> Some (uint32 ( regCont >>> int32 num) ||| ( regCont <<< (32 - int32 num)))  
-                    | _ -> None                                   
-                | _ -> None
-            | _ -> None
-        | _ -> None
-        
+                    match litRegNum litOrReg,suffix with           
+                    | Some num,"" -> Some (Ror regCont num),carryNum 
+                    | Some num,"S" -> Some (Ror regCont num),(shiftCarry regCont num Ror selectLSB)  
+                    | _ -> None,carryNum                                   
+                | _ -> None,carryNum
+            | _ -> None,carryNum
+        | _ -> None,carryNum
 
-(*   (cpuState.Regs.[r] >>> int32 number) ||| (cpuState.Regs.[r] <<< (32- int32 number)) 
-    type LitOrReg = Nm of uint32 | Rg of RName
+    /// decides if instruction should be executed based on condidtion
+    /// if instruction should be executed return is true, otherwise its false     
+    let exeCond flags cond =
+        let z = flags.Z
+        let n = flags.N
+        let v = flags.V
+        let c = flags.C
+        let exeDecide flag exeCondition =
+            match flag = exeCondition with
+            | true -> true
+            | false -> false
+        match cond with 
+        | Ceq -> exeDecide z true                // execute if Z=1
+        | Cne -> exeDecide z false               // execute if Z=0      
+        | Cmi -> exeDecide n true                // execute if N=1
+        | Cpl -> exeDecide n false               // execute if N=0
+        | Cvs -> exeDecide v true                // execute if V = 1
+        | Cvc -> exeDecide v false               // execute if V = 0            
+        | Chs -> exeDecide c true                // execute if C = 1
+        | Clo -> exeDecide c false               // execute if C = 0            
+        | Cge -> exeDecide n v                   // execute if N = V            
+        | Clt -> exeDecide n (not v)             // execute if N != V            
+        | Chi ->                                 // execute if C = 1 and Z = 0
+            match c with
+            | true -> exeDecide z false
+            | false -> true
+        | Cls ->                                 // execute if C = 0 or Z = 1
+            match  c with
+            | true -> exeDecide z true
+            | false -> false
+        | Cgt ->                                 // execute if Z = 0 and N = V 
+            match z with
+            | true -> false
+            | false -> exeDecide n v
+        | Cle ->                                 // execute if Z = 1 and N != V"
+            match z with
+            | true -> exeDecide n (not v)
+            | false -> false
+        | Cnv -> true
+        | Cal -> false
 
-    let flexOp2 (op2 : Op2) (cpuData : DataPath) = 
-    match op2,cpuData with
-        | Num n,_ -> n                          
-        | Reg r,cpuState -> cpuState.Regs.[r]   
-        | RegWithShift (r,LSL,number),cpuState -> cpuState.Regs.[r] <<< int32 number                    
-        | RegWithShift (r,ASR,number),cpuState -> uint32 ((int32 cpuState.Regs.[r]) >>> int32 number)   
-        | RegWithShift (r,LSR,number),cpuState -> cpuState.Regs.[r] >>> int32 number                    
-        | RegWithShift (r,ROR,number),cpuState -> (cpuState.Regs.[r] >>> int32 number) ||| (cpuState.Regs.[r] <<< (32- int32 number)) 
-        | RegWithShift (_,RRX,_),_ -> failwithf "Invalid, can't use RRX with a number"
-        | RegWithRegShift (r,LSL,rShifter),cpuState -> cpuState.Regs.[r] <<< int32 cpuState.Regs.[rShifter]
-        | RegWithRegShift (r,ASR,rShifter),cpuState -> uint32 ((int32 cpuState.Regs.[r]) >>> int32 cpuState.Regs.[rShifter]) 
-        | RegWithRegShift (r,LSR,rShifter),cpuState -> cpuState.Regs.[r] <<< int32 cpuState.Regs.[rShifter]
-        | RegWithRegShift (r,ROR,rShifter),cpuState -> (cpuState.Regs.[r] >>> int32 cpuState.Regs.[rShifter]) ||| (cpuState.Regs.[r] <<< (32- int32 cpuState.Regs.[rShifter]))
-        | RegWithRegShift (_,RRX,_),_ -> failwithf "Invalid, can't use RRX with a register"
-        | RegWithRRX (r,RRX),cpuState -> (cpuState.Regs.[r] >>> 1) + (System.Convert.ToUInt32(cpuState.Fl.C) * (uint32 0x80000000))
-        | RegWithRRX (_),_ -> failwithf "Invalid"
-*)
+    /// applies given function to operands
+    /// used to execute instructions
+    let execute opperation operand1 operand2 =
+        opperation operand1 operand2
