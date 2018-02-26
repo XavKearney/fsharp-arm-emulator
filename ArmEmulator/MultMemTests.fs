@@ -39,7 +39,7 @@ module MultMemTests
     /// target register, writeback (bool) and a register list
     [<Tests>]
     let testParseMemOpsUnit = 
-        makeUnitTestList parseMemOps "parseOps Unit" 
+        makeUnitTestList parseMemOps "parseMemOps Unit" 
             [
                 // test valid input
                 "R7, {R3,R9,R1}", Ok (R7, false, [R3;R9;R1])
@@ -195,7 +195,7 @@ module MultMemTests
                     None
             ]
 
-    let config = { FsCheckConfig.defaultConfig with maxTest = 10000 }
+    let config = { FsCheckConfig.defaultConfig with maxTest = 500000 }
 
     /// property-based testing of parse function
     /// for randomly generated branch instructions
