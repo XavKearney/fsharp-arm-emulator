@@ -73,28 +73,38 @@ module memInstructionsTests
                     
                     //DCD Working Tests
                     makeTest "DCD" (ldFunc "labelT" "1") "DCD 1" (Ok {InstructionType = Ok DCD; Name = (Ok (Some "labelT"));
-                                                                                    EQUExpr = None; DCDValueList = Some ["1"];
+                                                                                    EQUExpr = None; DCDValueList = Some (Ok ["1"]);
                                                                                     FillN = None})
                     makeTest "DCD" (ldFunc "labelT" "1,3,5") "DCD 1,3,5" (Ok {InstructionType = Ok DCD; Name = (Ok (Some "labelT"));
-                                                                                    EQUExpr = None; DCDValueList = Some ["1";"3";"5"];
+                                                                                    EQUExpr = None; DCDValueList = Some (Ok ["1";"3";"5"]);
                                                                                     FillN = None})
                     makeTest "DCD" (ldFunc "labelT" "1, 3, 5") "DCD 1, 3, 5" (Ok {InstructionType = Ok DCD; Name = (Ok (Some "labelT"));
-                                                                                    EQUExpr = None; DCDValueList = Some ["1";"3";"5"];
+                                                                                    EQUExpr = None; DCDValueList = Some (Ok ["1";"3";"5"]);
                                                                                     FillN = None})
                     makeTest "DCD" (ldFunc "labelT" "  1, 3, 5  ") "DCD   1, 3, 5  " (Ok {InstructionType = Ok DCD; Name = (Ok (Some "labelT"));
-                                                                                    EQUExpr = None; DCDValueList = Some ["1";"3";"5"];
+                                                                                    EQUExpr = None; DCDValueList = Some (Ok ["1";"3";"5"]);
                                                                                     FillN = None})
                     makeTest "DCD" (ldFunc "labelT" "1, -3, 5") "DCD 1, -3, 5" (Ok {InstructionType = Ok DCD; Name = (Ok (Some "labelT"));
-                                                                                    EQUExpr = None; DCDValueList = Some ["1";"-3";"5"];
+                                                                                    EQUExpr = None; DCDValueList = Some (Ok ["1";"-3";"5"]);
                                                                                     FillN = None})
                     makeTest "DCD" (ldFunc "labelT" "-1, 0, 5") "DCD -1, 0, 5" (Ok {InstructionType = Ok DCD; Name = (Ok (Some "labelT"));
-                                                                                    EQUExpr = None; DCDValueList = Some ["-1";"0";"5"];
-                                                                                    FillN = None})
-                    makeTest "DCD" (ldFunc "labelT" "") "DCD no input" (Ok {InstructionType = Ok DCD; Name = (Ok (Some "labelT"));
-                                                                                    EQUExpr = None; DCDValueList = Some [""];
+                                                                                    EQUExpr = None; DCDValueList = Some (Ok ["-1";"0";"5"]);
                                                                                     FillN = None})
                     //DCD Error Message Tests
-                
+                    makeTest "DCD" (ldFunc "labelT" "") "DCD no input" (Ok {InstructionType = Ok DCD; Name = (Ok (Some "labelT"));
+                                                                                    EQUExpr = None; DCDValueList = Some (Error "parseLabelIns: Input to DCD function not valid (No input etc)");
+                                                                                    FillN = None})
+                    makeTest "DCD" (ldFunc "labelT" "a") "DCD invalid input" (Ok {InstructionType = Ok DCD; Name = (Ok (Some "labelT"));
+                                                                                    EQUExpr = None; DCDValueList = Some (Error "parseLabelIns: Input to DCD function not valid (No input etc)");
+                                                                                    FillN = None})
+                    makeTest "DCD" (ldFunc "labelT" "1, ,5") "DCD invalid space list input" (Ok {InstructionType = Ok DCD; Name = (Ok (Some "labelT"));
+                                                                                    EQUExpr = None; DCDValueList = Some (Error "parseLabelIns: Input to DCD function not valid (No input etc)");
+                                                                                    FillN = None})
+                    makeTest "DCD" (ldFunc "labelT" "1, a, 5") "DCD invalid list input" (Ok {InstructionType = Ok DCD; Name = (Ok (Some "labelT"));
+                                                                                    EQUExpr = None; DCDValueList = Some (Error "parseLabelIns: Input to DCD function not valid (No input etc)");
+                                                                                    FillN = None})
+
+
                 
                 ]
 
@@ -494,17 +504,17 @@ module memInstructionsTests
                                                                     PSize = 4u; PCond = Cal}))
                     //DCD
                     makeTest (ldFunc st "DCD" "1") "Base DCD Test" (Some (Ok {PInstr = LabelO (Ok {InstructionType = Ok DCD; Name = (Ok (Some "labelTest"));
-                                                                                    EQUExpr = None; DCDValueList = Some ["1"];
+                                                                                    EQUExpr = None; DCDValueList = Some (Ok ["1"]);
                                                                                     FillN = None});
                                                                     PLabel = Some ("labelTest", 100u);
                                                                     PSize = 4u; PCond = Cal}))
                     makeTest (ldFunc st "DCD" "1,3,5") "DCD 1,3,5 Test" (Some (Ok {PInstr = LabelO (Ok {InstructionType = Ok DCD; Name = (Ok (Some "labelTest"));
-                                                                                    EQUExpr = None; DCDValueList = Some ["1";"3";"5"];
+                                                                                    EQUExpr = None; DCDValueList = Some (Ok ["1";"3";"5"]);
                                                                                     FillN = None});
                                                                     PLabel = Some ("labelTest", 100u);
                                                                     PSize = 12u; PCond = Cal}))
                     makeTest (ldFuncAll 200u "labelTestTwo" st "DCD" "1,3,5") "DCD Word Address Test" (Some (Ok {PInstr = LabelO (Ok {InstructionType = Ok DCD; Name = (Ok (Some "labelTestTwo"));
-                                                                                    EQUExpr = None; DCDValueList = Some ["1";"3";"5"];
+                                                                                    EQUExpr = None; DCDValueList = Some (Ok ["1";"3";"5"]);
                                                                                     FillN = None});
                                                                     PLabel = Some ("labelTestTwo", 200u);
                                                                     PSize = 12u; PCond = Cal}))
@@ -538,36 +548,77 @@ module memInstructionsTests
     [<Tests>]
     //updateSymbolTable (symbolTab: SymbolTable) (inputRecord: labelInstr) field
     let checkUpdateSymbolTable = 
-        let st:SymbolTable = ["testL",256u; "testL2",260u] |> Map.ofList
         let (stOneItem: SymbolTable) = ["testL",256u] |> Map.ofList
         //Record for labelTest EQU 2
-        let baseInpRec = (Some (Ok {PInstr = LabelO (Ok {InstructionType = Ok EQU; Name = (Ok (Some "labelTest"));
-                            EQUExpr = (Some (Ok 2u)); DCDValueList = None;
-                            FillN = None});
-                            PLabel = Some ("labelTest", 100u);
-                            PSize = 0u; PCond = Cal}))
         let ldFuncAll wAd lab symT opCodeIn ops = 
                     {LoadAddr= WA wAd; 
                     Label= Some lab; 
                     SymTab= Some symT;
                     OpCode= opCodeIn;
                     Operands= ops}
-        let baseEQU2 =  parse (ldFuncAll 100u "labelT" st "EQU" "2")
-        let baseEQU2' = ({InstructionType = Ok EQU; Name = (Ok (Some "labelT")); 
-                            EQUExpr = (Some (Ok 2u)); DCDValueList = None;
-                            FillN = None})
+
+        let baseEquFunc lab valO = ({InstructionType = Ok EQU; Name = (Ok (Some lab)); 
+                                    EQUExpr = (Some (Ok valO)); DCDValueList = None;
+                                    FillN = None})
+        let makeLabelInstr label root input =
+            let ldFuncEQU Lab Ops = 
+                    {LoadAddr= WA 100u; 
+                        Label= Some Lab; 
+                        SymTab= Some stOneItem;
+                        OpCode= "";
+                        Operands= Ops}
+            let removeRecord x =
+                match x with
+                | Ok y -> y 
+            ldFuncEQU label input
+            |> parseLabelIns root
+            |> removeRecord 
         let makeTest symTab inpRec field name output =
             testCase name <| fun () ->
                 Expect.equal (updateSymbolTable symTab inpRec field) output (sprintf "checkLiteral Tests\nTest: %A" name)
         Expecto.Tests.testList "checkLiteralMonad Tests"
                 [   
-                    //ADR Working tests
-                    makeTest stOneItem baseEQU2' (baseEQU2'.EQUExpr) "updateSymbolTable Base Test" (["testL",256u; "labelT",2u] |> Map.ofList |> Ok)
+                    //EQU Working tests
+                    makeTest stOneItem ((baseEquFunc "labelT" 2u)) ((baseEquFunc "labelT" 2u).EQUExpr) "updateSymbolTable EQU 2 Base Test" (["testL",256u; "labelT",2u] |> Map.ofList |> Ok)
+                    makeTest stOneItem ((baseEquFunc "labelT" 4u)) ((baseEquFunc "labelT" 4u).EQUExpr) "updateSymbolTable EQU 4 Base Test" (["testL",256u; "labelT",4u] |> Map.ofList |> Ok)
+                    makeTest stOneItem (makeLabelInstr "labelT" "EQU" "2") ((makeLabelInstr "labelT" "EQU" "2").EQUExpr) "updateSymbolTable EQU parseLabelIns generation Test" (["testL",256u; "labelT",2u] |> Map.ofList |> Ok)
+                    makeTest stOneItem (makeLabelInstr "labelT2" "EQU" "5-4*3-1*1+2*2*2") ((makeLabelInstr "labelT" "EQU" "5-4*3-1*1+2*2*2").EQUExpr) "updateSymbolTable EQU +*- Test" (["testL",256u; "labelT2",0u] |> Map.ofList |> Ok)
+                    //EQU Error Message tests
+                    makeTest stOneItem (makeLabelInstr "labelT2" "EQU" "") ((makeLabelInstr "labelT" "EQU" "").EQUExpr) "updateSymbolTable EQU Invalid Input Test" (Error "Did not match any of the evalExpression end case options")
+
+
+                    //FILL Working tests
+                    makeTest stOneItem (makeLabelInstr "labelT" "FILL" "4") ((makeLabelInstr "labelT" "FILL" "4").FillN) "updateSymbolTable FILL Base Case" (["testL",256u; "labelT",0u] |> Map.ofList |> Ok)
+                    makeTest stOneItem (makeLabelInstr "labelT" "FILL" "4*3") ((makeLabelInstr "labelT" "FILL" "4*3").FillN) "updateSymbolTable FILL Mult Case" (["testL",256u; "labelT",0u] |> Map.ofList |> Ok)
+                    makeTest stOneItem (makeLabelInstr "labelT" "FILL" "0") ((makeLabelInstr "labelT" "FILL" "0").FillN) "updateSymbolTable FILL Zero Case" (["testL",256u; "labelT",0u] |> Map.ofList |> Ok)
+                    //Fill Error Message Tests
+                    makeTest stOneItem (makeLabelInstr "labelT" "FILL" "-4") ((makeLabelInstr "labelT" "FILL" "-4").FillN) "updateSymbolTable FILL -4 Case" (Error "parseLabelIns: Fill expression (4294967292u) >0 and divisible by four" )
+
+                    //DCD Working tests
+                    makeTest stOneItem (makeLabelInstr "labelT" "DCD" "1") (removeOptionD ((makeLabelInstr "labelT" "DCD" "1").DCDValueList)) "updateSymbolTable DCD Base Case" (["testL",256u; "labelT",1u] |> Map.ofList |> Ok)
+                    makeTest stOneItem (makeLabelInstr "labelT" "DCD" "1,3,5") (removeOptionD (makeLabelInstr "labelT" "DCD" "1,3,5").DCDValueList) "updateSymbolTable DCD List Base Case" (["testL",256u; "labelT",1u] |> Map.ofList |> Ok)
+                    //DCD Error Message Tests
+                    makeTest stOneItem (makeLabelInstr "labelT" "DCD" "") (removeOptionD (makeLabelInstr "labelT" "DCD" "").DCDValueList) "updateSymbolTable DCD No input Case" (Error "parseLabelIns: Input to DCD function not valid (No input etc)")
+                    makeTest stOneItem (makeLabelInstr "labelT" "DCD" "a") (removeOptionD (makeLabelInstr "labelT" "DCD" "a").DCDValueList) "updateSymbolTable DCD Invalid input Case" (Error "parseLabelIns: Input to DCD function not valid (No input etc)")
+                    makeTest stOneItem (makeLabelInstr "labelT" "DCD" "1, ,5") (removeOptionD (makeLabelInstr "labelT" "DCD" "1, ,5").DCDValueList) "updateSymbolTable DCD List No input Case" (Error "parseLabelIns: Input to DCD function not valid (No input etc)")
+                    makeTest stOneItem (makeLabelInstr "labelT" "DCD" "1, a, 5") (removeOptionD (makeLabelInstr "labelT" "DCD" "1, a, 5").DCDValueList) "updateSymbolTable DCD List Invalid input Case" (Error "parseLabelIns: Input to DCD function not valid (No input etc)")
+
+
                 ]
+
+    // [<Tests>]
+    // let updateMemoryDataPathTest =
+    //     let st:SymbolTable = ["testL",256u; "testL2",260u] |> Map.ofList
+    //     let makeEvalExpTest name input labels output =
+    //         testCase name <| fun () ->
+    //             Expect.equal (evalExpression input st labels) output (sprintf "evalExpression Test '%s'" input)
+    //     Expecto.Tests.testList "evalExpressions Tests"
+    //             [   
+    //                 //evalExpression Working Tests
+    //             ]
 
 //Functions to test
 //  - updatedMemoryDataPath
-//  - updatedSymbolTable
 //  - DCDexec
 //  - EQUexec
 //  - FILLexec

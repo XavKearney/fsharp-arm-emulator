@@ -305,7 +305,7 @@ module MemInstructions
                 | Match @"(0b[0-1]+)" [_; ex] -> ex.Value |> uint32 |> Ok //Matching binary number, Eg 0b11
                 | Match @"([0-9]+)" [_; ex]   -> ex.Value |> uint32 |> Ok //Matching a decimal number  try (^[0-9]|(([^a-z]| )[0-9]+([^a-z]| |$)))
                 | Match @"(\w+)" [_; lab]     -> labelsOrNot (exp.Trim()) labels 
-                | _ -> Error "Did not match and of the evalExpression end case options"
+                | _ -> Error "Did not match any of the evalExpression end case options"
         evalExpression' exp0
 
 
@@ -371,7 +371,7 @@ module MemInstructions
             InstructionType: Result<LabelInstrType,String>;
             Name: LabelL;
             EQUExpr: Result<uint32,String> option;
-            DCDValueList: ValueList option;            //What to fill the memory with
+            DCDValueList: Result<ValueList,string> option;            //What to fill the memory with
             FillN: Result<uint32,String> option;
         }
 
@@ -429,10 +429,25 @@ module MemInstructions
             | Ok FILL ->   let fillN1 = evalExprHandler ls.Operands (ls.SymTab) false
                                             |> checkPosAndDivFour
                            (Some fillN1, None, None)
-            | Ok DCD  ->   let valList1 = (ls.Operands).Split(',') 
+            | Ok DCD  ->   let valList = (ls.Operands).Split(',') 
                                         |> Array.map (fun s-> s.Trim()) 
                                         |> Seq.toList
-                           (None, Some valList1, None)
+                           let valListRet =
+                                let symTab:SymbolTable = ["irrelevant",256u] |> Map.ofList
+                                let checkAllLiterals = 
+                                    let checkLiteral x =
+                                        match (evalExpression x symTab false) with
+                                        | Ok y -> 0
+                                        | Error m -> 1
+                                    List.map (checkLiteral) valList
+                                    |> List.reduce (fun a b -> a+b)
+                                match checkAllLiterals with 
+                                | 0 -> Ok valList
+                                | _ -> Error "parseLabelIns: Input to DCD function not valid (No input etc)"
+                                // match valList with
+                                // | [""] -> Error "parseLabelIns: No input to DCD function" 
+                                // | _ -> Ok valList
+                           (None, Some valListRet, None)
             | _       ->   (None, None, None)                   
         let nameOut = 
             match ls.Label with
@@ -456,17 +471,20 @@ module MemInstructions
                                                 | MemO of Result<MemInstr,string> 
                                                 | AdrO of Result<ADRInstr,string>
 
-    let removeOpt y =
-        match y with 
-        | Some z -> ((List.length z)*4)|>uint32
-        | None -> 0u 
 
-    let removeRes x =
-        match x with
-        | Ok y -> removeOpt (y.DCDValueList)                         
-        | _ ->  0u
+    
 
     let findDcdPSize pInstr =
+        let removeRes x =
+            let removeOpt y =
+                match y with 
+                | Some z -> match z with
+                            | Ok u -> ((List.length u)*4)|>uint32
+                            | _ -> 0u
+                | None -> 0u 
+            match x with
+            | Ok y -> removeOpt y.DCDValueList
+            | _ ->  0u
         match pInstr with     
         | LabelO x -> removeRes x
         | _ -> 0u
@@ -616,14 +634,24 @@ module MemInstructions
             match rec1.Name with
             | Ok y -> match y with
                       | Some z -> Ok z
-                      | None -> Error (sprintf "EQUexec: (Ok (%A).Name) = None" rec1)
-            | Error n -> Error (n+"\n"+(sprintf "EQUexec: (%A).Name = Error" rec1))
-        let removeFieldOption field =
-            match field with
-            | Some y -> y
-            | None -> Error (sprintf "EQUexec: (Ok (%A).EQUExpr) = None" field)
-            
-        match ((getLabel inputRecord),(removeFieldOption field)) with
+                      | None -> Error (sprintf "updateSymbolTable: (Ok (%A).Name) = None" rec1)
+            | Error n -> Error (n+"\n"+(sprintf "updateSymbolTable: (%A).Name = Error" rec1))
+        let getValue field inputRecord =
+            match inputRecord.InstructionType with
+            | Ok EQU -> match field with
+                        | Some y -> y
+                        | None -> Error (sprintf "updateSymbolTable-getValue: (Ok (%A).EQUExpr) = None" field)
+            | Ok FILL -> match field with
+                         | Some y -> match y with
+                                     | Ok _ -> Ok 0u
+                                     | Error m -> Error m
+                         | None -> Error (sprintf "updateSymbolTable-getValue: (Ok (%A).FillN) = None" field)
+            | Ok DCD  ->match field with
+                        | Some y -> y
+                        | None -> Error (sprintf "updateSymbolTable-getValue: (Ok (%A).FillN) = None" field)
+            | _ -> Error (sprintf "updateSymbolTable-getValue: InstructionType (%A) not EQU, DCD or FILL" inputRecord.InstructionType)
+
+        match ((getLabel inputRecord),(getValue field inputRecord)) with
         | (Error x, Error y) -> Error (x+"\n"+y)
         | (Error x, _) -> Error x
         | (_, Error y) -> Error y
@@ -631,7 +659,7 @@ module MemInstructions
 
 
 
-    let updatedMemoryDataPath (inputRecord: labelInstr) (dP: DataPath<'INS>) =
+    let updateMemoryDataPath (inputRecord: labelInstr) (dP: DataPath<'INS>) =
         let dataValList = 
             let fillNf = 
                 match inputRecord.FillN with
@@ -646,10 +674,12 @@ module MemInstructions
             match inputRecord.InstructionType with
             | Ok x ->   match x with
                         | DCD ->    match inputRecord.DCDValueList with
-                                    | Some x -> List.map (fun y -> (y|>uint32)) x
-                                    | None -> [0u]
-                        | FILL -> makeZeroList fillNf
-            | _ -> []
+                                    | Some z -> match z with
+                                                | Ok u -> Ok (List.map (fun y -> (y|>uint32)) u)
+                                                | Error m -> Error m
+                                    | None -> Error "updateMemoryDataPath-dataValList: DCDValueList = None"
+                        | FILL -> Ok (makeZeroList fillNf)
+            | Error m -> Error m
 
 
         let getAddrList lst length =
@@ -657,7 +687,10 @@ module MemInstructions
                 match len with 
                 | 1 -> list
                 | _ ->  getAddrList' (List.append list [((List.last list)+4u)]) (len-1)
-            getAddrList' lst length
+            match length with
+            | Ok x -> Ok (getAddrList' lst x)
+            | Error m -> Error m
+            
 
         let findMaxAddr (dP: DataPath<'INS>) = 
             let waToUin32 (k,l) =
@@ -668,24 +701,49 @@ module MemInstructions
             |> Seq.map waToUin32
             |> Seq.max 
 
-        let findAddrs (dP: DataPath<'INS>) : uint32 list=
+        let findAddrs (dP: DataPath<'INS>) :Result<uint32 list, string>=
             if ((dP.MM).IsEmpty) then
-                getAddrList [100u] (List.length dataValList)
+                getAddrList [100u] (Result.map (List.length) dataValList)
             else 
-                getAddrList [findMaxAddr dP] (List.length dataValList)
+                getAddrList [findMaxAddr dP] (Result.map (List.length) dataValList)
 
-        let rec updateMachineMemory' addrList (dPMM: MachineMemory<'INS>) (dataValList': uint32 list) =
-            match addrList with
-            | [] -> dPMM
-            | _ ->  
-                let remainingAddrList = addrList.[1..(List.length addrList)-1]
-                let remainingValueList = dataValList'.[1..(List.length dataValList')-1]
-                let updatedMachineMem = dPMM.Add(WA addrList.[0], DataLoc dataValList'.[0])
-                updateMachineMemory' remainingAddrList updatedMachineMem remainingValueList
-        {Fl = dP.Fl; Regs = dP.Regs; MM = updateMachineMemory' (findAddrs dP) dP.MM dataValList}
+        let rec updateMachineMemory' addrListRes (dPMM: MachineMemory<'INS>) (dataValListRes') =
+            match (addrListRes, dataValListRes') with
+            | (Error x, Error y) -> Error (x+"\n"+y)
+            | (Error x, _) -> Error x
+            | (_, Error y) -> Error y
+            | (Ok addrList, Ok (dataValList': uint32 list)) -> match addrList with
+                                                                | [] -> Ok dPMM
+                                                                | _ ->  
+                                                                    let remainingAddrList = Ok addrList.[1..(List.length addrList)-1]
+                                                                    let remainingValueList = Ok dataValList'.[1..(List.length dataValList')-1]
+                                                                    let updatedMachineMem = dPMM.Add(WA addrList.[0], DataLoc dataValList'.[0])
+                                                                    updateMachineMemory' remainingAddrList updatedMachineMem remainingValueList
+        
+        match (updateMachineMemory' (findAddrs dP) dP.MM dataValList) with
+        | Ok x -> Ok {Fl = dP.Fl; Regs = dP.Regs; MM = x}
+        | Error m -> Error m
+        
 
+    //Taken out for testing
+    let removeOptionD (x:Result<ValueList,string> option) =   
+        let makeType (x:ValueList)  =
+            let y = (x.[0])|>uint32
+            let temp =
+                match Ok y with
+                       | Ok y -> Ok y
+                       | _ -> Error "should never happen"
+            match x with
+            | x -> Some temp 
+            | _ -> None
+        let removeResult x =
+            match x with 
+            | Ok y -> makeType y
+            | Error m -> Some (Error m)
 
-
+        match x with
+        | Some y -> removeResult y
+        | _ -> None
 
     let DCDexec (symbolTab: SymbolTable) (dP: DataPath<'INS>) (inputRecord: labelInstr) = 
         //Takes a label and a list of values, it then stores 
@@ -703,22 +761,27 @@ module MemInstructions
         
         //Making the value list of correct type to feed into 
         // updateSymbolTable
-        let makeType (x:ValueList)  =
-            let y = (x.[0])|>uint32
-            let temp =
-                match Ok y with
-                       | Ok y -> Ok y
-                       | _ -> Error "should never happen"
+
+        let removeOptionD (x:Result<ValueList,string> option) =   
+            let makeType (x:ValueList)  =
+                let y = (x.[0])|>uint32
+                let temp =
+                    match Ok y with
+                           | Ok y -> Ok y
+                           | _ -> Error "should never happen"
+                match x with
+                | x -> Some temp 
+                | _ -> None
+            let removeResult x =
+                match x with 
+                | Ok y -> makeType y
+                | Error m -> Some (Error m)
+
             match x with
-            | x -> Some temp 
+            | Some y -> removeResult y
             | _ -> None
 
-        let removeOptionD (x:ValueList option) =
-            match x with
-            | Some y -> makeType y
-            | _ -> None
-
-        (updateSymbolTable symbolTab inputRecord (removeOptionD (inputRecord.DCDValueList)), Ok (updatedMemoryDataPath inputRecord dP))                
+        (updateSymbolTable symbolTab inputRecord (removeOptionD (inputRecord.DCDValueList)), (updateMemoryDataPath inputRecord dP))                
 
 
     let EQUexec (symbolTab: SymbolTable) (dP: DataPath<'INS>) (inputRecord: labelInstr) = 
@@ -742,7 +805,7 @@ module MemInstructions
         //As you can see, the last operand can be an expression
         
         //Update Symbol Table and update the DataPath.MM
-        (updateSymbolTable symbolTab inputRecord ((inputRecord.FillN)), Ok (updatedMemoryDataPath inputRecord dP))                
+        (updateSymbolTable symbolTab inputRecord ((inputRecord.FillN)), (updateMemoryDataPath inputRecord dP))                
 
 
 

@@ -1,5 +1,10 @@
 # ARM Assembler Instructions - APSW
-
+## To do List
+  - Add check to parseLabelIns so that DCD returns an error if it is given a number and not a literal
+  - Get a systematic testing section added for all unit testing sections
+  - Get execution working for STR, LDR and ADR
+  - Get unit testing done for label execution functions
+  - Add visual testing for most of the unit testing sections
 
 This section covers six instructions seperated into three groups:
 
@@ -110,9 +115,9 @@ Currently only the parsing of DCD has been tested, and it has only been tested u
 The Fill instruction declares a series of empty consecutive words in memory. Because it declares words and not bytes N must be a positive multiple of 4.
 
 ### visUAL Quirks 
-
-### Parsing
-
+1. Interestingly if you input an N value of 0 then it still generates a label, although because this label corresponds to an initialised memory block of length zero, this gives a multiple labels pointing to the same address. As can be seen below:
+![Symbol Tool on Visual](READ_ME_images/fill0.PNG?raw=true "Title")
+2. In the 
 ### Execution
 ### How I've tested it  
 
