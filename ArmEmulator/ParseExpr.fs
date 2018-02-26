@@ -176,6 +176,10 @@ module ParseExpr
         | [] -> Error "No input expression supplied."
         | _ -> eval' tokInput [] []
 
+    /// main function to interface with the parser
+    /// takes a symbol table and expression string
+    /// returns a Result which is either the evaluated
+    /// expression as a number, or an error string
     let evalExpr symTab expr = 
         tokenize expr symTab
         |> Result.bind evalTokenized
