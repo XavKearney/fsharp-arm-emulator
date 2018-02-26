@@ -618,7 +618,7 @@ module Arithmetic
                                 let result = (uint64 op2Num - uint64 op1Num + uint64 (carryVal - 1u))
                                 match suffix with
                                 | true -> 
-                                    setFlags result op1Num op2Num flags ADD
+                                    setFlags result op1Num op2Num flags RSC
                                 | false ->
                                     Ok (result, flags)
                     | _ -> Error ("The instruction is invalid")

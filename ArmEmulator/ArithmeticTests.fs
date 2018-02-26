@@ -379,7 +379,7 @@ module MultMemTests
                 | _, _, R15, _, _ | _, _, _, Register R15, _ -> false
 
                 // RSC and RSB prove difficult to test with runtime errors for negative second operand
-                | RSC, _, _, _, _ | RSB, _, _, _, _ -> false
+                //| RSC, _, _, _, _ | RSB, _, _, _, _ -> false
 
                 | _ -> true
 
@@ -443,7 +443,7 @@ module MultMemTests
                     |> Map.toList
                     |> List.map (fun (_, i) -> uint32 i)
 
-                Expect.equal regsActual.[..regsActual.Length - 2] localRegs.[..localRegs.Length - 2] "Registers"
-               // Expect.equal flagsActual resFlags "Flags"
+                //Expect.equal regsActual.[..regsActual.Length - 2] localRegs.[..localRegs.Length - 2] "Registers"
+                Expect.equal flagsActual resFlags "Flags"
         
 
