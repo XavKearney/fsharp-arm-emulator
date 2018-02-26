@@ -53,7 +53,8 @@ However, for maximum robustness, a property-based test is used to compare the ef
 
 This property-based test randomly generates both initial CPU state (registers, memory and flags) and also the instruction parameters. The random parameters are first checked to see if they conform to the restrictions set both by ARM (as above) and VisUAL (see below). If not, the test is skipped. If the parameters are valid they are converted into the forms used by both `MultMem.fs` and VisUAL (which differ slightly due to types), and the results after execution are compared. Some sorting is required to transform the resulting VisUAL register & memory state into the same form as the return value of `execMultMem`.
 
-If no errors are returned, the register contents, memory address data and flags are all checked for equality to consider a test passed. By default 10,000 tests are run (although the actual test number is much lower given the validity constraints). Increasing this to 500,000 takes over an hour to run and results in a 100% pass rate.
+If no errors are returned, the register contents, memory address data and flags are all checked for equality to consider a test passed. By default 10,000 tests are run (although the actual test number is much lower given the validity constraints). Increasing this (and all other randomised testing) to 500,000 iterations takes over two hours to run and results in a 100% pass rate.
+![500k tests passing](http://i.xav.ai/PXDDCG.png)
 
 ### B & BL
 #### Parsing
