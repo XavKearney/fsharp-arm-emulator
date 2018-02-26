@@ -130,7 +130,8 @@ module Arithmetic
             // Rotate right
             | ROR _ ->
                 match cpuData with
-                | {Fl = _ ; Regs = regmap } -> (Map.find reg regmap <<< (32 - integer)) + (Map.find reg regmap >>> integer)
+                | {Fl = _ ; Regs = regmap } -> 
+                    (Map.find reg regmap <<< (32 - integer)) ||| (Map.find reg regmap >>> integer)
 
         
         | RegisterRegisterShift (reg, op, reg2) ->
@@ -166,7 +167,8 @@ module Arithmetic
             // Rotate right
             | ROR _ ->
                 match cpuData with
-                | {Fl = _ ; Regs = regmap } -> (Map.find reg regmap <<< (32 - integer)) + (Map.find reg regmap >>> integer)
+                | {Fl = _ ; Regs = regmap } -> 
+                    (Map.find reg regmap <<< (32 - integer)) ||| (Map.find reg regmap >>> integer)
 
 
     let check32BitBound input =
@@ -414,7 +416,15 @@ module Arithmetic
             match ins.InstrType, ins.Target, ins.Op1, ins.Op2 with
             // ADD target can only be R15 if both op1 and op2 are not R13
             | Some (ADD), R15, R13, _ | Some (ADD), R15, _, Register R13->
-                Error ("Target register cannot be PC if op1 or op2 is R13")
+                Error ("Target register cannot be PC if op1 or op2 is R13")          
+            | Some (ADC), R15, _, _ | Some (RSB), R15, _, _ | Some (RSC), R15, _, _ | Some (SBC), R15, _, _  ->
+                Error ("Target register cannot be PC for ADC, RSB, SBC and RSC")
+            | Some (ADC), R13, _, _ | Some (RSB), R13, _, _ | Some (RSC), R13, _, _ | Some (SBC), R13, _, _ ->
+                Error ("Target register cannot be SP for ADC, RSB, SBC and RSC")
+            | Some (SUB), R13, op1, _ when op1 <> R13 ->
+                Error ("Target register can only be SP if op1 is SP")
+            | Some (ADD), R13, op1, _ when op1 <> R13 ->
+                Error ("Target register can only be SP if op1 is SP")
             | _ ->
                  Ok(ins)
         

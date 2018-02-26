@@ -136,7 +136,7 @@ module MultMemTests
         opcodeStr, suffixStr, operandStr
 
     
-    //[<Tests>]
+    [<Tests>]
     let testArithParse = 
         let makeTestLineData wa opcode suffix target op1 op2 = 
             
@@ -159,6 +159,29 @@ module MultMemTests
                 // ADD target can only be R15 if both op1 and op2 are not R13
                 | ADD, R15, R13, _ | ADD, R15, _, Register R13->
                     Some (Error ("Target register cannot be PC if op1 or op2 is R13"))
+                | ADC, R15, _, _ | RSB, R15, _, _ | RSC, R15, _, _ | SBC, R15, _, _  ->
+                    Some (Error ("Target register cannot be PC for ADC, RSB, SBC and RSC"))
+                | ADC, R13, _, _ | RSB, R13, _, _ | RSC, R13, _, _ | SBC, R13, _, _ ->
+                    Some (Error ("Target register cannot be SP for ADC, RSB, SBC and RSC"))
+                | SUB, R13, op1, _ when op1 <> R13 ->
+                    Some (Error ("Target register can only be SP if op1 is SP"))
+                | ADD, R13, op1, _ when op1 <> R13 ->
+                    Some (Error ("Target register can only be SP if op1 is SP"))
+                // Restriction on RRX
+                | _, _, _, RegisterShift(op2Reg, RRX, _) | _, _, _, RegisterRegisterShift(op2Reg, RRX, _) ->
+                    Some (Ok {
+                        PInstr = ArithI
+                            {
+                            InstrType = Some opcode;
+                            SuffixSet = suffix;
+                            Target = target;
+                            Op1 = op1;
+                            Op2 = RegisterShift(op2Reg, RRX, 1)
+                            } 
+                        PLabel = None;
+                        PSize = 4u;
+                        PCond = Cal;
+                     })
                 | _ -> 
                     Some (Ok {
                         PInstr = ArithI
@@ -207,7 +230,7 @@ module MultMemTests
         opcodeStr, operandStr
 
 
-    //[<Tests>]
+    [<Tests>]
     let testCompParse = 
         let makeTestLineData wa opcode op1 op2 = 
             
@@ -225,18 +248,32 @@ module MultMemTests
         fun wa opcode op1 op2 ->
             let ls = makeTestLineData wa opcode op1 op2
 
-            let expected = match opcode with
-                           | _ -> Some (Ok {
-                                        PInstr = CompI
-                                            {
-                                            InstrType = Some opcode;
-                                            Op1 = op1;
-                                            Op2 = op2;
-                                            } 
-                                        PLabel = None;
-                                        PSize = 4u;
-                                        PCond = Cal;
-                                     })
+            let expected = 
+                match opcode, op1, op2 with
+                | _, _, RegisterShift(op2Reg, RRX, _) | _, _, RegisterRegisterShift(op2Reg, RRX, _) ->
+                    Some (Ok {
+                        PInstr = CompI
+                            {
+                            InstrType = Some opcode;
+                            Op1 = op1;
+                            Op2 = RegisterShift(op2Reg, RRX, 1)
+                            } 
+                        PLabel = None;
+                        PSize = 4u;
+                        PCond = Cal;
+                     })
+                | _ ->
+                    Some (Ok {
+                        PInstr = CompI
+                            {
+                            InstrType = Some opcode;
+                            Op1 = op1;
+                            Op2 = op2;
+                            } 
+                        PLabel = None;
+                        PSize = 4u;
+                        PCond = Cal;
+                     })
 
             
             let result = parse ls
@@ -244,7 +281,7 @@ module MultMemTests
 
 
 
-    //[<Tests>]
+    [<Tests>]
     let testArithExec =
         let makeTestExecStr opcode suffix target op1 op2 = 
             let opcodeStr, suffixStr, operandStr = makeArithInstrString opcode suffix target op1 op2
@@ -260,47 +297,78 @@ module MultMemTests
                 match opcode, target, op1, op2, flags with
                 | _, _, _, _, f when f.N && f.Z -> false
                 | ADD, R15, R13, _, _ | ADD, R15, _, Register R13, _ -> false
-                | SUB, R13, _, Register(_), _ -> false
-                | SUB, _, R15, Register(_), _ -> false
-                | _, _, R15, RegisterRegisterShift _, _ -> false
-                // ADC, RSB, RSC first operand cannot be SP or PC   
+                
+                | SUB, R13, op1, _, _ when op1 <> R13 -> false
+                | ADD, R13, op1, _, _ when op1 <> R13 -> false
+                
+                // ADC, RSB, RSC, SBC target cannot be SP or PC
+                | ADC, R15, _, _, _ | RSB, R15, _, _, _ | RSC, R15, _, _, _ | SBC, R15, _, _, _ -> false
+                | ADC, R13, _, _, _ | RSB, R13, _, _, _ | RSC, R13, _, _, _ | SBC, R15, _, _, _ -> false
+                // ADC, RSB, RSC, SBC first operand cannot be SP or PC   
                 | ADC, _, R15, _, _ -> false
                 | RSB, _, R15, _, _ -> false
                 | RSC, _, R15, _, _ -> false
+                | SBC, _, R15, _, _ -> false
                 | ADC, _, R13, _, _ -> false
                 | RSB, _, R13, _, _ -> false
                 | RSC, _, R13, _, _ -> false
-                // ADC, RSB, RSC second operand cannot be SP or PC
+                | SBC, _, R13, _, _ -> false
+                // ADC, RSB, RSC, ADD, SUB, SBC second operand cannot be SP or PC
                 | ADC, _, _, Register R15, _ -> false
                 | RSB, _, _, Register R15, _ -> false
                 | RSC, _, _, Register R15, _ -> false
+                | ADD, _, _, Register R15, _ -> false
+                | SUB, _, _, Register R15, _ -> false
+                | SBC, _, _, Register R15, _ -> false
                 | ADC, _, _, Register R13, _ -> false
                 | RSB, _, _, Register R13, _ -> false
-                | RSC, _, _, Register R15, _ -> false
+                | RSC, _, _, Register R13, _ -> false
+                | ADD, _, _, Register R13, _ -> false
+                | SUB, _, _, Register R13, _ -> false
+                | SBC, _, _, Register R13, _ -> false
+
                 | ADC, _, _, RegisterShift (R15,_, _), _ -> false
                 | RSB, _, _, RegisterShift (R15,_, _), _ -> false
                 | RSC, _, _, RegisterShift (R15,_, _), _ -> false
+                | ADD, _, _, RegisterShift (R15,_, _), _ -> false
+                | SUB, _, _, RegisterShift (R15,_, _), _ -> false
+                | SBC, _, _, RegisterShift (R15,_, _), _ -> false
                 | ADC, _, _, RegisterShift (R13,_, _), _ -> false
                 | RSB, _, _, RegisterShift (R13,_, _), _ -> false
                 | RSC, _, _, RegisterShift (R13,_, _), _ -> false
+                | ADD, _, _, RegisterShift (R13,_, _), _ -> false
+                | SUB, _, _, RegisterShift (R13,_, _), _ -> false
+                | SBC, _, _, RegisterShift (R13,_, _), _ -> false
+
                 | ADC, _, _, RegisterRegisterShift (R15,_, _), _ -> false
                 | RSB, _, _, RegisterRegisterShift (R15,_, _), _ -> false
                 | RSC, _, _, RegisterRegisterShift (R15,_, _), _ -> false
+                | ADD, _, _, RegisterRegisterShift (R15,_, _), _ -> false
+                | SUB, _, _, RegisterRegisterShift (R15,_, _), _ -> false
+                | SBC, _, _, RegisterRegisterShift (R15,_, _), _ -> false
                 | ADC, _, _, RegisterRegisterShift (R13,_, _), _ -> false
                 | RSB, _, _, RegisterRegisterShift (R13,_, _), _ -> false
                 | RSC, _, _, RegisterRegisterShift (R13,_, _), _ -> false
+                | ADD, _, _, RegisterRegisterShift (R13,_, _), _ -> false
+                | SUB, _, _, RegisterRegisterShift (R13,_, _), _ -> false
+                | SBC, _, _, RegisterRegisterShift (R13,_, _), _ -> false
                 
                 
-                // ADC, RSB, RSC target cannot be R13
-                | ADC, R13, _, _, _ -> false
-                | RSB, R13, _, _, _ -> false
-                | RSC, R13, _, _, _ -> false
+                // ADC, RSB, RSC target cannot be R13 or R15
+                | ADC, R13, _, _, _ | ADC, R15, _, _, _ -> false
+                | RSB, R13, _, _, _ | RSB, R15, _, _, _ -> false
+                | RSC, R13, _, _, _ | RSC, R15, _, _, _ -> false
                 // TODO
                 | SUB, _, R15, _, _ -> false
                 | SUB, _, _, RegisterShift(R15, _, _), _ -> false
                 // visUAL restriction on ADC with RRX -> This is not in my implementation
                 | ADC, _, _, RegisterShift(_, RRX, _), _ -> false
                 | ADC, _, _, RegisterRegisterShift(_, RRX, _), _ -> false
+
+                // Don't make PC target for tests due to infinte looping issues
+                | _, R15, _, _, _ -> false
+
+
                 | _ -> true
 
             match valid with

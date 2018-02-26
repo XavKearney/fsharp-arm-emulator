@@ -164,3 +164,50 @@
   "<VisUAL xmlns="http://bitbucket.org/salmanarif/visual">";
   "    <syntax-error line="21">Restrictions for R13 (SP) as destination not met.</syntax-error>";
   "</VisUAL>"|]
+ line="21">Invalid destination.syntax error in
+:[|"<?xml version="1.0" encoding="UTF-8" standalone="no"?>";
+  "<VisUAL xmlns="http://bitbucket.org/salmanarif/visual">";
+  "    <syntax-error line="21">Invalid destination.</syntax-error>"; "</VisUAL>"|]
+ line="21">Invalid first operand.syntax error in
+:[|"<?xml version="1.0" encoding="UTF-8" standalone="no"?>";
+  "<VisUAL xmlns="http://bitbucket.org/salmanarif/visual">";
+  "    <syntax-error line="21">Invalid first operand.</syntax-error>";
+  "</VisUAL>"|]
+ line="21">Restrictions for R13 (SP) as destination not met.syntax error in
+:[|"<?xml version="1.0" encoding="UTF-8" standalone="no"?>";
+  "<VisUAL xmlns="http://bitbucket.org/salmanarif/visual">";
+  "    <syntax-error line="21">Restrictions for R13 (SP) as destination not met.</syntax-error>";
+  "</VisUAL>"|]
+ line="21">Invalid first operand.syntax error in
+:[|"<?xml version="1.0" encoding="UTF-8" standalone="no"?>";
+  "<VisUAL xmlns="http://bitbucket.org/salmanarif/visual">";
+  "    <syntax-error line="21">Invalid first operand.</syntax-error>";
+  "</VisUAL>"|]
+ line="21">Invalid destination.syntax error in
+:[|"<?xml version="1.0" encoding="UTF-8" standalone="no"?>";
+  "<VisUAL xmlns="http://bitbucket.org/salmanarif/visual">";
+  "    <syntax-error line="21">Invalid destination.</syntax-error>"; "</VisUAL>"|]
+ line="21">Invalid first operand.syntax error in
+:[|"<?xml version="1.0" encoding="UTF-8" standalone="no"?>";
+  "<VisUAL xmlns="http://bitbucket.org/salmanarif/visual">";
+  "    <syntax-error line="21">Invalid first operand.</syntax-error>";
+  "</VisUAL>"|]
+ line="21">Invalid first operand.syntax error in
+:[|"<?xml version="1.0" encoding="UTF-8" standalone="no"?>";
+  "<VisUAL xmlns="http://bitbucket.org/salmanarif/visual">";
+  "    <syntax-error line="21">Invalid first operand.</syntax-error>";
+  "</VisUAL>"|]
+ line="21">Restrictions for R13 (SP) as destination not met.syntax error in
+:[|"<?xml version="1.0" encoding="UTF-8" standalone="no"?>";
+  "<VisUAL xmlns="http://bitbucket.org/salmanarif/visual">";
+  "    <syntax-error line="21">Restrictions for R13 (SP) as destination not met.</syntax-error>";
+  "</VisUAL>"|]
+ line="21">Invalid destination.syntax error in
+:[|"<?xml version="1.0" encoding="UTF-8" standalone="no"?>";
+  "<VisUAL xmlns="http://bitbucket.org/salmanarif/visual">";
+  "    <syntax-error line="21">Invalid destination.</syntax-error>"; "</VisUAL>"|]
+ line="21">Invalid first operand.syntax error in
+:[|"<?xml version="1.0" encoding="UTF-8" standalone="no"?>";
+  "<VisUAL xmlns="http://bitbucket.org/salmanarif/visual">";
+  "    <syntax-error line="21">Invalid first operand.</syntax-error>";
+  "</VisUAL>"|]

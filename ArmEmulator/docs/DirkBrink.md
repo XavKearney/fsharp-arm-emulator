@@ -44,3 +44,7 @@ Op1 can only be PC if op2 is a Literal -> Different from visUAL
 Op1 cannot be PC when op2 is register controlled shift -> Different from visUAL
 SUB instruction first operand cannot be R15
 SUB instruction second operand cannot be R15
+ADD second operand cannot be R13 or R15
+SUB/ADD dest can only be R13 if op1 is R13 and op2 is constant or LSL #1/#2/#3 -> Changed to any second operand but op1 must still be SP
+SUB second operand cannot be PC or SP -> Changed to allowed
+SBC first operand cannot be SP or PC -> Changed to allowed
