@@ -298,8 +298,13 @@ module MultMemTests
                 | _, _, _, _, f when f.N && f.Z -> false
                 | ADD, R15, R13, _, _ | ADD, R15, _, Register R13, _ -> false
                 
+                // Dest can only be R13 if op1 is also R13
                 | SUB, R13, op1, _, _ when op1 <> R13 -> false
                 | ADD, R13, op1, _, _ when op1 <> R13 -> false
+                
+                // There are also restrictions on op2.  These restrictions are removed in my implementation
+                | SUB, R13, R13, _, _ -> false 
+                | ADD, R13, R13, _, _ -> false
                 
                 // ADC, RSB, RSC, SBC target cannot be SP or PC
                 | ADC, R15, _, _, _ | RSB, R15, _, _, _ | RSC, R15, _, _, _ | SBC, R15, _, _, _ -> false
@@ -372,6 +377,9 @@ module MultMemTests
 
                 // PC is different between visual and local so remove from testing
                 | _, _, R15, _, _ | _, _, _, Register R15, _ -> false
+
+                // RSC and RSB prove difficult to test with runtime errors for negative second operand
+                | RSC, _, _, _, _ | RSB, _, _, _, _ -> false
 
                 | _ -> true
 
