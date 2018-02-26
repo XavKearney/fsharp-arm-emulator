@@ -70,7 +70,7 @@ This cannot (easily) be tested against VisUAL because branching to a random inst
 In testing, a number of differences from VisUAL were discovered:
 1. VisUAL does not allow `LDM/STM` instructions without a suffix, e.g. `LDM R0, {R1}`. 
    - These instructions are excluded from randomised testing against VisUAL, but allowed by both the parsing and execution functions because it is a trivial difference, conforms to the ARM spec, and allows easier, more readable code to be written.
-2. VisUAL does not allow `LDM/STM` instructions to access memory space below `0x1000`, which is reserved for code.
+2. VisUAL (in the testing framework) does not allow `LDM/STM` instructions to access memory space below `0x1000`, which is reserved for code.
    - Tests are limited to a starting memory address above `0x1030` (to allow instructions which decrement by up to `0x30`)
    - This restriction does not apply to this F# implementation. Memory locations can be set as `Code` or as `DataLoc` types, and this distinction is handled within the execution; accessing a `Code` memory location throws an error.
 3. VisUAL does not allow the target register to be within the register list, even when the writeback suffix is not used.
