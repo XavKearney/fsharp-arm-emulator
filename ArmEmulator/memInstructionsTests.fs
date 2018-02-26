@@ -107,34 +107,34 @@ module memInstructionsTests
     [<Tests>]
     let evalExpressionTest =
         let st:SymbolTable = ["testL",256u; "testL2",260u] |> Map.ofList
-        let makeevalExpTest name input labels output =
+        let makeEvalExpTest name input labels output =
             testCase name <| fun () ->
                 Expect.equal (evalExpression input st labels) output (sprintf "evalExpression Test '%s'" input)
         Expecto.Tests.testList "evalExpressions Tests"
                 [   
                     //evalExpression Working Tests
-                    makeevalExpTest "Mult Only" "1*2*3*4" true (Ok 24u)
-                    makeevalExpTest "Add Only" "1+2" true (Ok 3u)
-                    makeevalExpTest "Subtract Only" "3-1" true (Ok 2u)
-                    makeevalExpTest "All" "1*2*3*4+5*3-2" true (Ok 37u)
-                    makeevalExpTest "All2" "5-4*3-1*1+2*2*2" true (Ok 0u)
-                    makeevalExpTest "Num Only" "3" true (Ok 3u)
-                    makeevalExpTest "Label Only" "testL" true (Ok 256u)
-                    makeevalExpTest "Label + 2" "testL + 2" true (Ok 258u)
-                    makeevalExpTest "Label Right Multiply" "testL + 2*2" true (Ok 260u)
-                    makeevalExpTest "Label Left Multiply" "2*2 + testL" true (Ok 260u)
-                    makeevalExpTest "Label Add Hex" "testL + 0x4" true (Ok 260u)
-                    makeevalExpTest "Label Add Hex&" "testL + &4" true (Ok 260u)
-                    makeevalExpTest "Label Add Bin" "testL + 0b100" true (Ok 260u)
-                    makeevalExpTest "Brackets1" "(4*2)+3" true (Ok 11u)
-                    makeevalExpTest "Brackets2" "testL + (2*2)" true (Ok 260u)
-                    makeevalExpTest "Label Right Left Multiply" "4*2 + testL + 2*2" true (Ok 268u)
-                    makeevalExpTest "* first character" "*3+7" true (Ok 10u)
-                    makeevalExpTest "+ first character" "+3+7" true (Ok 10u)
-                    makeevalExpTest "- first character" "-3+7" true (Ok 4u)
-                    makeevalExpTest "Negative Output" "3-7" true (Ok 4294967292u)
-                    // makeevalExpTest "Brackets test" "2*(6+(3*4)-(6+3))*5" 90u
-                    // makeevalExpTest "NumLabel Only" "testL2" 260u
+                    makeEvalExpTest "Mult Only" "1*2*3*4" true (Ok 24u)
+                    makeEvalExpTest "Add Only" "1+2" true (Ok 3u)
+                    makeEvalExpTest "Subtract Only" "3-1" true (Ok 2u)
+                    makeEvalExpTest "All" "1*2*3*4+5*3-2" true (Ok 37u)
+                    makeEvalExpTest "All2" "5-4*3-1*1+2*2*2" true (Ok 0u)
+                    makeEvalExpTest "Num Only" "3" true (Ok 3u)
+                    makeEvalExpTest "Label Only" "testL" true (Ok 256u)
+                    makeEvalExpTest "Label + 2" "testL + 2" true (Ok 258u)
+                    makeEvalExpTest "Label Right Multiply" "testL + 2*2" true (Ok 260u)
+                    makeEvalExpTest "Label Left Multiply" "2*2 + testL" true (Ok 260u)
+                    makeEvalExpTest "Label Add Hex" "testL + 0x4" true (Ok 260u)
+                    makeEvalExpTest "Label Add Hex&" "testL + &4" true (Ok 260u)
+                    makeEvalExpTest "Label Add Bin" "testL + 0b100" true (Ok 260u)
+                    makeEvalExpTest "Brackets1" "(4*2)+3" true (Ok 11u)
+                    makeEvalExpTest "Brackets2" "testL + (2*2)" true (Ok 260u)
+                    makeEvalExpTest "Label Right Left Multiply" "4*2 + testL + 2*2" true (Ok 268u)
+                    makeEvalExpTest "* first character" "*3+7" true (Ok 10u)
+                    makeEvalExpTest "+ first character" "+3+7" true (Ok 10u)
+                    makeEvalExpTest "- first character" "-3+7" true (Ok 4u)
+                    makeEvalExpTest "Negative Output" "3-7" true (Ok 4294967292u)
+                    // makeEvalExpTest "Brackets test" "2*(6+(3*4)-(6+3))*5" 90u
+                    // makeEvalExpTest "NumLabel Only" "testL2" 260u
 
                 
                     //evalExpression Error Message Tests
@@ -532,3 +532,42 @@ module memInstructionsTests
                                                                     PSize = 4u; PCond = Cal}))
 
                 ]
+
+
+
+    [<Tests>]
+    //updateSymbolTable (symbolTab: SymbolTable) (inputRecord: labelInstr) field
+    let checkUpdateSymbolTable = 
+        let st:SymbolTable = ["testL",256u; "testL2",260u] |> Map.ofList
+        let (stOneItem: SymbolTable) = ["testL",256u] |> Map.ofList
+        //Record for labelTest EQU 2
+        let baseInpRec = (Some (Ok {PInstr = LabelO (Ok {InstructionType = Ok EQU; Name = (Ok (Some "labelTest"));
+                            EQUExpr = (Some (Ok 2u)); DCDValueList = None;
+                            FillN = None});
+                            PLabel = Some ("labelTest", 100u);
+                            PSize = 0u; PCond = Cal}))
+        let ldFuncAll wAd lab symT opCodeIn ops = 
+                    {LoadAddr= WA wAd; 
+                    Label= Some lab; 
+                    SymTab= Some symT;
+                    OpCode= opCodeIn;
+                    Operands= ops}
+        let baseEQU2 =  parse (ldFuncAll 100u "labelT" st "EQU" "2")
+        let baseEQU2' = ({InstructionType = Ok EQU; Name = (Ok (Some "labelT")); 
+                            EQUExpr = (Some (Ok 2u)); DCDValueList = None;
+                            FillN = None})
+        let makeTest symTab inpRec field name output =
+            testCase name <| fun () ->
+                Expect.equal (updateSymbolTable symTab inpRec field) output (sprintf "checkLiteral Tests\nTest: %A" name)
+        Expecto.Tests.testList "checkLiteralMonad Tests"
+                [   
+                    //ADR Working tests
+                    makeTest stOneItem baseEQU2' (baseEQU2'.EQUExpr) "updateSymbolTable Base Test" (["testL",256u; "labelT",2u] |> Map.ofList |> Ok)
+                ]
+
+//Functions to test
+//  - updatedMemoryDataPath
+//  - updatedSymbolTable
+//  - DCDexec
+//  - EQUexec
+//  - FILLexec

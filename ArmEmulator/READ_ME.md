@@ -9,6 +9,8 @@ This section covers six instructions seperated into three groups:
 
 I seperated the instructions in this way because each group contained instrucitons which recieved their input in the same form and so could be easily parsed together.
 
+<br />
+
 # General Parsing
 Although I made three seperate functions for parsing each group of instructions, I use a general parsing function, `parse`, to call them. Each individual parsing function returns a record containing all the information necessary to execute any of the functions in the group. 
 

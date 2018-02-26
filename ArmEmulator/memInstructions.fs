@@ -562,6 +562,7 @@ module MemInstructions
 
 
 
+
     let LDRexec (inputRecord: LabelAndMemGeneralParse) dP = 
         //insert psuedo code here
         //Eg: LDR r8, [r10]     //Loads r8 with the value 
@@ -607,7 +608,86 @@ module MemInstructions
 
         0
 
-    let DCDexec (inputRecord: LabelAndMemGeneralParse) symbolTab dP = 
+
+    ///Updates the symbol table
+    ///Used for DCDexec, EQUexec and FILLexec
+    let updateSymbolTable (symbolTab: SymbolTable) (inputRecord: labelInstr) field = 
+        let getLabel (rec1: labelInstr) = 
+            match rec1.Name with
+            | Ok y -> match y with
+                      | Some z -> Ok z
+                      | None -> Error (sprintf "EQUexec: (Ok (%A).Name) = None" rec1)
+            | Error n -> Error (n+"\n"+(sprintf "EQUexec: (%A).Name = Error" rec1))
+        let removeFieldOption field =
+            match field with
+            | Some y -> y
+            | None -> Error (sprintf "EQUexec: (Ok (%A).EQUExpr) = None" field)
+            
+        match ((getLabel inputRecord),(removeFieldOption field)) with
+        | (Error x, Error y) -> Error (x+"\n"+y)
+        | (Error x, _) -> Error x
+        | (_, Error y) -> Error y
+        | (Ok x, Ok y) -> Ok (symbolTab.Add(x,y))
+
+
+
+    let updatedMemoryDataPath (inputRecord: labelInstr) (dP: DataPath<'INS>) =
+        let dataValList = 
+            let fillNf = 
+                match inputRecord.FillN with
+                | Some x -> match x with 
+                            | Ok y -> y|>int
+                            | _ -> 0
+                | _ -> 0
+            let rec makeZeroList length =
+                match length with
+                | 0 -> []
+                | _ -> List.append (makeZeroList (length-1)) [0u]
+            match inputRecord.InstructionType with
+            | Ok x ->   match x with
+                        | DCD ->    match inputRecord.DCDValueList with
+                                    | Some x -> List.map (fun y -> (y|>uint32)) x
+                                    | None -> [0u]
+                        | FILL -> makeZeroList fillNf
+            | _ -> []
+
+
+        let getAddrList lst length =
+            let rec getAddrList' list len =
+                match len with 
+                | 1 -> list
+                | _ ->  getAddrList' (List.append list [((List.last list)+4u)]) (len-1)
+            getAddrList' lst length
+
+        let findMaxAddr (dP: DataPath<'INS>) = 
+            let waToUin32 (k,l) =
+                match k with
+                | WA y -> y
+            dP.MM
+            |> Map.toSeq
+            |> Seq.map waToUin32
+            |> Seq.max 
+
+        let findAddrs (dP: DataPath<'INS>) : uint32 list=
+            if ((dP.MM).IsEmpty) then
+                getAddrList [100u] (List.length dataValList)
+            else 
+                getAddrList [findMaxAddr dP] (List.length dataValList)
+
+        let rec updateMachineMemory' addrList (dPMM: MachineMemory<'INS>) (dataValList': uint32 list) =
+            match addrList with
+            | [] -> dPMM
+            | _ ->  
+                let remainingAddrList = addrList.[1..(List.length addrList)-1]
+                let remainingValueList = dataValList'.[1..(List.length dataValList')-1]
+                let updatedMachineMem = dPMM.Add(WA addrList.[0], DataLoc dataValList'.[0])
+                updateMachineMemory' remainingAddrList updatedMachineMem remainingValueList
+        {Fl = dP.Fl; Regs = dP.Regs; MM = updateMachineMemory' (findAddrs dP) dP.MM dataValList}
+
+
+
+
+    let DCDexec (symbolTab: SymbolTable) (dP: DataPath<'INS>) (inputRecord: labelInstr) = 
         //Takes a label and a list of values, it then stores 
         // the values in memory, they can be accessed using
         // the label.
@@ -620,14 +700,28 @@ module MemInstructions
         //NOTE: this line will not run in visual but it should
         
         //Update Symbol Table and update the DataPath.MM
-        0
+        
+        //Making the value list of correct type to feed into 
+        // updateSymbolTable
+        let makeType (x:ValueList)  =
+            let y = (x.[0])|>uint32
+            let temp =
+                match Ok y with
+                       | Ok y -> Ok y
+                       | _ -> Error "should never happen"
+            match x with
+            | x -> Some temp 
+            | _ -> None
 
-    // let checkAndMatchInputRecord inpRec constructor =
-    //     match inpRec with
-    //     | constructor m -> 
-    //     | 
+        let removeOptionD (x:ValueList option) =
+            match x with
+            | Some y -> makeType y
+            | _ -> None
 
-    let EQUexec (inputRecord: LabelAndMemGeneralParse) (symbolTab: SymbolTable) = 
+        (updateSymbolTable symbolTab inputRecord (removeOptionD (inputRecord.DCDValueList)), Ok (updatedMemoryDataPath inputRecord dP))                
+
+
+    let EQUexec (symbolTab: SymbolTable) (dP: DataPath<'INS>) (inputRecord: labelInstr) = 
         //Eg: abc EQU 2 
         // this line assigns the value 2 to the label abc
         //Eg2: xyz EQU label+8
@@ -636,36 +730,9 @@ module MemInstructions
         //Update Symbol Table, no need to update Machine
         // Memory
         
-        let infoRecordRes  =
-            match inputRecord with
-            | LabelO m -> m
-            | x -> Error (sprintf "EQUexec: Wrong type of LabelAndMemGeneralParse passed to function (%A)" x)
-        let getLabel (rec1: Result<labelInstr,string>) = 
-            match rec1 with
-            | Ok x -> match x.Name with
-                      | Ok y -> match y with
-                                | Some z -> Ok z
-                                | None -> Error (sprintf "EQUexec: (Ok (%A).Name) = None" x)
-                      | Error n -> Error (n+"\n"+(sprintf "EQUexec: (%A).Name = Error" x))
-            | Error m -> Error (m+"\n"+"EQUexec: labelInstr result is error")
-        let getVal (val0: Result<labelInstr,string>) =
-            match val0 with
-            | Ok x -> match x.EQUExpr with
-                      | Some y -> y
-                      | None -> Error (sprintf "EQUexec: (Ok (%A).EQUExpr) = None" x)
-            | Error m -> Error (m+"\n"+"EQUexec: labelInstr result is error")
-        let (updatedSymbolTable: SymbolTable) = 
-            match ((getLabel infoRecordRes),(getVal infoRecordRes)) with
-            | (Error x, Error y) -> symbolTab
-            | (Error x, _) -> symbolTab
-            | (_, Error y) -> symbolTab
-            | (Ok x, Ok y) -> (symbolTab.Add(x,y))
-        match infoRecordRes with
-        | Error m -> symbolTab
-        | Ok _ -> updatedSymbolTable
-                   
+        (updateSymbolTable symbolTab inputRecord inputRecord.EQUExpr, Ok dP)                
 
-    let FILLexec (inputRecord: LabelAndMemGeneralParse) symbolTab dP = 
+    let FILLexec (symbolTab: SymbolTable) (dP: DataPath<'INS>) (inputRecord: labelInstr) = 
         //insert psuedo code here
         //Eg:   data4	Fill		12
         // fills 12 data slots with 0. It basically initialises
@@ -675,5 +742,21 @@ module MemInstructions
         //As you can see, the last operand can be an expression
         
         //Update Symbol Table and update the DataPath.MM
-        0
-        
+        (updateSymbolTable symbolTab inputRecord ((inputRecord.FillN)), Ok (updatedMemoryDataPath inputRecord dP))                
+
+
+
+
+    let generalExecHandler (inputRecord: LabelAndMemGeneralParse) (symbolTab: SymbolTable) (dP: DataPath<'INS>) =
+        let labelInstructionsHandler (symbolTab: SymbolTable) (dP: DataPath<'INS>) (inputRecord: labelInstr) =
+            match inputRecord.InstructionType with
+            | Ok x -> match x with
+                      | EQU -> Ok (EQUexec symbolTab dP inputRecord)
+                      | DCD -> Ok (DCDexec symbolTab dP inputRecord)
+                      | FILL -> Ok (FILLexec symbolTab dP inputRecord)
+                      | _ -> Error (sprintf "labelInstructionsHandler: InstructionType (%A) not recognised" x)
+            | Error m -> Error m
+        match inputRecord with
+        | LabelO x -> Result.bind (labelInstructionsHandler symbolTab dP) x
+        // | MemO x -> 
+        // | AdrO x -> 
