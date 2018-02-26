@@ -195,7 +195,7 @@ module MultMemTests
                     None
             ]
 
-    let config = { FsCheckConfig.defaultConfig with maxTest = 500000 }
+    let config = { FsCheckConfig.defaultConfig with maxTest = 10000 }
 
     /// property-based testing of parse function
     /// for randomly generated branch instructions
