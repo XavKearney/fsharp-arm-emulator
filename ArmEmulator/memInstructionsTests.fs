@@ -5,8 +5,9 @@ module memInstructionsTests
     open Expecto
     open Expecto.ExpectoFsCheck
     open MemInstructions
-    open Expecto.Logging
     open System
+
+
 
 
     [<Tests>]
@@ -24,6 +25,7 @@ module memInstructionsTests
         Expecto.Tests.testList "parseLabelIns Tests"
                 [   
                     //EQU, DCD and FILL Working Tests
+                    //EQU Working Test
                     makeTest "EQU" (ldFunc "labelT" "4") "EQU1" (Ok {InstructionType = Ok EQU; Name = (Ok (Some "labelT")); 
                                                         EQUExpr = (Some (Ok 4u)); DCDValueList = None;
                                                         FillN = None})
@@ -42,27 +44,34 @@ module memInstructionsTests
                     makeTest "EQU" (ldFunc "labelT" "5-4*3-1*1+2*2*2") "EQU All" (Ok {InstructionType = Ok EQU; Name = (Ok (Some "labelT"));
                                                                                     EQUExpr = (Some (Ok 0u)); DCDValueList = None;
                                                                                     FillN = None})
+                    //EQU Error Message Tests
+                    
+                    //Fill Working Tests
                     makeTest "FILL" (ldFunc "labelT" "4") "FILL 4" (Ok {InstructionType = Ok FILL; Name = (Ok (Some "labelT"));
                                                                                     EQUExpr = None; DCDValueList = None;
-                                                                                    FillN = Some 4u})
+                                                                                    FillN = Some (Ok 4u)})
                     makeTest "FILL" (ldFunc "labelT" "64") "FILL 64" (Ok {InstructionType = Ok FILL; Name = (Ok (Some "labelT"));
                                                                                     EQUExpr = None; DCDValueList = None;
-                                                                                    FillN = Some 64u})
-                    makeTest "FILL" (ldFunc "labelT" "3") "FILL 3" (Ok {InstructionType = Ok FILL; Name = (Ok (Some "labelT"));
-                                                                                    EQUExpr = None; DCDValueList = None;
-                                                                                    FillN = Some 0u})
-                    makeTest "FILL" (ldFunc "labelT" "123") "FILL 123" (Ok {InstructionType = Ok FILL; Name = (Ok (Some "labelT"));
-                                                                                    EQUExpr = None; DCDValueList = None;
-                                                                                    FillN = Some 0u})
+                                                                                    FillN = Some (Ok 64u)})
                     makeTest "FILL" (ldFunc "labelT" "0") "FILL 0" (Ok {InstructionType = Ok FILL; Name = (Ok (Some "labelT"));
                                                                                     EQUExpr = None; DCDValueList = None;
-                                                                                    FillN = Some 0u})
+                                                                                    FillN = Some (Ok 0u)})
+                    //Fill Error Message Tests
+                    makeTest "FILL" (ldFunc "labelT" "3") "FILL 3" (Ok {InstructionType = Ok FILL; Name = (Ok (Some "labelT"));
+                                                                                    EQUExpr = None; DCDValueList = None;
+                                                                                    // FillN = Some (Error "parseLabelIns: Fill expression (3u) does not evaluate to something which is a positive multiple of four")})
+                                                                                    FillN = Some (Error "parseLabelIns: Fill expression (3u) >0 and divisible by four")})
+                    makeTest "FILL" (ldFunc "labelT" "123") "FILL 123" (Ok {InstructionType = Ok FILL; Name = (Ok (Some "labelT"));
+                                                                                    EQUExpr = None; DCDValueList = None;
+                                                                                    FillN = Some (Error "parseLabelIns: Fill expression (123u) >0 and divisible by four")})
                     makeTest "FILL" (ldFunc "labelT" "-1") "FILL -1" (Ok {InstructionType = Ok FILL; Name = (Ok (Some "labelT"));
                                                                                     EQUExpr = None; DCDValueList = None;
-                                                                                    FillN = Some 0u})
+                                                                                    FillN = Some (Error "parseLabelIns: Fill expression (4294967295u) >0 and divisible by four")})
                     makeTest "FILL" (ldFunc "labelT" "-4") "FILL -4" (Ok {InstructionType = Ok FILL; Name = (Ok (Some "labelT"));
                                                                                     EQUExpr = None; DCDValueList = None;
-                                                                                    FillN = Some 0u})
+                                                                                    FillN = Some (Error "parseLabelIns: Fill expression (4294967292u) >0 and divisible by four")})
+                    
+                    //DCD Working Tests
                     makeTest "DCD" (ldFunc "labelT" "1") "DCD 1" (Ok {InstructionType = Ok DCD; Name = (Ok (Some "labelT"));
                                                                                     EQUExpr = None; DCDValueList = Some ["1"];
                                                                                     FillN = None})
@@ -70,6 +79,9 @@ module memInstructionsTests
                                                                                     EQUExpr = None; DCDValueList = Some ["1";"3";"5"];
                                                                                     FillN = None})
                     makeTest "DCD" (ldFunc "labelT" "1, 3, 5") "DCD 1, 3, 5" (Ok {InstructionType = Ok DCD; Name = (Ok (Some "labelT"));
+                                                                                    EQUExpr = None; DCDValueList = Some ["1";"3";"5"];
+                                                                                    FillN = None})
+                    makeTest "DCD" (ldFunc "labelT" "  1, 3, 5  ") "DCD   1, 3, 5  " (Ok {InstructionType = Ok DCD; Name = (Ok (Some "labelT"));
                                                                                     EQUExpr = None; DCDValueList = Some ["1";"3";"5"];
                                                                                     FillN = None})
                     makeTest "DCD" (ldFunc "labelT" "1, -3, 5") "DCD 1, -3, 5" (Ok {InstructionType = Ok DCD; Name = (Ok (Some "labelT"));
@@ -81,9 +93,8 @@ module memInstructionsTests
                     makeTest "DCD" (ldFunc "labelT" "") "DCD no input" (Ok {InstructionType = Ok DCD; Name = (Ok (Some "labelT"));
                                                                                     EQUExpr = None; DCDValueList = Some [""];
                                                                                     FillN = None})
+                    //DCD Error Message Tests
                 
-                
-                    //EQU, DCD and FILL Error Message Tests
                 
                 ]
 
@@ -96,32 +107,32 @@ module memInstructionsTests
     [<Tests>]
     let evalExpressionTest =
         let st:SymbolTable = ["testL",256u; "testL2",260u] |> Map.ofList
-        let makeevalExpTest name input output =
+        let makeevalExpTest name input labels output =
             testCase name <| fun () ->
-                Expect.equal (evalExpression input st) output (sprintf "evalExpression Test '%s'" input)
+                Expect.equal (evalExpression input st labels) output (sprintf "evalExpression Test '%s'" input)
         Expecto.Tests.testList "evalExpressions Tests"
                 [   
                     //evalExpression Working Tests
-                    makeevalExpTest "Mult Only" "1*2*3*4" (Ok 24u)
-                    makeevalExpTest "Add Only" "1+2" (Ok 3u)
-                    makeevalExpTest "Subtract Only" "3-1" (Ok 2u)
-                    makeevalExpTest "All" "1*2*3*4+5*3-2" (Ok 37u)
-                    makeevalExpTest "All2" "5-4*3-1*1+2*2*2" (Ok 0u)
-                    makeevalExpTest "Num Only" "3" (Ok 3u)
-                    makeevalExpTest "Label Only" "testL" (Ok 256u)
-                    makeevalExpTest "Label + 2" "testL + 2" (Ok 258u)
-                    makeevalExpTest "Label Right Multiply" "testL + 2*2" (Ok 260u)
-                    makeevalExpTest "Label Left Multiply" "2*2 + testL" (Ok 260u)
-                    makeevalExpTest "Label Add Hex" "testL + 0x4" (Ok 260u)
-                    makeevalExpTest "Label Add Hex&" "testL + &4" (Ok 260u)
-                    makeevalExpTest "Label Add Bin" "testL + 0b100" (Ok 260u)
-                    makeevalExpTest "Brackets1" "(4*2)+3" (Ok 11u)
-                    makeevalExpTest "Brackets2" "testL + (2*2)" (Ok 260u)
-                    makeevalExpTest "Label Right Left Multiply" "4*2 + testL + 2*2" (Ok 268u)
-                    makeevalExpTest "* first character" "*3+7" (Ok 10u)
-                    makeevalExpTest "+ first character" "+3+7" (Ok 10u)
-                    makeevalExpTest "- first character" "-3+7" (Ok 4u)
-                    makeevalExpTest "Negative Output" "3-7" (Ok 4294967292u)
+                    makeevalExpTest "Mult Only" "1*2*3*4" true (Ok 24u)
+                    makeevalExpTest "Add Only" "1+2" true (Ok 3u)
+                    makeevalExpTest "Subtract Only" "3-1" true (Ok 2u)
+                    makeevalExpTest "All" "1*2*3*4+5*3-2" true (Ok 37u)
+                    makeevalExpTest "All2" "5-4*3-1*1+2*2*2" true (Ok 0u)
+                    makeevalExpTest "Num Only" "3" true (Ok 3u)
+                    makeevalExpTest "Label Only" "testL" true (Ok 256u)
+                    makeevalExpTest "Label + 2" "testL + 2" true (Ok 258u)
+                    makeevalExpTest "Label Right Multiply" "testL + 2*2" true (Ok 260u)
+                    makeevalExpTest "Label Left Multiply" "2*2 + testL" true (Ok 260u)
+                    makeevalExpTest "Label Add Hex" "testL + 0x4" true (Ok 260u)
+                    makeevalExpTest "Label Add Hex&" "testL + &4" true (Ok 260u)
+                    makeevalExpTest "Label Add Bin" "testL + 0b100" true (Ok 260u)
+                    makeevalExpTest "Brackets1" "(4*2)+3" true (Ok 11u)
+                    makeevalExpTest "Brackets2" "testL + (2*2)" true (Ok 260u)
+                    makeevalExpTest "Label Right Left Multiply" "4*2 + testL + 2*2" true (Ok 268u)
+                    makeevalExpTest "* first character" "*3+7" true (Ok 10u)
+                    makeevalExpTest "+ first character" "+3+7" true (Ok 10u)
+                    makeevalExpTest "- first character" "-3+7" true (Ok 4u)
+                    makeevalExpTest "Negative Output" "3-7" true (Ok 4294967292u)
                     // makeevalExpTest "Brackets test" "2*(6+(3*4)-(6+3))*5" 90u
                     // makeevalExpTest "NumLabel Only" "testL2" 260u
 
@@ -453,15 +464,70 @@ module memInstructionsTests
                     SymTab= Some symTab;
                     OpCode= opCodeIn;
                     Operands= ops}
+        let ldFuncAll wAd lab symT opCodeIn ops = 
+                    {LoadAddr= WA wAd; 
+                    Label= Some lab; 
+                    SymTab= Some symT;
+                    OpCode= opCodeIn;
+                    Operands= ops}
         let makeTest ls name output =
             testCase name <| fun () ->
                 Expect.equal (parse ls) output (sprintf "parse Tests\nTest: %A" name)
         Expecto.Tests.testList "Total Parse Tests"
                 [   
                     //parse Working Tests
+                    //ADR
                     makeTest (ldFunc st "ADR" "R0, 4") "Base Test" (Some (Ok {PInstr = AdrO (Ok {InstructionType= Ok ADRm;
                                                                                 DestReg= Ok R0;
                                                                                 SecondOp= Ok 4u;});
+                                                                    PLabel = Some ("labelTest", 100u);
+                                                                    PSize = 4u; PCond = Cal}))
+                    makeTest (ldFunc st "ADR" "R9, testL") "parse ADR Label" (Some (Ok {PInstr = AdrO (Ok {InstructionType= Ok ADRm;
+                                                                                DestReg= Ok R9;
+                                                                                SecondOp= Ok 256u;});
+                                                                    PLabel = Some ("labelTest", 100u);
+                                                                    PSize = 4u; PCond = Cal}))
+                    makeTest (ldFunc st "ADR" "R15, testL") "parse ADR R15" (Some (Ok {PInstr = AdrO (Ok {InstructionType= Ok ADRm;
+                                                                                DestReg= Ok R15;
+                                                                                SecondOp= Ok 256u;});
+                                                                    PLabel = Some ("labelTest", 100u);
+                                                                    PSize = 4u; PCond = Cal}))
+                    //DCD
+                    makeTest (ldFunc st "DCD" "1") "Base DCD Test" (Some (Ok {PInstr = LabelO (Ok {InstructionType = Ok DCD; Name = (Ok (Some "labelTest"));
+                                                                                    EQUExpr = None; DCDValueList = Some ["1"];
+                                                                                    FillN = None});
+                                                                    PLabel = Some ("labelTest", 100u);
+                                                                    PSize = 4u; PCond = Cal}))
+                    makeTest (ldFunc st "DCD" "1,3,5") "DCD 1,3,5 Test" (Some (Ok {PInstr = LabelO (Ok {InstructionType = Ok DCD; Name = (Ok (Some "labelTest"));
+                                                                                    EQUExpr = None; DCDValueList = Some ["1";"3";"5"];
+                                                                                    FillN = None});
+                                                                    PLabel = Some ("labelTest", 100u);
+                                                                    PSize = 12u; PCond = Cal}))
+                    makeTest (ldFuncAll 200u "labelTestTwo" st "DCD" "1,3,5") "DCD Word Address Test" (Some (Ok {PInstr = LabelO (Ok {InstructionType = Ok DCD; Name = (Ok (Some "labelTestTwo"));
+                                                                                    EQUExpr = None; DCDValueList = Some ["1";"3";"5"];
+                                                                                    FillN = None});
+                                                                    PLabel = Some ("labelTestTwo", 200u);
+                                                                    PSize = 12u; PCond = Cal}))
+                    //EQU
+                    makeTest (ldFuncAll 100u "labelTest" st "EQU" "2") "EQU Base Case" (Some (Ok {PInstr = LabelO (Ok {InstructionType = Ok EQU; Name = (Ok (Some "labelTest"));
+                                                                                    EQUExpr = (Some (Ok 2u)); DCDValueList = None;
+                                                                                    FillN = None});
+                                                                    PLabel = Some ("labelTest", 100u);
+                                                                    PSize = 0u; PCond = Cal}))
+                    makeTest (ldFuncAll 100u "labelTest" st "EQU" "5-4*3-1*1+2*2*2") "EQU +-* Eg Case" (Some (Ok {PInstr = LabelO (Ok {InstructionType = Ok EQU; Name = (Ok (Some "labelTest"));
+                                                                                    EQUExpr = (Some (Ok 0u)); DCDValueList = None;
+                                                                                    FillN = None});
+                                                                    PLabel = Some ("labelTest", 100u);
+                                                                    PSize = 0u; PCond = Cal}))
+                    //Fill
+                    makeTest (ldFuncAll 100u "labelTest" st "FILL" "4") "Fill Base Case" (Some (Ok {PInstr = LabelO (Ok {InstructionType = Ok FILL; Name = (Ok (Some "labelTest"));
+                                                                                    EQUExpr = None; DCDValueList = None;
+                                                                                    FillN = Some (Ok 4u)});
+                                                                    PLabel = Some ("labelTest", 100u);
+                                                                    PSize = 4u; PCond = Cal}))
+                    makeTest (ldFuncAll 100u "labelTest" st "FILL" "-1") "Fill Error Case" (Some (Ok {PInstr = LabelO (Ok {InstructionType = Ok FILL; Name = (Ok (Some "labelTest"));
+                                                                                    EQUExpr = None; DCDValueList = None;
+                                                                                    FillN = Some (Error "parseLabelIns: Fill expression (4294967295u) >0 and divisible by four")});
                                                                     PLabel = Some ("labelTest", 100u);
                                                                     PSize = 4u; PCond = Cal}))
 

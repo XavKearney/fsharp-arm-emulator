@@ -5,7 +5,6 @@ module MemInstructions
     open CommonLex
     open System
     open System.Text.RegularExpressions
-    open System.Runtime.CompilerServices
 
 
 
@@ -215,7 +214,7 @@ module MemInstructions
     /// - Add multiple bracket functionality 
     ///   Eg 2*(6+(3*4)-(6+3))*5
     /// - Add working CheckLiteral function which works for -ve's
-    let evalExpression (exp0: string) (symTab: SymbolTable) =
+    let evalExpression (exp0: string) (symTab: SymbolTable) (labels: bool) =
         let rec evalExpression' (exp: string) = 
             if String.exists (fun c -> (c ='(')||(c =')')) exp then
                 let mapFunction (x: string) = 
@@ -291,20 +290,23 @@ module MemInstructions
                 |> List.map (fun x -> evalExpression' x)
                 |> List.reduce (resultMult)
             else 
-                let symTabTryFindMonad (item: Group) =
-                    match symTab.TryFind (item.Value) with
+                let symTabTryFindMonad item =
+                    match symTab.TryFind item with
                     | None -> Error (sprintf "evalExpression: Couldn't find label (%A)
-                              in the Symbol Table" item.Value)
+                              in the Symbol Table" item)
                     | Some x -> x |> string |> uint32 |> Ok
+                let labelsOrNot item labs =
+                    match labs with
+                    | false -> Error "Did not match and of the evalExpression end case options"
+                    | true -> symTabTryFindMonad item
                 match (exp.Trim()) with 
                 | Match @"(0x[0-9]+)" [_; ex] -> ex.Value |> uint32 |> Ok //Matching a hex number, Eg 0x5
                 | Match @"(&[0-9]+)" [_; ex]  -> ("0x"+(ex.Value).[1..(ex.Length-1)]) |> uint32 |> Ok //Matching a hex number, Eg &5
                 | Match @"(0b[0-1]+)" [_; ex] -> ex.Value |> uint32 |> Ok //Matching binary number, Eg 0b11
                 | Match @"([0-9]+)" [_; ex]   -> ex.Value |> uint32 |> Ok //Matching a decimal number  try (^[0-9]|(([^a-z]| )[0-9]+([^a-z]| |$)))
-                | Match @"(\w+)" [_; lab]     -> symTabTryFindMonad lab
+                | Match @"(\w+)" [_; lab]     -> labelsOrNot (exp.Trim()) labels 
                 | _ -> Error "Did not match and of the evalExpression end case options"
         evalExpression' exp0
-
 
 
 
@@ -330,7 +332,7 @@ module MemInstructions
             | None   -> Error "parseAdrIns: ls.SymTab = None"
             | Some x -> match ((ls.Operands).Trim()) with
                         | Match @"(R[0-9]|1[0-5]) *, *(.*)" [_; rA; expression] -> 
-                            evalExpression expression.Value x
+                            evalExpression expression.Value x true
                         | _ -> Error (sprintf "parseAdrIns: Line Data in incorrect form\n
                           ls.Operands: %A" ls.Operands)
         match (errorMessage1, labelExpVal) with
@@ -370,7 +372,7 @@ module MemInstructions
             Name: LabelL;
             EQUExpr: Result<uint32,String> option;
             DCDValueList: ValueList option;            //What to fill the memory with
-            FillN: uint32 option;
+            FillN: Result<uint32,String> option;
         }
 
     /// parse error (dummy, but will do)
@@ -389,7 +391,6 @@ module MemInstructions
     /// Parse Active Pattern used by top-level code
     // let (|IMatch|_|) = parse
 
-
     type labelMemOrADR = LabelInstrType | ADRInstrType | MemInstrType
 
 
@@ -398,17 +399,22 @@ module MemInstructions
     let opCodesMem = opCodeExpand memSpec
     let opCodesLabel = opCodeExpand labelSpec
             
+    let checkPosAndDivFour (uint32Res: Result<uint32,string>) =
+        match uint32Res with
+        | Error m -> Error m
+        | Ok x -> if (((x|>int) % 4 =0)&&((x|>int)>=0)) then Ok x
+                //   else Error (sprintf "parseLabelIns: Fill expression (%A) does not evaluate to something which is a positive multiple of four" x)
+                  else Error (sprintf "parseLabelIns: Fill expression (%A) >0 and divisible by four" x)
 
-
-
-    let (|PosMultFour|ErrorM4|) x = if ((x % 4 = 0)&&(x>=0)) then PosMultFour else ErrorM4
-    let isPosAndDivisibleByFour x = match x with PosMultFour -> x | ErrorM4 -> 0
-
-
-///Parse function for Label based instructions such as EQU
-/// FILL and DCD. Returns a record with all the information
-/// needed to execute an LDR or STR instruction.
+    ///Parse function for Label based instructions such as EQU
+    /// FILL and DCD. Returns a record with all the information
+    /// needed to execute an LDR or STR instruction.
     let parseLabelIns root ls =
+        let evalExprHandler ops symT labels =
+            match symT with 
+            | None -> Error (sprintf "parseLabelIns: ls.SymTab = None
+                      \nroot: %A\nls: %A" root ls)
+            | Some x -> (evalExpression ops x labels)
         let instTypeTmp = 
             match root with
             | "EQU"  -> Ok EQU 
@@ -418,11 +424,10 @@ module MemInstructions
                         not EQU, FILL or DCD" root) 
         let (fillN, valList, equExp) =
             match instTypeTmp with
-            | Ok EQU  ->   let equExp1 = evalExpression ls.Operands (Option.get (ls.SymTab))
+            | Ok EQU  ->   let equExp1 = evalExprHandler ls.Operands (ls.SymTab) true
                            (None, None, (Some equExp1))  
-            | Ok FILL ->   let fillN1 = ls.Operands |> int 
-                                        |> isPosAndDivisibleByFour 
-                                        |> uint32
+            | Ok FILL ->   let fillN1 = evalExprHandler ls.Operands (ls.SymTab) false
+                                            |> checkPosAndDivFour
                            (Some fillN1, None, None)
             | Ok DCD  ->   let valList1 = (ls.Operands).Split(',') 
                                         |> Array.map (fun s-> s.Trim()) 
@@ -446,10 +451,25 @@ module MemInstructions
 
 
 
+
     type LabelAndMemGeneralParse = LabelO of Result<labelInstr,string> 
                                                 | MemO of Result<MemInstr,string> 
                                                 | AdrO of Result<ADRInstr,string>
 
+    let removeOpt y =
+        match y with 
+        | Some z -> ((List.length z)*4)|>uint32
+        | None -> 0u 
+
+    let removeRes x =
+        match x with
+        | Ok y -> removeOpt (y.DCDValueList)                         
+        | _ ->  0u
+
+    let findDcdPSize pInstr =
+        match pInstr with     
+        | LabelO x -> removeRes x
+        | _ -> 0u
 
     /// main function to parse a line of assembler
     /// ls contains the line input
@@ -465,6 +485,17 @@ module MemInstructions
             // this does the real work of parsing
             // dummy return for now
             
+            let PInstrTmp =
+                match instrC with
+                | LABEL -> LabelO (parseLabelIns root ls)
+                | MEM   -> MemO (parseMemIns root suffix ls)
+                | ADR   -> AdrO (parseAdrIns root ls)
+            let PSizeTmp =
+                match root with
+                | "EQU" -> 0u
+                | "DCD" -> findDcdPSize PInstrTmp
+                | _     -> 4u
+
 
             if 1=1 then           
             Ok { 
@@ -473,11 +504,7 @@ module MemInstructions
                 // the operands. Not done in the sample.
                 // Note the record type returned must be written by the module author.
                 // PInstr={InstructionType= (); DestSourceReg= (); SecondOp= ();}; 
-                PInstr = 
-                    match instrC with
-                    | LABEL -> LabelO (parseLabelIns root ls)
-                    | MEM   -> MemO (parseMemIns root suffix ls)
-                    | ADR   -> AdrO (parseAdrIns root ls)
+                PInstr = PInstrTmp
 
 
                 // This is normally the line label as contained in
@@ -492,7 +519,8 @@ module MemInstructions
                 // word loaded into memory. For arm instructions it is always 4 bytes. 
                 // For data definition DCD etc it is variable.
                 //  For EQU (which does not affect memory) it is 0
-                PSize = 4u; 
+                PSize = PSizeTmp
+
 
                 // the instruction condition is detected in the opcode and opCodeExpand                 
                 // has already calculated condition already in the opcode map.
@@ -500,7 +528,7 @@ module MemInstructions
                 PCond = pCond 
                 }
             else Error "parse: Should never happen, just setting the type"
-        let test = Map.tryFind ls.OpCode opCodesLabel // lookup opcode to see if it is known
+        // Map.tryFind ls.OpCode opCodesLabel // lookup opcode to see if it is known
         // |> Option.map parse' // if unknown keep none, if known parse it.
         if (Map.tryFind ls.OpCode opCodesLabel |> Option.map parse') <> None 
         then (Map.tryFind ls.OpCode opCodesLabel |> Option.map parse')
@@ -525,6 +553,12 @@ module MemInstructions
 
 
 
+    //General inforRecord Extractor
+    // constructor = LabelO, instrName = "EQU"
+    // let infoRecordRes constructor instrName =
+    //     match inputRecord with
+    //     | constructor m -> m
+    //     | x -> Error (sprintf "%Aexec: Wrong type of LabelAndMemGeneralParse passed to function (%A)" instrName x)
 
 
 
@@ -553,15 +587,24 @@ module MemInstructions
         //insert psuedo code here
         0
 
-    let ADRexec (inputRecord: LabelAndMemGeneralParse) dP = 
+    let ADRexec (inputRecord: LabelAndMemGeneralParse) (dP: DataPath<'INS>) = 
         //Takes the address of a label and puts it into the 
         // register. 
         //Eg: ADR		R0, BUFFIN1
         //Eg2: start		MOV		r0,#10
         //                  ADR		r4,start 
         //                  (; => SUB r4,pc,#0xc)
-        //
         
+        // let infoRecordRes  =
+        //     match inputRecord with
+        //     | LabelO m -> m
+        //     | x -> Error (sprintf "EQUexec: Wrong type of LabelAndMemGeneralParse passed to function (%A)" x)
+        // let updateDataPath = 
+
+        // match infoRecordRes with
+        // | Error m -> dP
+        // | Ok _ -> updatedDataPath
+
         0
 
     let DCDexec (inputRecord: LabelAndMemGeneralParse) symbolTab dP = 
@@ -584,26 +627,43 @@ module MemInstructions
     //     | constructor m -> 
     //     | 
 
-    let EQUexec (inputRecord: LabelAndMemGeneralParse) symbolTab dP = 
-        //insert psuedo code here
-        //Assigns a value to a label
+    let EQUexec (inputRecord: LabelAndMemGeneralParse) (symbolTab: SymbolTable) = 
         //Eg: abc EQU 2 
         // this line assigns the value 2 to the label abc
         //Eg2: xyz EQU label+8
         // this assigns the address (label+8) to the label xyz
         // checkAndMatchInputRecord inputRecord LabelO
-        //Update Symbol Table and update the DataPath.MM
-        let mainFunctionBody = 
-            Ok 5u
-        let checkType =
+        //Update Symbol Table, no need to update Machine
+        // Memory
+        
+        let infoRecordRes  =
             match inputRecord with
-            | LabelO m -> Ok m
-            | x -> Error (sprintf "EQUexec: Wrong type of 
-                   LabelAndMemGeneralParse passed to function (%A)" x)
-        match checkType with
-        | Error m -> Error m
-        | Ok x -> mainFunctionBody
-        0
+            | LabelO m -> m
+            | x -> Error (sprintf "EQUexec: Wrong type of LabelAndMemGeneralParse passed to function (%A)" x)
+        let getLabel (rec1: Result<labelInstr,string>) = 
+            match rec1 with
+            | Ok x -> match x.Name with
+                      | Ok y -> match y with
+                                | Some z -> Ok z
+                                | None -> Error (sprintf "EQUexec: (Ok (%A).Name) = None" x)
+                      | Error n -> Error (n+"\n"+(sprintf "EQUexec: (%A).Name = Error" x))
+            | Error m -> Error (m+"\n"+"EQUexec: labelInstr result is error")
+        let getVal (val0: Result<labelInstr,string>) =
+            match val0 with
+            | Ok x -> match x.EQUExpr with
+                      | Some y -> y
+                      | None -> Error (sprintf "EQUexec: (Ok (%A).EQUExpr) = None" x)
+            | Error m -> Error (m+"\n"+"EQUexec: labelInstr result is error")
+        let (updatedSymbolTable: SymbolTable) = 
+            match ((getLabel infoRecordRes),(getVal infoRecordRes)) with
+            | (Error x, Error y) -> symbolTab
+            | (Error x, _) -> symbolTab
+            | (_, Error y) -> symbolTab
+            | (Ok x, Ok y) -> (symbolTab.Add(x,y))
+        match infoRecordRes with
+        | Error m -> symbolTab
+        | Ok _ -> updatedSymbolTable
+                   
 
     let FILLexec (inputRecord: LabelAndMemGeneralParse) symbolTab dP = 
         //insert psuedo code here
