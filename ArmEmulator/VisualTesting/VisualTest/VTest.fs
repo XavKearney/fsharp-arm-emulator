@@ -581,7 +581,6 @@ module VTest =
     let VisualUnitTest paras name src (flagsExpected:string) (outExpected: (Out * int) list) =
         testCase name <| fun () ->
             let flagsActual, outActual, memActual = RunVisualWithFlagsOut paras src
-            (printfn "%A" memActual)
             Expecto.Expect.equal flagsActual (flagsExpected |> strToFlags) "Status flags don't match"
             let outRegsNoted = 
                 outExpected 
