@@ -10,11 +10,11 @@ This code fully implements the following instructions:
 
 The `LDM/STM` instructions contain numerous different parameters, and as such are difficult to test thoroughly. For robustness, they have been tested against `VisUAL` using randomised data for 500,000 iterations. This was only possible by modifying the supplied `VisualTesting` framework to enable memory initialisation.
 
-For the `B/BL` instructions, I wrote a general-purpose parser to evaluate expressions (contained in the `ParseExpr` module). This supports exactly the same expression syntax as VisUAL (with labels, brackets, arithmetic and numbers in different forms) and so should be able to be utilised throughout the group project wherever expressions are used.
+For the `B/BL` instructions, I wrote a general-purpose parser to evaluate expressions (contained in the `ParseExpr` module). This supports exactly the same expression syntax as VisUAL (with labels, brackets, arithmetic and numbers in different forms) with the difference that evaluation conforms to standard [order of operations](https://en.wikipedia.org/wiki/Order_of_operations). The intention is that this forms a module which can be utilised throughout the group phase of the project wherever expressions are used.
 
 To maximise compatibility, the majority of the code is based on the standard interfaces defined in the `CommonData` and `CommonLex` modules, used by the whole team. Before beginning on the individual proportion of the work, we liaised as a group to set out a standard project structure which is followed here.
 
-The main interface to the `MultMem` module is via the `parse` function, which takes `LineData` and outputs a parsed instruction if the instruction is handled by the module and is valid. The result of the `parse` function can then be fed to the `execInstr` function which returns the correct function to be executed for any given instruction in the module.
+The main interface to the `MultMem` module is via the `parse` function, which takes `LineData` and outputs a parsed instruction if the instruction is handled by the module and is valid. The result of the `parse` function can then be piped directly to the `execInstr` function which uses the correct instruction-specific execution function to modify and return a `DataPath` object.
 
 ## Table of Features
 | Instruction/s | Feature | Tested? |  
@@ -29,6 +29,8 @@ The main interface to the `MultMem` module is via the `parse` function, which ta
 | `LDM/STM` | Descriptive error messages, no exceptions | ✔️ |
 | `B/BL` | Basic operation implemented | ✔️ |
 | `B/BL` | VisUAL-style expression parsing with labels | ✔️ |
+| `B/BL` | Standard order of mathematical operations on expressions |✔️|
+| `B/BL` | Nested bracketing of expressions |✔️|
 | `B/BL` | Descriptive error messages, no exceptions | ✔️|
 | `END` | Implemented | ✔️|
 | `All` | Universal parse and execution functions. | ✔️|
