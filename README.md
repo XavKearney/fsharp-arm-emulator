@@ -3,6 +3,7 @@ The goal of this project is to create a fully functional ARM Assembly Language E
 
 **For individual project statements, see the `docs` directory.**
 
+## Running the Project
 If you don't have `paket` installed, run `.paket/paket.bootstrapper.exe` and then `.paket/paket.exe install`. `paket` should now be installed.
 
 To run from a fresh clone, if you have `paket` installed then from the root directory run:
