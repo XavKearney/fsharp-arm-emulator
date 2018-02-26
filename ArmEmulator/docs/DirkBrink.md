@@ -48,3 +48,4 @@ ADD second operand cannot be R13 or R15
 SUB/ADD dest can only be R13 if op1 is R13 and op2 is constant or LSL #1/#2/#3 -> Changed to any second operand but op1 must still be SP
 SUB second operand cannot be PC or SP -> Changed to allowed
 SBC first operand cannot be SP or PC -> Changed to allowed
+RegisterRegisterShift cannot be PC for any instructions -> Changed to allowed

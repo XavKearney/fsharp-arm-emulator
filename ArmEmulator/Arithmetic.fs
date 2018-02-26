@@ -600,19 +600,27 @@ module Arithmetic
                             | false ->
                                 Ok (result, flags)
                         | RSB -> 
-                            let result = (uint64 op2Num - uint64 op1Num)
-                            match suffix with
-                            | true -> 
-                                setFlags result op1Num op2Num flags RSB
-                            | false ->
-                                Ok (result, flags)
+                            match int32 op2Num with
+                            | x when x < 0 ->
+                                Error ("Invalid immediate operand value")
+                            | _ ->
+                                let result = (uint64 op2Num - uint64 op1Num)
+                                match suffix with
+                                | true -> 
+                                    setFlags result op1Num op2Num flags RSB
+                                | false ->
+                                    Ok (result, flags)
                         | RSC -> 
-                            let result = (uint64 op2Num - uint64 op1Num + uint64 (carryVal - 1u))
-                            match suffix with
-                            | true -> 
-                                setFlags result op1Num op2Num flags ADD
-                            | false ->
-                                Ok (result, flags)
+                            match int32 op2Num with
+                            | x when x < 0 ->
+                                Error ("Invalid immediate operand value")
+                            | _ ->
+                                let result = (uint64 op2Num - uint64 op1Num + uint64 (carryVal - 1u))
+                                match suffix with
+                                | true -> 
+                                    setFlags result op1Num op2Num flags ADD
+                                | false ->
+                                    Ok (result, flags)
                     | _ -> Error ("The instruction is invalid")
 
             match logicOp with

@@ -303,7 +303,7 @@ module MultMemTests
                 
                 // ADC, RSB, RSC, SBC target cannot be SP or PC
                 | ADC, R15, _, _, _ | RSB, R15, _, _, _ | RSC, R15, _, _, _ | SBC, R15, _, _, _ -> false
-                | ADC, R13, _, _, _ | RSB, R13, _, _, _ | RSC, R13, _, _, _ | SBC, R15, _, _, _ -> false
+                | ADC, R13, _, _, _ | RSB, R13, _, _, _ | RSC, R13, _, _, _ | SBC, R13, _, _, _ -> false
                 // ADC, RSB, RSC, SBC first operand cannot be SP or PC   
                 | ADC, _, R15, _, _ -> false
                 | RSB, _, R15, _, _ -> false
@@ -353,7 +353,9 @@ module MultMemTests
                 | SUB, _, _, RegisterRegisterShift (R13,_, _), _ -> false
                 | SBC, _, _, RegisterRegisterShift (R13,_, _), _ -> false
                 
-                
+                // RegisterRegisterShift cannot have PC as the shift value
+                | _, _, _, RegisterRegisterShift (_, _ , R15), _ -> false
+
                 // ADC, RSB, RSC target cannot be R13 or R15
                 | ADC, R13, _, _, _ | ADC, R15, _, _, _ -> false
                 | RSB, R13, _, _, _ | RSB, R15, _, _, _ -> false
@@ -368,6 +370,8 @@ module MultMemTests
                 // Don't make PC target for tests due to infinte looping issues
                 | _, R15, _, _, _ -> false
 
+                // PC is different between visual and local so remove from testing
+                | _, _, R15, _, _ | _, _, _, Register R15, _ -> false
 
                 | _ -> true
 
@@ -375,8 +379,7 @@ module MultMemTests
             | false -> ()
             | true -> 
                 let randomRegs = 
-                    genRandomUint32List (0, 10) 12
-                    |> fun lst -> List.concat [lst; [0u; 0u; 0u;]]
+                    genRandomUint32List (0, 10) 15
                 
                 let testParas = {
                     defaultParas with
@@ -385,7 +388,8 @@ module MultMemTests
                         InitFlags = {FN=flags.N;FZ=flags.Z; FC=flags.C;FV=flags.V}
                     }
                 
-                let initTestRegs = List.mapi (fun i x -> (inverseRegNums.[i], x)) randomRegs |> Map.ofList;
+                let randomRegsLocal = randomRegs |> fun lst -> List.concat [lst; [0u;]]
+                let initTestRegs = List.mapi (fun i x -> (inverseRegNums.[i], x)) randomRegsLocal |> Map.ofList;
 
                 let parsed = {
                     PInstr = ArithI
@@ -431,6 +435,7 @@ module MultMemTests
                     |> Map.toList
                     |> List.map (fun (_, i) -> uint32 i)
 
-                Expect.equal regsActual.[..regsActual.Length - 2] localRegs.[..localRegs.Length - 1] "Registers"
+                Expect.equal regsActual.[..regsActual.Length - 2] localRegs.[..localRegs.Length - 2] "Registers"
+               // Expect.equal flagsActual resFlags "Flags"
         
 
