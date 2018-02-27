@@ -8,7 +8,9 @@
   <ItemGroup>
     <Compile Include="CommonData.fs" />
     <Compile Include="CommonLex.fs" />
+    <Compile Include="VisualTesting/VisualTest/VTest.fs" />
     <Compile Include="BitArithmetic.fs" />
+    <Compile Include="BitArithmeticTests.fs" />
     <Compile Include="Tests.fs" />
     <Compile Include="Main.fs" />
     <None Include="App.config" />
