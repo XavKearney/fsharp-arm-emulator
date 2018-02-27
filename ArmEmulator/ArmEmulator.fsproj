@@ -8,8 +8,6 @@
   <ItemGroup>
     <Compile Include="CommonData.fs" />
     <Compile Include="CommonLex.fs" />
-    <Compile Include="MultMem.fs" />
-    <Compile Include="MultMemTests.fs" />
     <Compile Include="memInstructions.fs" />
     <Compile Include="memInstructionsTests.fs" />
     <Compile Include="Tests.fs" />

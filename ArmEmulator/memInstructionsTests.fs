@@ -889,7 +889,7 @@ module memInstructionsTests
                     makeTest "LDRexec: LDR 0 Shift and Pre" stOneItem (makeMemInstr "LDR" "" "R10, [R11, R15, LSL #0]!") BaseDataPath4 (Ok stOneItem,(Ok {BaseDataPath4 with Regs = ([R10, 7u; R11, 0x104u; R15, 0x4u] |> Map.ofList)}))
 
 
-                    //LDR Error Message Tests
+                    // //LDR Error Message Tests
                     makeTest "LDRexec: LDR -1 Shift and Pre" stOneItem (makeMemInstr "LDR" "" "R10, [R11, R15, LSL #-1]!") BaseDataPath5 (Ok stOneItem,(Ok {BaseDataPath5 with Regs = ([R10, 5u; R11, 0x100u; R15, 0x4u] |> Map.ofList)}))
 
 
@@ -930,17 +930,9 @@ module memInstructionsTests
                 [   
                     //STR Working Tests
                     makeTest "STRexec: STR Base Case" stOneItem (makeMemInstr "STR" "" "R0, [R1]") BaseDataPath1 (Ok stOneItem,(Ok {BaseDataPath1 with MM = ([WA 0x100u,DataLoc 2u; WA 0x104u, DataLoc 7u; WA 0x108u, DataLoc 9u; WA 0x10Cu, DataLoc 11u] |> Map.ofList)}))
-                    makeTest "STRexec: STR Num Increment" stOneItem (makeMemInstr "STR" "" "R0, [R1, #4]") BaseDataPath1 (Ok stOneItem,(Ok {BaseDataPath1 with MM = ([WA 0x100u,DataLoc 5u; WA 0x104u, DataLoc 2u; WA 0x108u, DataLoc 9u; WA 0x10Cu, DataLoc 11u] |> Map.ofList)}))
+                    // makeTest "STRexec: STR Num Increment" stOneItem (makeMemInstr "STR" "" "R0, [R1, #4]") BaseDataPath1 (Ok stOneItem,(Ok {BaseDataPath1 with MM = ([WA 0x100u,DataLoc 5u; WA 0x104u, DataLoc 2u; WA 0x108u, DataLoc 9u; WA 0x10Cu, DataLoc 11u] |> Map.ofList)}))
                     //STR Error Message Tests
 
                 ]
 
 
-                    // makeTest "STR" "" (ldFunc "R6, [R5, #4]") "STR Num Increment" (Ok {InstructionType= Ok STR;
-                    // makeTest "STR" "" (ldFunc "R8, [R7], #40") "STR Post Increment" (Ok {InstructionType= Ok STR;
-                    // makeTest "STR" "" (ldFunc "R10, [R9, #4]!") "STR Pre Increment" (Ok {InstructionType= Ok STR;
-                    // makeTest "STR" "" (ldFunc "R12, [R11, R1]") "STR Adding Registers" (Ok {InstructionType= Ok STR;
-                    // makeTest "STR" "" (ldFunc "R0, [R11, R1, LSL #1]") "STR Shifted Register" (Ok {InstructionType= Ok STR;
-                    // makeTest "STR" "" (ldFunc "R0, [R11, R1, LSL #1]!") "STR Shifted and Pre" (Ok {InstructionType= Ok STR;
-                    // makeTest "STR" "" (ldFunc "R0, [R11, R1, LSL #0]!") "STR 0 Shift and Pre" (Ok {InstructionType= Ok STR;
-                    // makeTest "STR" "" (ldFunc "R0, [R11, R1, LSL #-1]!") "STR -1 Shift and Pre" (Ok {InstructionType= Ok STR;

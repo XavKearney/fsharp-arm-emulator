@@ -623,6 +623,7 @@ module MemInstructions
         let changedToBytes (inputRecord: MemInstr) (a: Result<(uint32 * uint32),string>) =
             resultDotBindTwoInp makeBytes inputRecord.BytesNotWords a 
 
+
         changedToBytes inputRecord (changeType (resultDotBindTwoInp (preOrPost inputRecord.PreIndexRb inputRecord.PostIndexRb inputRecord dP) (incrementRbValue inputRecord dP (getOrigVal inputRecord dP)) (getOrigVal inputRecord dP)))
 
 
@@ -654,7 +655,6 @@ module MemInstructions
     let STRexec (symbolTab: SymbolTable) (dP: DataPath<'INS>) (inputRecord: MemInstr) = 
 
         let interpretedRecord = interpretingRecord dP inputRecord
-        printfn "interpretedRecord = %A" interpretedRecord
 
         let updatedSTRMachineMem (tuple: Result<(uint32 * uint32),string>) =
             match tuple with
