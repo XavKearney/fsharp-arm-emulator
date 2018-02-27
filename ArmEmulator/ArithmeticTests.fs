@@ -381,7 +381,7 @@ module MultMemTests
                 // RSC and RSB prove difficult to test with runtime errors for negative second operand
                 | RSC, _, _, _, _ | RSB, _, _, _, _ -> false
 
-                | SUB, _, _, _, _ | SBC, _, _, _, _ -> false
+                | ADD, _, _, _, _ | ADC, _, _, _, _ -> false
 
                 | _ -> true
 

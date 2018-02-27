@@ -540,10 +540,13 @@ module Arithmetic
                 x, newFlags
             |> function 
             // Inputs are both positive
-            | (x, flags) when int32 op1Num > 0 && int32 op2Num > 0 ->
+            | (x, flags) when int32 op1Num >= 0 && int32 op2Num >= 0 ->
                 match opcode with
                 | ADD | ADC ->             
                     let newFlags = if int32 x < int32 op1Num && int32 x < int32 op2Num then {flags with V = true} else {flags with V = false}
+                    x, newFlags
+                | SUB | SBC ->
+                    let newFlags = if uint32 x < uint32 op1Num && uint32 x < uint32 op2Num && op2Num > op1Num then {flags with V = true} else {flags with V = false}
                     x, newFlags
                 | _ ->             
                     let newFlags = {flags with V = false}
@@ -554,23 +557,32 @@ module Arithmetic
                 | ADD | ADC ->             
                     let newFlags = if int32 x > int32 op1Num && int32 x > int32 op2Num then {flags with V = true} else {flags with V = false}
                     x, newFlags
+                | SUB | SBC ->
+                    let newFlags = if uint32 x < uint32 op1Num && uint32 x < uint32 op2Num then {flags with V = true} else {flags with V = false}
+                    x, newFlags
                 | _ ->             
                     let newFlags = {flags with V = false}
                     x, newFlags
             // Op1 is positve, op2 is negative
-            | (x, flags) when int32 op1Num > 0 && int32 op2Num < 0 ->
+            | (x, flags) when int32 op1Num >= 0 && int32 op2Num < 0 ->
                 match opcode with
                 | ADD | ADC ->             
                     let newFlags = if uint32 x < uint32 op1Num && uint32 x < uint32 op2Num then {flags with V = true} else {flags with V = false}
+                    x, newFlags
+                | SUB | SBC ->             
+                    let newFlags = if (uint32 x <= uint32 op1Num && uint32 x < uint32 op2Num) || int32 x - int32 op2Num >= - int32 op1Num then {flags with V = true} else {flags with V = false}
                     x, newFlags
                 | _ ->             
                     let newFlags = {flags with V = false}
                     x, newFlags
             // Op1 is negative, op2 is positive
-            | (x, flags) when int32 op1Num < 0 && int32 op2Num > 0 ->
+            | (x, flags) when int32 op1Num < 0 && int32 op2Num >= 0 ->
                 match opcode with
                 | ADD | ADC ->             
                     let newFlags = if uint32 x < uint32 op1Num && uint32 x < uint32 op2Num then {flags with V = true} else {flags with V = false}
+                    x, newFlags
+                | SUB | SBC ->             
+                    let newFlags = if int32 x > int32 op1Num && int32 x > int32 op2Num then {flags with V = true} else {flags with V = false}
                     x, newFlags
                 | _ ->             
                     let newFlags = {flags with V = false}
