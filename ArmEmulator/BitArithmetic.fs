@@ -375,6 +375,7 @@ module BitArithmetic
         match isNeg,isZero with 
         | true,false -> Ok {flgs with N = true ; Z=false ; C=convCarry}
         | false,true -> Ok {flgs with N = false ; Z=true ; C=convCarry}
+        | false,false -> Ok {flgs with N = false ; Z=false ; C=convCarry}
         | _ -> Error "can't be both negative and zero"
 
 

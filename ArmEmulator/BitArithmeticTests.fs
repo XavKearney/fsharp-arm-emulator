@@ -236,7 +236,20 @@ module BitArithmeticTests
                 [R rName.RegNum,specRegConts] // flgs, ..
             | _ -> failwithf "exeOut is an error"
 
+    let calcFlgs exeOut =
+
+        let boolToStrInt = function
+        | true -> "1"
+        | false -> "0"
+
+        match exeOut with 
+            | Ok instExe ->
+                    List.map boolToStrInt [instExe.Fl.N;instExe.Fl.Z;instExe.Fl.C;instExe.Fl.V]
+                    |> List.reduce (+)
+            | _ -> failwithf "exeOut is an error"               
+
     let parseThenExe cpuData destReg = parse >> exeInstr cpuData >> convExe destReg
+    let evalFlgs cpuData = parse >> exeInstr cpuData >> calcFlgs
 
 
         /// ARM Status bits
@@ -265,7 +278,7 @@ module BitArithmeticTests
         testList "Execution tests"
             [
 
-            // valid input tests
+            // valid input tests (suffix not set)
 
             // MOV tests with decimals
             vTest "MOV test 1" "MOV R0, #1" "0000"      (parseThenExe cpuDat R0 ({ld with OpCode = "MOV" ; Operands = "R0, #1"})) 
@@ -362,6 +375,10 @@ module BitArithmeticTests
             vTest "LSL test 4" "LSL R3, R3, #31" "0000"  (parseThenExe cpuDat R3 ({ld with OpCode = "LSL" ; Operands = "R3, R3, #31"}))
             //vTest "LSL test 5" "LSL R3, R3, #32" "0000"  (parseThenExe cpuDat R3 ({ld with OpCode = "LSL" ; Operands = "R3, R3, #32"}))
             // fails for large rotate values as f# seems to wrap around when integer is exceeded   
+            // LSL tests with registers
+            //vTest "LSL test 5" "LSL R2, R1, R7" "0000"   (parseThenExe cpuDat R2 ({ld with OpCode = "LSL" ; Operands = "R2, R1, R7"}))
+            //vTest "LSL test 6" "LSL R3, R2, R11" "0000"   (parseThenExe cpuDat R3 ({ld with OpCode = "LSL" ; Operands = "R3, R2, R11"}))
+ 
 
             // LSR tests with literals
             vTest "LSR test 1" "LSR R2, R1, #0" "0000"   (parseThenExe cpuDat R2 ({ld with OpCode = "LSR" ; Operands = "R2, R1, #0"}))
@@ -369,6 +386,9 @@ module BitArithmeticTests
             vTest "LSR test 3" "LSR R2, R2, #17" "0000"  (parseThenExe cpuDat R2 ({ld with OpCode = "LSR" ; Operands = "R2, R2, #17"}))
             vTest "LSR test 4" "LSR R3, R11, #31" "0000"  (parseThenExe cpuDat R3 ({ld with OpCode = "LSR" ; Operands = "R3, R11, #31"}))
             vTest "LSR test 5" "LSR R3, R11, #137" "0000"  (parseThenExe cpuDat R3 ({ld with OpCode = "LSR" ; Operands = "R3, R11, #137"}))
+            // LSR tests with registers
+            vTest "LSR test 6" "LSR R2, R1, R7" "0000"   (parseThenExe cpuDat R2 ({ld with OpCode = "LSR" ; Operands = "R2, R1, R7"}))
+            vTest "LSR test 7" "LSR R3, R2, R11" "0000"   (parseThenExe cpuDat R3 ({ld with OpCode = "LSR" ; Operands = "R3, R2, R11"}))
 
             // ASR tests with literals
             vTest "ASR test 1" "ASR R2, R1, #0" "0000"   (parseThenExe cpuDat R2 ({ld with OpCode = "ASR" ; Operands = "R2, R1, #0"}))
@@ -376,9 +396,153 @@ module BitArithmeticTests
             vTest "ASR test 3" "ASR R2, R2, #17" "0000"  (parseThenExe cpuDat R2 ({ld with OpCode = "ASR" ; Operands = "R2, R2, #17"}))
             vTest "ASR test 4" "ASR R3, R11, #31" "0000"  (parseThenExe cpuDat R3 ({ld with OpCode = "ASR" ; Operands = "R3, R11, #31"}))
             vTest "ASR test 5" "ASR R3, R11, #137" "0000"  (parseThenExe cpuDat R3 ({ld with OpCode = "ASR" ; Operands = "R3, R11, #137"}))
+            // ASR tests with registers
+            vTest "ASR test 6" "ASR R2, R1, R7" "0000"   (parseThenExe cpuDat R2 ({ld with OpCode = "ASR" ; Operands = "R2, R1, R7"}))
+            vTest "ASR test 7" "ASR R3, R2, R11" "0000"   (parseThenExe cpuDat R3 ({ld with OpCode = "ASR" ; Operands = "R3, R2, R11"}))            
 
-            // RRX tests with literals
-            vTest "RRX test 2" "RRX R3, R2" "0000"   (parseThenExe cpuDat R3 ({ld with OpCode = "RRX" ; Operands = "R3, R2"}))
-            vTest "RRX test 3" "RRX R2, R7" "0000"  (parseThenExe cpuDat R2 ({ld with OpCode = "RRX" ; Operands = "R2, R7"}))
+            // RRX tests
+            vTest "RRX test 1" "RRX R3, R2" "0000"   (parseThenExe cpuDat R3 ({ld with OpCode = "RRX" ; Operands = "R3, R2"}))
+            vTest "RRX test 2" "RRX R2, R7" "0000"  (parseThenExe cpuDat R2 ({ld with OpCode = "RRX" ; Operands = "R2, R7"}))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+            // valid input tests (suffix set)
+
+            // MOV tests with decimals
+            vTest "MOVS test 1" "MOVS R0, #1" (evalFlgs cpuDat ({ld with OpCode = "MOVS" ; Operands = "R0, #1"}))  (parseThenExe cpuDat R0 ({ld with OpCode = "MOVS" ; Operands = "R0, #1"})) 
+            vTest "MOVS test 2" "MOVS R1, #0" (evalFlgs cpuDat ({ld with OpCode = "MOVS" ; Operands = "R1, #0"}))  (parseThenExe cpuDat R1 ({ld with OpCode = "MOVS" ; Operands = "R1, #0"}))
+            vTest "MOVS test 3" "MOVS R2, #137" (evalFlgs cpuDat ({ld with OpCode = "MOVS" ; Operands = "R2, #137"}))     (parseThenExe cpuDat R2 ({ld with OpCode = "MOVS" ; Operands = "R2, #137"}))
+            vTest "MOVS test 4" "MOVS R3, #4080" (evalFlgs cpuDat ({ld with OpCode = "MOVS" ; Operands = "R3, #4080"}))    (parseThenExe cpuDat R3 ({ld with OpCode = "MOVS" ; Operands = "R3, #4080"}))
+            // // MOVS tests with hex numbers
+            // vTest "MOVS test 5" "MOVS R4, #0x0" (evalFlgs cpuDat ({ld with OpCode = ".." ; Operands = ".."}))     (parseThenExe cpuDat R4 ({ld with OpCode = "MOVS" ; Operands = "R4, #0x0"}))
+            // vTest "MOVS test 6" "MOVS R5, #0xA" (evalFlgs cpuDat ({ld with OpCode = ".." ; Operands = ".."}))     (parseThenExe cpuDat R5 ({ld with OpCode = "MOVS" ; Operands = "R5, #0xA"}))
+            // vTest "MOVS test 7" "MOVS R6, #0x2300" (evalFlgs cpuDat ({ld with OpCode = ".." ; Operands = ".."}))  (parseThenExe cpuDat R6 ({ld with OpCode = "MOVS" ; Operands = "R6, #0x2300"}))
+            // vTest "MOVS test 8" "MOVS R6, #-0xA" (evalFlgs cpuDat ({ld with OpCode = ".." ; Operands = ".."}))    (parseThenExe cpuDat R6 ({ld with OpCode = "MOVS" ; Operands = "R6, #-0xA"}))
+            // vTest "MOVS test 9" "MOVS R6, #-0x2301" (evalFlgs cpuDat ({ld with OpCode = ".." ; Operands = ".."})) (parseThenExe cpuDat R6 ({ld with OpCode = "MOVS" ; Operands = "R6, #-0x2301"}))
+            // // MOVS tests with binary numbers
+            // vTest "MOVS test 10" "MOVS R4, #0b0" (evalFlgs cpuDat ({ld with OpCode = ".." ; Operands = ".."}))                (parseThenExe cpuDat R4 ({ld with OpCode = "MOVS" ; Operands = "R4, #0b0"}))
+            // vTest "MOVS test 11" "MOVS R0, #0b1010" (evalFlgs cpuDat ({ld with OpCode = ".." ; Operands = ".."}))             (parseThenExe cpuDat R0 ({ld with OpCode = "MOVS" ; Operands = "R0, #0b1010"}))
+            // vTest "MOVS test 12" "MOVS R0, #0b10001100000000" (evalFlgs cpuDat ({ld with OpCode = ".." ; Operands = ".."}))   (parseThenExe cpuDat R0 ({ld with OpCode = "MOVS" ; Operands = "R0, #0b10001100000000"}))
+            // vTest "MOVS test 13" "MOVS R4, #-0b10101001" (evalFlgs cpuDat ({ld with OpCode = ".." ; Operands = ".."}))        (parseThenExe cpuDat R4 ({ld with OpCode = "MOVS" ; Operands = "R4, #-0b10101001"}))
+            // // MOVS tests with flexible opperators
+            // vTest "MOVS test 14" "MOVS R0, R5" (evalFlgs cpuDat ({ld with OpCode = ".." ; Operands = ".."}))           (parseThenExe cpuDat R0 ({ld with OpCode = "MOVS" ; Operands = "R0, R5"})) 
+            // vTest "MOVS test 15" "MOVS R1, R7, LSL #12" (evalFlgs cpuDat ({ld with OpCode = ".." ; Operands = ".."}))  (parseThenExe cpuDat R1 ({ld with OpCode = "MOVS" ; Operands = "R1, R7, LSL #12"}))
+            // vTest "MOVS test 16" "MOVS R2, R9, RRX" (evalFlgs cpuDat ({ld with OpCode = ".." ; Operands = ".."}))      (parseThenExe cpuDat R2 ({ld with OpCode = "MOVS" ; Operands = "R2, R9, RRX"}))
+            // vTest "MOVS test 17" "MOVS R3, R10, ASR R3" (evalFlgs cpuDat ({ld with OpCode = ".." ; Operands = ".."}))  (parseThenExe cpuDat R3 ({ld with OpCode = "MOVS" ; Operands = "R3, R10, ASR R3"}))            
+
+            // // MVN tests with decimals
+            // vTest "MVN test 1" "MVN R0, #1" (evalFlgs cpuDat ({ld with OpCode = ".." ; Operands = ".."}))       (parseThenExe cpuDat R0 ({ld with OpCode = "MVN" ; Operands = "R0, #1"})) 
+            // vTest "MVN test 2" "MVN R1, #0" (evalFlgs cpuDat ({ld with OpCode = ".." ; Operands = ".."}))       (parseThenExe cpuDat R1 ({ld with OpCode = "MVN" ; Operands = "R1, #0"}))
+            // vTest "MVN test 3" "MVN R2, #137" (evalFlgs cpuDat ({ld with OpCode = ".." ; Operands = ".."}))     (parseThenExe cpuDat R2 ({ld with OpCode = "MVN" ; Operands = "R2, #137"}))
+            // vTest "MVN test 4" "MVN R3, #4080" (evalFlgs cpuDat ({ld with OpCode = ".." ; Operands = ".."}))    (parseThenExe cpuDat R3 ({ld with OpCode = "MVN" ; Operands = "R3, #4080"}))
+            // // MVN tests with hex numbers
+            // vTest "MVN test 5" "MVN R4, #0x0" (evalFlgs cpuDat ({ld with OpCode = ".." ; Operands = ".."}))     (parseThenExe cpuDat R4 ({ld with OpCode = "MVN" ; Operands = "R4, #0x0"}))
+            // vTest "MVN test 6" "MVN R5, #0xA" (evalFlgs cpuDat ({ld with OpCode = ".." ; Operands = ".."}))     (parseThenExe cpuDat R5 ({ld with OpCode = "MVN" ; Operands = "R5, #0xA"}))
+            // vTest "MVN test 7" "MVN R6, #0x2300" (evalFlgs cpuDat ({ld with OpCode = ".." ; Operands = ".."}))  (parseThenExe cpuDat R6 ({ld with OpCode = "MVN" ; Operands = "R6, #0x2300"}))
+            // vTest "MVN test 8" "MVN R6, #-0xA" (evalFlgs cpuDat ({ld with OpCode = ".." ; Operands = ".."}))    (parseThenExe cpuDat R6 ({ld with OpCode = "MVN" ; Operands = "R6, #-0xA"}))
+            // vTest "MVN test 9" "MVN R6, #-0x2301" (evalFlgs cpuDat ({ld with OpCode = ".." ; Operands = ".."})) (parseThenExe cpuDat R6 ({ld with OpCode = "MVN" ; Operands = "R6, #-0x2301"}))
+            // // // MVN tests with binary numbers
+            // vTest "MVN test 10" "MVN R4, #0b0" (evalFlgs cpuDat ({ld with OpCode = ".." ; Operands = ".."}))                (parseThenExe cpuDat R4 ({ld with OpCode = "MVN" ; Operands = "R4, #0b0"}))
+            // vTest "MVN test 11" "MVN R0, #0b1010" (evalFlgs cpuDat ({ld with OpCode = ".." ; Operands = ".."}))             (parseThenExe cpuDat R0 ({ld with OpCode = "MVN" ; Operands = "R0, #0b1010"}))
+            // vTest "MVN test 12" "MVN R0, #0b10001100000000" (evalFlgs cpuDat ({ld with OpCode = ".." ; Operands = ".."}))   (parseThenExe cpuDat R0 ({ld with OpCode = "MVN" ; Operands = "R0, #0b10001100000000"}))
+            // vTest "MVN test 13" "MVN R4, #-0b10101001" (evalFlgs cpuDat ({ld with OpCode = ".." ; Operands = ".."}))        (parseThenExe cpuDat R4 ({ld with OpCode = "MVN" ; Operands = "R4, #-0b10101001"}))            
+            // // MVN tests with flexible opperators
+            // vTest "MVN test 14" "MVN R0, R5" (evalFlgs cpuDat ({ld with OpCode = ".." ; Operands = ".."}))           (parseThenExe cpuDat R0 ({ld with OpCode = "MVN" ; Operands = "R0, R5"})) 
+            // vTest "MVN test 15" "MVN R1, R7, LSL #12" (evalFlgs cpuDat ({ld with Opcode = ".." ; Operands = ".."}))  (parseThenExe cpuDat R1 ({ld with OpCode = "MVN" ; Operands = "R1, R7, LSL #12"}))
+            // vTest "MVN test 16" "MVN R2, R9, RRX" (evalFlgs cpuDat ({ld with Opcode = ".." ; Operands = ".."}))      (parseThenExe cpuDat R2 ({ld with OpCode = "MVN" ; Operands = "R2, R9, RRX"}))
+            // vTest "MVN test 17" "MVN R3, R10, ASR R3" (evalFlgs cpuDat ({ld with Opcode = ".." ; Operands = ".."}))  (parseThenExe cpuDat R3 ({ld with OpCode = "MVN" ; Operands = "R3, R10, ASR R3"}))            
+
+
+            // // AND tests with literals
+            // vTest "AND test 1" "AND R2, R1, #0" (evalFlgs cpuDat ({ld with Opcode = ".." ; Operands = ".."}))       (parseThenExe cpuDat R2 ({ld with OpCode = "AND" ; Operands = "R2, R1, #0"}))
+            // vTest "AND test 2" "AND R3, R2, #1" (evalFlgs cpuDat ({ld with Opcode = ".." ; Operands = ".."}))       (parseThenExe cpuDat R3 ({ld with OpCode = "AND" ; Operands = "R3, R2, #1"}))
+            // vTest "AND test 3" "AND R2, R2, #137" (evalFlgs cpuDat ({ld with Opcode = ".." ; Operands = ".."}))     (parseThenExe cpuDat R2 ({ld with OpCode = "AND" ; Operands = "R2, R2, #137"}))
+            // vTest "AND test 4" "AND R3, R3, #4080" (evalFlgs cpuDat ({ld with Opcode = ".." ; Operands = ".."}))    (parseThenExe cpuDat R3 ({ld with OpCode = "AND" ; Operands = "R3, R3, #4080"}))
+            // // AND tests with registers
+            // vTest "AND test 5" "AND R2, R1, R3" (evalFlgs cpuDat ({ld with Opcode = ".." ; Operands = ".."}))       (parseThenExe cpuDat R2 ({ld with OpCode = "AND" ; Operands = "R2, R1, R3"}))
+            // vTest "AND test 6" "AND R3, R2, R7" (evalFlgs cpuDat ({ld with Opcode = ".." ; Operands = ".."}))       (parseThenExe cpuDat R3 ({ld with OpCode = "AND" ; Operands = "R3, R2, R7"}))
+            // vTest "AND test 7" "AND R2, R2, R12" (evalFlgs cpuDat ({ld with Opcode = ".." ; Operands = ".."}))      (parseThenExe cpuDat R2 ({ld with OpCode = "AND" ; Operands = "R2, R2, R12"}))
+            // // AND tests with flexible opperators
+            // vTest "AND test 8" "AND R2, R1, R8, LSL #17" (evalFlgs cpuDat ({ld with Opcode = ".." ; Operands = ".."}))  (parseThenExe cpuDat R2 ({ld with OpCode = "AND" ; Operands = "R2, R1, R8, LSL #17"}))
+            // vTest "AND test 9" "AND R3, R2, R6, ASR R7" (evalFlgs cpuDat ({ld with Opcode = ".." ; Operands = ".."}))   (parseThenExe cpuDat R3 ({ld with OpCode = "AND" ; Operands = "R3, R2, R6, ASR R7"}))
+            // vTest "AND test 10" "AND R2, R2, R5, RRX" (evalFlgs cpuDat ({ld with Opcode = ".." ; Operands = ".."}))     (parseThenExe cpuDat R2 ({ld with OpCode = "AND" ; Operands = "R2, R2, R5, RRX"})) 
+
+            // // ORR tests with literals
+            // vTest "ORR test 1" "ORR R2, R1, #0" (evalFlgs cpuDat ({ld with Opcode = ".." ; Operands = ".."}))       (parseThenExe cpuDat R2 ({ld with OpCode = "ORR" ; Operands = "R2, R1, #0"}))
+            // vTest "ORR test 2" "ORR R3, R2, #1" (evalFlgs cpuDat ({ld with Opcode = ".." ; Operands = ".."}))       (parseThenExe cpuDat R3 ({ld with OpCode = "ORR" ; Operands = "R3, R2, #1"}))
+            // vTest "ORR test 3" "ORR R2, R2, #137" (evalFlgs cpuDat ({ld with Opcode = ".." ; Operands = ".."}))     (parseThenExe cpuDat R2 ({ld with OpCode = "ORR" ; Operands = "R2, R2, #137"}))
+            // vTest "ORR test 4" "ORR R3, R3, #4080" (evalFlgs cpuDat ({ld with Opcode = ".." ; Operands = ".."}))    (parseThenExe cpuDat R3 ({ld with OpCode = "ORR" ; Operands = "R3, R3, #4080"}))
+            // // ORR tests with registers
+            // vTest "ORR test 5" "ORR R2, R1, R3" (evalFlgs cpuDat ({ld with Opcode = ".." ; Operands = ".."}))       (parseThenExe cpuDat R2 ({ld with OpCode = "ORR" ; Operands = "R2, R1, R3"}))
+            // vTest "ORR test 6" "ORR R3, R2, R7" (evalFlgs cpuDat ({ld with Opcode = ".." ; Operands = ".."}))       (parseThenExe cpuDat R3 ({ld with OpCode = "ORR" ; Operands = "R3, R2, R7"}))
+            // vTest "ORR test 7" "ORR R2, R2, R12" (evalFlgs cpuDat ({ld with Opcode = ".." ; Operands = ".."}))      (parseThenExe cpuDat R2 ({ld with OpCode = "ORR" ; Operands = "R2, R2, R12"}))
+            // // ORR tests with flexible opperators
+            // vTest "ORR test 8" "ORR R2, R1, R8, LSL #17" (evalFlgs cpuDat ({ld with Opcode = ".." ; Operands = ".."}))  (parseThenExe cpuDat R2 ({ld with OpCode = "ORR" ; Operands = "R2, R1, R8, LSL #17"}))
+            // vTest "ORR test 9" "ORR R3, R2, R6, ASR R7" (evalFlgs cpuDat ({ld with Opcode = ".." ; Operands = ".."}))   (parseThenExe cpuDat R3 ({ld with OpCode = "ORR" ; Operands = "R3, R2, R6, ASR R7"}))
+            // vTest "ORR test 10" "ORR R2, R2, R5, RRX" (evalFlgs cpuDat ({ld with Opcode = ".." ; Operands = ".."}))     (parseThenExe cpuDat R2 ({ld with OpCode = "ORR" ; Operands = "R2, R2, R5, RRX"})) 
+
+            // // EOR tests with literals
+            // vTest "EOR test 1" "EOR R2, R1, #0" (evalFlgs cpuDat ({ld with Opcode = ".." ; Operands = ".."}))       (parseThenExe cpuDat R2 ({ld with OpCode = "EOR" ; Operands = "R2, R1, #0"}))
+            // vTest "EOR test 2" "EOR R3, R2, #1" (evalFlgs cpuDat ({ld with Opcode = ".." ; Operands = ".."}))       (parseThenExe cpuDat R3 ({ld with OpCode = "EOR" ; Operands = "R3, R2, #1"}))
+            // vTest "EOR test 3" "EOR R2, R2, #137" (evalFlgs cpuDat ({ld with Opcode = ".." ; Operands = ".."}))     (parseThenExe cpuDat R2 ({ld with OpCode = "EOR" ; Operands = "R2, R2, #137"}))
+            // vTest "EOR test 4" "EOR R3, R3, #4080" (evalFlgs cpuDat ({ld with Opcode = ".." ; Operands = ".."}))    (parseThenExe cpuDat R3 ({ld with OpCode = "EOR" ; Operands = "R3, R3, #4080"}))
+            // // EOR tests with registers
+            // vTest "EOR test 5" "EOR R2, R1, R3" (evalFlgs cpuDat ({ld with Opcode = ".." ; Operands = ".."}))       (parseThenExe cpuDat R2 ({ld with OpCode = "EOR" ; Operands = "R2, R1, R3"}))
+            // vTest "EOR test 6" "EOR R3, R2, R7" (evalFlgs cpuDat ({ld with Opcode = ".." ; Operands = ".."}))       (parseThenExe cpuDat R3 ({ld with OpCode = "EOR" ; Operands = "R3, R2, R7"}))
+            // vTest "EOR test 7" "EOR R2, R2, R12" (evalFlgs cpuDat ({ld with Opcode = ".." ; Operands = ".."}))      (parseThenExe cpuDat R2 ({ld with OpCode = "EOR" ; Operands = "R2, R2, R12"}))
+            // // EOR tests with flexible opperators
+            // vTest "EOR test 8" "EOR R2, R1, R8, LSL #17" (evalFlgs cpuDat ({ld with Opcode = ".." ; Operands = ".."}))  (parseThenExe cpuDat R2 ({ld with OpCode = "EOR" ; Operands = "R2, R1, R8, LSL #17"}))
+            // vTest "EOR test 9" "EOR R3, R2, R6, ASR R7" (evalFlgs cpuDat ({ld with Opcode = ".." ; Operands = ".."}))   (parseThenExe cpuDat R3 ({ld with OpCode = "EOR" ; Operands = "R3, R2, R6, ASR R7"}))
+            // vTest "EOR test 10" "EOR R2, R2, R5, RRX" (evalFlgs cpuDat ({ld with Opcode = ".." ; Operands = ".."}))     (parseThenExe cpuDat R2 ({ld with OpCode = "EOR" ; Operands = "R2, R2, R5, RRX"}))             
+            
+
+            // // LSL tests with literals
+            // vTest "LSL test 1" "LSL R2, R1, #0" (evalFlgs cpuDat ({ld with Opcode = ".." ; Operands = ".."}))    (parseThenExe cpuDat R2 ({ld with OpCode = "LSL" ; Operands = "R2, R1, #0"}))
+            // vTest "LSL test 2" "LSL R3, R2, #1" (evalFlgs cpuDat ({ld with Opcode = ".." ; Operands = ".."}))    (parseThenExe cpuDat R3 ({ld with OpCode = "LSL" ; Operands = "R3, R2, #1"}))
+            // vTest "LSL test 3" "LSL R2, R2, #17" (evalFlgs cpuDat ({ld with Opcode = ".." ; Operands = ".."}))   (parseThenExe cpuDat R2 ({ld with OpCode = "LSL" ; Operands = "R2, R2, #17"}))
+            // vTest "LSL test 4" "LSL R3, R3, #31" (evalFlgs cpuDat ({ld with Opcode = ".." ; Operands = ".."}))   (parseThenExe cpuDat R3 ({ld with OpCode = "LSL" ; Operands = "R3, R3, #31"}))
+            // //vTest "LSL test 5" "LSL R3, R3, #32" (evalFlgs cpuDat ({ld with Opcode = ".." ; Operands = ".."}))   (parseThenExe cpuDat R3 ({ld with OpCode = "LSL" ; Operands = "R3, R3, #32"}))
+            // // fails for large rotate values as f# seems to wrap around when integer is exceeded   
+            // // LSL tests with registers
+            // vTest "LSL test 1" "LSL R2, R1, R7" (evalFlgs cpuDat ({ld with Opcode = ".." ; Operands = ".."}))    (parseThenExe cpuDat R2 ({ld with OpCode = "LSL" ; Operands = "R2, R1, R7"}))
+            // vTest "LSL test 2" "LSL R3, R2, R11" (evalFlgs cpuDat ({ld with Opcode = ".." ; Operands = ".."}))    (parseThenExe cpuDat R3 ({ld with OpCode = "LSL" ; Operands = "R3, R2, R11"}))
+ 
+
+            // // LSR tests with literals
+            // vTest "LSR test 1" "LSR R2, R1, #0" (evalFlgs cpuDat ({ld with Opcode = ".." ; Operands = ".."}))    (parseThenExe cpuDat R2 ({ld with OpCode = "LSR" ; Operands = "R2, R1, #0"}))
+            // vTest "LSR test 2" "LSR R3, R2, #1" (evalFlgs cpuDat ({ld with Opcode = ".." ; Operands = ".."}))    (parseThenExe cpuDat R3 ({ld with OpCode = "LSR" ; Operands = "R3, R2, #1"}))
+            // vTest "LSR test 3" "LSR R2, R2, #17" (evalFlgs cpuDat ({ld with Opcode = ".." ; Operands = ".."}))   (parseThenExe cpuDat R2 ({ld with OpCode = "LSR" ; Operands = "R2, R2, #17"}))
+            // vTest "LSR test 4" "LSR R3, R11, #31" (evalFlgs cpuDat ({ld with Opcode = ".." ; Operands = ".."}))   (parseThenExe cpuDat R3 ({ld with OpCode = "LSR" ; Operands = "R3, R11, #31"}))
+            // vTest "LSR test 5" "LSR R3, R11, #137" (evalFlgs cpuDat ({ld with Opcode = ".." ; Operands = ".."}))   (parseThenExe cpuDat R3 ({ld with OpCode = "LSR" ; Operands = "R3, R11, #137"}))
+            // // LSR tests with registers
+            // vTest "LSR test 6" "LSR R2, R1, R7" (evalFlgs cpuDat ({ld with Opcode = ".." ; Operands = ".."}))    (parseThenExe cpuDat R2 ({ld with OpCode = "LSR" ; Operands = "R2, R1, R7"}))
+            // vTest "LSR test 7" "LSR R3, R2, R11" (evalFlgs cpuDat ({ld with Opcode = ".." ; Operands = ".."}))    (parseThenExe cpuDat R3 ({ld with OpCode = "LSR" ; Operands = "R3, R2, R11"}))
+
+            // // ASR tests with literals
+            // vTest "ASR test 1" "ASR R2, R1, #0" (evalFlgs cpuDat ({ld with Opcode = ".." ; Operands = ".."}))    (parseThenExe cpuDat R2 ({ld with OpCode = "ASR" ; Operands = "R2, R1, #0"}))
+            // vTest "ASR test 2" "ASR R3, R2, #1" (evalFlgs cpuDat ({ld with Opcode = ".." ; Operands = ".."}))    (parseThenExe cpuDat R3 ({ld with OpCode = "ASR" ; Operands = "R3, R2, #1"}))
+            // vTest "ASR test 3" "ASR R2, R2, #17" (evalFlgs cpuDat ({ld with Opcode = ".." ; Operands = ".."}))   (parseThenExe cpuDat R2 ({ld with OpCode = "ASR" ; Operands = "R2, R2, #17"}))
+            // vTest "ASR test 4" "ASR R3, R11, #31" (evalFlgs cpuDat ({ld with Opcode = ".." ; Operands = ".."}))   (parseThenExe cpuDat R3 ({ld with OpCode = "ASR" ; Operands = "R3, R11, #31"}))
+            // vTest "ASR test 5" "ASR R3, R11, #137" (evalFlgs cpuDat ({ld with Opcode = ".." ; Operands = ".."}))   (parseThenExe cpuDat R3 ({ld with OpCode = "ASR" ; Operands = "R3, R11, #137"}))
+            // // ASR tests with registers
+            // vTest "ASR test 6" "ASR R2, R1, R7" (evalFlgs cpuDat ({ld with Opcode = ".." ; Operands = ".."}))    (parseThenExe cpuDat R2 ({ld with OpCode = "ASR" ; Operands = "R2, R1, R7"}))
+            // vTest "ASR test 7" "ASR R3, R2, R11" (evalFlgs cpuDat ({ld with Opcode = ".." ; Operands = ".."}))    (parseThenExe cpuDat R3 ({ld with OpCode = "ASR" ; Operands = "R3, R2, R11"}))            
+
+            // // RRX tests
+            // vTest "RRX test 1" "RRX R3, R2" (evalFlgs cpuDat ({ld with Opcode = ".." ; Operands = ".."}))    (parseThenExe cpuDat R3 ({ld with OpCode = "RRX" ; Operands = "R3, R2"}))
+            // vTest "RRX test 2" "RRX R2, R7" (evalFlgs cpuDat ({ld with Opcode = ".." ; Operands = ".."}))   (parseThenExe cpuDat R2 ({ld with OpCode = "RRX" ; Operands = "R2, R7"}))            
+
+
             ]
 
