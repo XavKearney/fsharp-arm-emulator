@@ -107,17 +107,17 @@ module Arithmetic
             | LSL _ -> 
                 match cpuData with 
                 | {Fl = _ ; Regs = regmap } -> 
-                    if integer < 32 then Map.find reg regmap <<< integer else uint32 0
+                    if uint32 integer < 32u then Map.find reg regmap <<< integer else uint32 0
             
             | LSR _ -> 
                 match cpuData with 
                 | {Fl = _ ; Regs = regmap } -> 
-                    if integer < 32 then Map.find reg regmap >>> integer else uint32 0
+                    if uint32 integer < 32u then Map.find reg regmap >>> integer else uint32 0
 
             | ASR _ -> 
                 match cpuData with
                 | {Fl = _ ; Regs = regmap } -> 
-                    if integer < 32 then uint32(int32(Map.find reg regmap) >>> integer) else uint32 0
+                    if uint32 integer < 32u then uint32(int32(Map.find reg regmap) >>> integer) else uint32 0
             
             | RRX _ -> 
                 match cpuData with 
@@ -143,17 +143,17 @@ module Arithmetic
             | LSL _ -> 
                 match cpuData with 
                 | {Fl = _ ; Regs = regmap } -> 
-                    if integer < 32 then Map.find reg regmap <<< integer else uint32 0
+                    if uint32 integer < 32u then Map.find reg regmap <<< integer else uint32 0
 
             | LSR _ -> 
                 match cpuData with 
                 | {Fl = _ ; Regs = regmap } -> 
-                    if integer < 32 then Map.find reg regmap >>> integer else uint32 0
+                    if uint32 integer < 32u then Map.find reg regmap >>> integer else uint32 0
 
             | ASR _ -> 
                 match cpuData with
                 | {Fl = _ ; Regs = regmap } -> 
-                    if integer < 32 then uint32(int32(Map.find reg regmap) >>> integer) else uint32 0
+                    if uint32 integer < 32u then uint32(int32(Map.find reg regmap) >>> integer) else uint32 0
 
             | RRX _ -> 
                 match cpuData with 
