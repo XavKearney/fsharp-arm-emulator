@@ -384,12 +384,13 @@ module MultMemTests
                 | _, _, R15, _, _ | _, _, _, Register R15, _ -> false
 
                 // RSC and RSB prove difficult to test with runtime errors for negative second operand
-                | RSC, _, _, _, _ | RSB, _, _, _, _ -> false
+                //| RSC, _, _, _, _ | RSB, _, _, _, _ -> false
+                
                 // Shift of more than 32 will be 0 in my implementation
                 | _, _, _, RegisterShift(_,_, x), _ when uint32 x >= 32u -> false
                 | _, _, _, RegisterRegisterShift(_), _ -> false
 
-                //| SUB, _, _, _, _ | SBC, _, _, _, _ -> false
+                | SUB, _, _, _, _ | SBC, _, _, _, _ -> false
                 | ADD, _, _, _, _ | ADC, _, _, _, _ -> false
 
                 | _ -> true
@@ -456,7 +457,7 @@ module MultMemTests
                 Expect.equal regsActual.[..regsActual.Length - 2] localRegs.[..localRegs.Length - 2] "Registers"
                 Expect.equal flagsActual resCpu.Fl "Flags"
 
-    [<Tests>]
+    //[<Tests>]
     let testCompExec =
         let makeTestExecStr opcode op1 op2 = 
             let opcodeStr, operandStr = makeCompInstrString opcode op1 op2
@@ -464,7 +465,7 @@ module MultMemTests
             opcodeStr + " " + operandStr
 
 
-        testPropertyWithConfig config "Test Arithmetic Execution" <|
+        testPropertyWithConfig config "Test Comparison Execution" <|
         fun opcode op1 op2 (flags: CommonData.Flags) ->
             let instrStr = makeTestExecStr opcode op1 op2
             

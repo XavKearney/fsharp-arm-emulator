@@ -639,7 +639,11 @@ module Arithmetic
                                 let result = op2Num - op1Num
                                 match suffix with
                                 | true -> 
-                                    setFlags result op1Num op2Num flags RSB
+                                    match op2Num with
+                                    | 0u ->
+                                        setFlags result op2Num (~~~op1Num) flags SUB
+                                    | _ ->
+                                        setFlags result op2Num (~~~op1Num + 1u) flags SUB
                                 | false ->
                                     Ok (result, flags)
                         | RSC -> 
@@ -647,10 +651,20 @@ module Arithmetic
                             | x when x < 0 ->
                                 Error ("Invalid immediate operand value")
                             | _ ->
-                                let result = op2Num - op1Num + uint32 (int32 carryVal - 1)
+                                let extra = 
+                                    match carryVal with
+                                    | 0u ->
+                                        op1Num + 1u
+                                    | _ ->
+                                        op1Num
+                                let result = op2Num - extra
                                 match suffix with
                                 | true -> 
-                                    setFlags result op1Num op2Num flags RSC
+                                    match op2Num with
+                                    | 0u ->
+                                        setFlags result op2Num (~~~op1Num) flags SUB
+                                    | _ ->
+                                        setFlags result op2Num (~~~op1Num + 1u) flags SUB
                                 | false ->
                                     Ok (result, flags)
                     | _ -> Error ("The instruction is invalid")
