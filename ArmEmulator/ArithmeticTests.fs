@@ -385,8 +385,11 @@ module MultMemTests
 
                 // RSC and RSB prove difficult to test with runtime errors for negative second operand
                 | RSC, _, _, _, _ | RSB, _, _, _, _ -> false
+                // Shift of more than 32 will be 0 in my implementation
+                | _, _, _, RegisterShift(_,_, x), _ when uint32 x >= 32u -> false
+                | _, _, _, RegisterRegisterShift(_), _ -> false
 
-                | SUB, _, _, _, _ | SBC, _, _, _, _ -> false
+                //| SUB, _, _, _, _ | SBC, _, _, _, _ -> false
 
                 | _ -> true
 
