@@ -529,25 +529,77 @@ module Arithmetic
                 let newFlags = {flags with Z = true}
                 x, newFlags
             | x ->
-                x, flags
+                let newFlags = {flags with Z = false}
+                x, newFlags
             |> function
             | (x, flags) when int32 x < int32 0 ->
                 let newFlags = {flags with N = true}
                 x, newFlags
             | (x, flags) -> 
-                x, flags
-            |> function 
-            | (x, flags) when uint32 x < op1Num && uint32 x < op2Num ->
-                let newFlags = {flags with V = true}
+                let newFlags = {flags with N = false}
                 x, newFlags
+            |> function 
+            // Inputs are both positive
+            | (x, flags) when int32 op1Num > 0 && int32 op2Num > 0 ->
+                match opcode with
+                | ADD | ADC ->             
+                    let newFlags = if int32 x < int32 op1Num && int32 x < int32 op2Num then {flags with V = true} else {flags with V = false}
+                    x, newFlags
+                | _ ->             
+                    let newFlags = {flags with V = false}
+                    x, newFlags
+            // Inputs are both negative
+            | (x, flags) when int32 op1Num < 0 && int32 op2Num < 0 ->
+                match opcode with
+                | ADD | ADC ->             
+                    let newFlags = if int32 x > int32 op1Num && int32 x > int32 op2Num then {flags with V = true} else {flags with V = false}
+                    x, newFlags
+                | _ ->             
+                    let newFlags = {flags with V = false}
+                    x, newFlags
+            // Op1 is positve, op2 is negative
+            | (x, flags) when int32 op1Num > 0 && int32 op2Num < 0 ->
+                match opcode with
+                | ADD | ADC ->             
+                    let newFlags = if uint32 x < uint32 op1Num && uint32 x < uint32 op2Num then {flags with V = true} else {flags with V = false}
+                    x, newFlags
+                | _ ->             
+                    let newFlags = {flags with V = false}
+                    x, newFlags
+            // Op1 is negative, op2 is positive
+            | (x, flags) when int32 op1Num < 0 && int32 op2Num > 0 ->
+                match opcode with
+                | ADD | ADC ->             
+                    let newFlags = if uint32 x < uint32 op1Num && uint32 x < uint32 op2Num then {flags with V = true} else {flags with V = false}
+                    x, newFlags
+                | _ ->             
+                    let newFlags = {flags with V = false}
+                    x, newFlags
+            
+                
             | (x, flags) ->
-                x, flags
+                let newFlags = {flags with V = false}
+                x, newFlags
             |> function
             | (x, flags) when x > uint64 4294967296L -> 
-                let newFlags = {flags with C = true}                           
-                x, newFlags
+                match opcode with
+                | ADD | ADC ->
+                    let newFlags = {flags with C = true}                           
+                    x, newFlags
+                | _ ->
+                    let newFlags = {flags with C = false}                           
+                    x, newFlags
+            | (x, flags) when int32 x >= int32 0 ->
+                match opcode with
+                | ADD | ADC ->
+                    let newFlags = {flags with C = false}                           
+                    x, newFlags
+                | _ -> 
+                    let newFlags = {flags with C = true}                           
+                    x, newFlags
             | (x, flags) -> 
-                x, flags
+                let newFlags = {flags with C = false}
+                x, newFlags
             |> Ok
 
 
@@ -593,7 +645,7 @@ module Arithmetic
                             | false ->
                                 Ok (result, flags)
                         | SBC -> 
-                            let result = (uint64 op1Num - uint64 op2Num + uint64 (carryVal - 1u))
+                            let result = (uint64 op1Num - uint64 op2Num + uint64 (int32 carryVal - 1))
                             match suffix with
                             | true -> 
                                 setFlags result op1Num op2Num flags SBC
@@ -615,7 +667,7 @@ module Arithmetic
                             | x when x < 0 ->
                                 Error ("Invalid immediate operand value")
                             | _ ->
-                                let result = (uint64 op2Num - uint64 op1Num + uint64 (carryVal - 1u))
+                                let result = (uint64 op2Num - uint64 op1Num + uint64 (int32 carryVal - 1))
                                 match suffix with
                                 | true -> 
                                     setFlags result op1Num op2Num flags RSC
@@ -626,7 +678,7 @@ module Arithmetic
             match logicOp with
             | Ok regVal -> 
                 let outVal, outFlags = regVal
-                Map.add target (uint32 outVal) regMap, outFlags
+                {Regs = Map.add target (uint32 outVal) regMap; Fl = outFlags; MM = cpuData.MM}
             | Error _ -> failwithf "The instruction is invalid"
 
         let instr = input.PInstr
