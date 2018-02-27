@@ -21,7 +21,7 @@ module MultMemTests
         |> testList (sprintf "%s Test List" name)
 
     
-    // Taken from xk-mult-mem
+    // Taken from xk-mult-mem -> Generate list of random values
     let genRandomUint32List (min,max) count =
         let rnd = System.Random()
         List.init count (fun _ -> rnd.Next (min, max))
@@ -30,6 +30,7 @@ module MultMemTests
 
     [<Tests>]
     let testParseArithLine = 
+        // Unit tests for ParseArithLine
         let symTable = Some (["test", uint32 2] |> Map.ofList)
         makeTestList parseArithLine symTable "parseArithLine Unit Tests" 
             [
@@ -80,7 +81,8 @@ module MultMemTests
             ]
 
     [<Tests>]
-    let testParseCompLine = 
+    let testParseCompLine =
+        // Unit tests for ParseCompLine
         let symTable = Some (["test", uint32 2] |> Map.ofList)
         makeTestList parseCompLine symTable "parseCompLine Unit Tests"
             [
@@ -101,6 +103,7 @@ module MultMemTests
 
     let config = { FsCheckConfig.defaultConfig with maxTest = 10000 }
 
+    /// Make instruction string for arithmetic from random input values
     let makeArithInstrString opcode suffix target op1 op2 = 
         let opcodeStr = 
             match opcode with
@@ -138,6 +141,7 @@ module MultMemTests
     
     [<Tests>]
     let testArithParse = 
+        // Test parse function for arithmetic opcodes
         let makeTestLineData wa opcode suffix target op1 op2 = 
             
             let opcodeStr, suffixStr, operandStr = makeArithInstrString opcode suffix target op1 op2
@@ -156,7 +160,7 @@ module MultMemTests
 
             let expected = 
                 match opcode, target, op1, op2 with
-                // ADD target can only be R15 if both op1 and op2 are not R13
+                // Restrictions on target register
                 | ADD, R15, R13, _ | ADD, R15, _, Register R13->
                     Some (Error ("Target register cannot be PC if op1 or op2 is R13"))
                 | ADC, R15, _, _ | RSB, R15, _, _ | RSC, R15, _, _ | SBC, R15, _, _  ->
@@ -201,7 +205,7 @@ module MultMemTests
             let result = parse ls
             Expect.equal result expected "Parse Arith Test"
 
-
+    // Make Comparison instruction string from random input values
     let makeCompInstrString opcode op1 op2 = 
         let opcodeStr = 
             match opcode with
@@ -232,6 +236,7 @@ module MultMemTests
 
     [<Tests>]
     let testCompParse = 
+        // Test parse function for comparison instructions
         let makeTestLineData wa opcode op1 op2 = 
             
             let opcodeStr, operandStr = makeCompInstrString opcode op1 op2

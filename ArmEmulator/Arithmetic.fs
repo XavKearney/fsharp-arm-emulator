@@ -2,35 +2,31 @@ module Arithmetic
     open CommonData
     open CommonLex
     open System.Text.RegularExpressions
-    open System.Linq.Expressions
-    open VisualTest
-    open Microsoft.VisualBasic.CompilerServices
-    open System.Threading
-    open VisualTest
 
+    // DUs for the instructions in Arithmetic
     type ArithInstrType = ADD | ADC | SUB | SBC | RSB | RSC
-
     type CompInstrType = CMP | CMN
 
-    type OpCode = Target of RName | Value of uint32
-
+    // DU for all shift operations
     type Operations = LSL | ASR | LSR | ROR | RRX
 
+    // Map of all shift operations
     let operationNames = 
         Map.ofList [
             "LSL",LSL; "ASR",ASR; "LSR",LSR; "ROR",ROR; "RRX",RRX
         ]
-
+    
+    // Reverse map
     let operationStrings = 
         operationNames
         |> Map.toList
         |> List.map (fun (s,rn)-> (rn,s)) 
         |> Map.ofList
 
+    // DU for flex op 2
     type Op2Types = Literal of uint32 | Register of RName | RegisterShift of RName * Operations * int32 | RegisterRegisterShift of RName * Operations * RName
 
-    type ParseReturn = Arith of RName * RName * Op2Types | Compare of RName * Op2Types
-
+    // Main arithmetic instruction type
     type ArithInstr = 
         {
             // Arithmetic type
@@ -45,6 +41,7 @@ module Arithmetic
             Op2: Op2Types;
         }
 
+    // CMP and CMN instruction type
     type CompInstr = 
         {
             InstrType: CompInstrType option;
@@ -52,6 +49,7 @@ module Arithmetic
             Op2: Op2Types;
         }
 
+    // Defines the spec for all the Arithmetic instructions
     let CompSpec = {
         InstrC = COMP
         Roots = ["CMP";"CMN"]
@@ -64,21 +62,24 @@ module Arithmetic
         Suffixes = [""; "S"]
     }
 
+    // DU return type for parse to return the 2 possible instruction types
     type ReturnInstr = | ArithI of ArithInstr | CompI of CompInstr
 
+    // Map of all possible opcodes
     let arithOpCodes = opCodeExpand ArithSpec
     let compOpCodes = opCodeExpand CompSpec
 
 
     // #### START - Active pattern code ####
     
-    // Flexible operand 2 string parsing
+    // Flexible operand 2 string parsing -> Returns group matches
     let (|FlexParse|_|) pattern input = 
         let flexMatch = Regex.Match(input, pattern)
         match flexMatch.Success with
         | true -> Some (List.tail [for strMatch in flexMatch.Groups -> strMatch.Value ])
         | false -> None
 
+    // Matches the first character of a string and returns the rest
     let (|Prefix|_|) (p:string) (s:string) =
         if s.StartsWith(p) then
             // Return string after pattern
@@ -100,25 +101,21 @@ module Arithmetic
             match cpuData with 
             | {Fl = _ ; Regs = regmap } -> Map.find reg regmap
         
+        // Register Shift
         | RegisterShift (reg, op, integer) -> 
-            // Register shift with various possible operations
             match op with
-            // Logical shift left
             | LSL _ -> 
                 match cpuData with 
                 | {Fl = _ ; Regs = regmap } -> Map.find reg regmap <<< integer
             
-            // Logical shift right
             | LSR _ -> 
                 match cpuData with 
                 | {Fl = _ ; Regs = regmap } -> Map.find reg regmap >>> integer
 
-            // Arithmetic Shift Right
             | ASR _ -> 
                 match cpuData with
                 | {Fl = _ ; Regs = regmap } -> uint32(int32(Map.find reg regmap) >>> integer)
             
-            // RRX puts 1 in MSB if C is true
             | RRX _ -> 
                 match cpuData with 
                 | {Fl = flag ; Regs = regmap } -> 
@@ -126,36 +123,32 @@ module Arithmetic
                     | {N = _ ; C = carry ; Z = _ ; V = _} -> 
                         let carryNum = match carry with | true -> uint32(1) | false -> uint32(0)
                         (Map.find reg regmap >>> 1) + (carryNum <<< 31)
-                
-            // Rotate right
+
             | ROR _ ->
                 match cpuData with
                 | {Fl = _ ; Regs = regmap } -> 
                     (Map.find reg regmap <<< (32 - integer)) ||| (Map.find reg regmap >>> integer)
 
-        
+        // Register with register shift
         | RegisterRegisterShift (reg, op, reg2) ->
-            let integer = match cpuData with 
-                          | {Fl = _ ; Regs = regmap } -> int32(Map.find reg2 regmap &&& uint32(31))
+            let integer = 
+                match cpuData with 
+                | {Fl = _ ; Regs = regmap } -> 
+                    int32(Map.find reg2 regmap &&& uint32(31))
 
-            // Register shift with various possible operations
             match op with
-            // Logical shift left
             | LSL _ -> 
                 match cpuData with 
                 | {Fl = _ ; Regs = regmap } -> Map.find reg regmap <<< integer
-            
-            // Logical shift right
+
             | LSR _ -> 
                 match cpuData with 
                 | {Fl = _ ; Regs = regmap } -> Map.find reg regmap >>> integer
 
-            // Arithmetic Shift Right
             | ASR _ -> 
                 match cpuData with
                 | {Fl = _ ; Regs = regmap } -> uint32(int32(Map.find reg regmap) >>> integer)
-            
-            // RRX puts 1 in MSB if C is true
+
             | RRX _ -> 
                 match cpuData with 
                 | {Fl = flag ; Regs = regmap } -> 
@@ -163,14 +156,13 @@ module Arithmetic
                     | {N = _ ; C = carry ; Z = _ ; V = _} -> 
                         let carryNum = match carry with | true -> uint32(1) | false -> uint32(0)
                         (Map.find reg regmap >>> 1) + (carryNum <<< 31)
-                
-            // Rotate right
+
             | ROR _ ->
                 match cpuData with
                 | {Fl = _ ; Regs = regmap } -> 
                     (Map.find reg regmap <<< (32 - integer)) ||| (Map.find reg regmap >>> integer)
 
-
+    /// Checks if input conforms to restrictions on literals
     let check32BitBound input =
         match int64 input with
         | x when x > int64 System.Int32.MaxValue -> Error ("Invalid 32 bit number")
@@ -186,8 +178,10 @@ module Arithmetic
             | true -> Ok x
             | false -> Error ("Invalid 32 bit number")
 
-
+    /// Recursively split an expression and evaluate
+    /// Combine expression in BIDMAD format
     let recursiveSplit expression (symTable:SymbolTable option) =
+        // Lift result type up through recursive function
         let lift op a b =
             match a,b with
             | Ok x, Ok y -> Ok (op x y)
@@ -228,6 +222,7 @@ module Arithmetic
 
                 else
                     match expression with
+                    // Binary string
                     | FlexParse "^(-?0b[0-1]+)$" [binStr] -> 
                         match binStr.Length with
                         | x when x > 38 -> Error ("Op2 is not a valid 32 bit number")
@@ -236,6 +231,7 @@ module Arithmetic
                             | Ok binInt -> Ok (binInt)
                             | _ -> Error ("Op2 is not a valid 32 bit number")  
 
+                    // Hex string
                     | FlexParse "^(-?0x[0-9A-F]+|-?&[0-9A-F]+)$" [hexStr] -> 
                         match hexStr.Length with
                         | x when x > 14 -> Error ("Op2 is not a valid 32 bit number")
@@ -251,6 +247,7 @@ module Arithmetic
                                 | Ok hexInt -> Ok (hexInt)
                                 | _ -> Error ("Invalid 32 bit number")
 
+                    // Decimal string
                     | FlexParse "^(-?[0-9]+)$" [numStr] ->
                         match numStr.Length with
                         | x when x > 14 -> Error ("Op2 is not a valid 32 bit number")
@@ -258,6 +255,8 @@ module Arithmetic
                             match check32BitBound numStr with
                             | Ok numInt -> Ok (numInt)
                             | _ -> Error ("Invalid 32 bit number")
+                    
+                    // Otherwise could be symbol or otherwise invalid expression
                     | _ -> 
                         match symTable with
                         | Some symMap -> 
@@ -268,12 +267,13 @@ module Arithmetic
 
             recursiveSplit' expression
 
-
+    /// Parse a line for CMP and CMN instructions
     let parseCompLine (line:string) (symTable:SymbolTable option) = 
-        
+        // List of operands (split by comma)       
         let opList = line.Split(',') |> Array.map (fun s-> s.Trim()) |> Array.toList
 
         match opList.Length with
+        // If length 2 then there is no shift op -> must be literal or register
         | 2 ->
             let op1Str = opList.[0]
             let op2Str = opList.[1]
@@ -293,6 +293,7 @@ module Arithmetic
             
             | _ -> Error ("Op1 is not a valid register")
         
+        // Should have a shift operation
         | 3 -> 
             let op1Str = opList.[0]
             let op2Str = opList.[1]
@@ -307,6 +308,7 @@ module Arithmetic
                         match operationNames.TryFind shiftOpStr with
                         | Some shiftOp ->
                             match shiftOp with
+                            // RRX should have no shift amount specified
                             | RRX ->
                                 Error ("RRX always has a shift of 1")
                             | _ ->
@@ -321,6 +323,7 @@ module Arithmetic
                                     | Some flexOut -> Ok (op1, RegisterRegisterShift (op2, shiftOp, flexOut))                 
                                     | _ -> Error ("Flex is not a valid register or expression")
                         | _ -> Error ("Shift op is invalid")
+                    // Special case for RRX -> There is no shift amount specified
                     | FlexParse "^(RRX)\s*$" [shiftOpStr] ->
                         match operationNames.TryFind shiftOpStr with
                         | Some shiftOp -> 
@@ -334,8 +337,8 @@ module Arithmetic
             | _ -> Error ("Op1 is an invalid register")
         | _ -> Error ("Invalid compare instruction")
 
+    /// Parse string for arithmetic 
     let parseArithLine (line:string) symTable = 
-
         let opList = line.Split(',') |> Array.map (fun s-> s.Trim()) |> Array.toList
 
         match opList.Length with
@@ -409,12 +412,12 @@ module Arithmetic
             | _ -> Error ("Invalid destination register")
         | _ -> Error ("Invalid arithmetic instruction")
         
-
+    /// Make an arithmeric operand string from random input values
     let makeArithInstr root (suffix:string) operands symTable =
-        // Makes final instruction from baseInstr
+        // Makes final instruction from baseInstr after checking conditions
         let makeInstr (ins:ArithInstr) = 
             match ins.InstrType, ins.Target, ins.Op1, ins.Op2 with
-            // ADD target can only be R15 if both op1 and op2 are not R13
+            // Restrictions on target register
             | Some (ADD), R15, R13, _ | Some (ADD), R15, _, Register R13->
                 Error ("Target register cannot be PC if op1 or op2 is R13")          
             | Some (ADC), R15, _, _ | Some (RSB), R15, _, _ | Some (RSC), R15, _, _ | Some (SBC), R15, _, _  ->
@@ -453,7 +456,7 @@ module Arithmetic
         
         | Error err -> Error err
 
-
+    /// Make comparison op string from random input values
     let makeCompInstr root operands symTable = 
         let makeInstr ins = 
             Ok(ins)
@@ -480,7 +483,6 @@ module Arithmetic
     /// ls contains the line input
     /// and other state needed to generate output
     /// the result is None if the opcode does not match
-    /// otherwise it is Ok Parse or Error (parse error string)
     let parse ls =
         let parse' (instrC, (root,suffix,pCond)) =
             let (WA la) = ls.LoadAddr
