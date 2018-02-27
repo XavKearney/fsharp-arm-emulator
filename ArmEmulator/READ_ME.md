@@ -5,6 +5,7 @@
   - Get execution working for STR, LDR and ADR
   - Get unit testing done for label execution functions
   - Add visual testing for most of the unit testing sections
+  - Make non valid inputs to FILL for updateMemoryDataPathTest return an error monad instead of just not doing anything (Probably change FillNf funtion)
 
 This section covers six instructions seperated into three groups:
 

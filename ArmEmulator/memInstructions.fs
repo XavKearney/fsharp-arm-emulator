@@ -174,8 +174,6 @@ module MemInstructions
     /// Parse Active Pattern used by top-level code
     // let (|IMatch|_|) = parse
 
-    let test = List.append ["0"] ["1";"2";"3"]
-
 
     // let (|BitRotatable|_|) num =
     //     match num with
@@ -297,7 +295,7 @@ module MemInstructions
                     | Some x -> x |> string |> uint32 |> Ok
                 let labelsOrNot item labs =
                     match labs with
-                    | false -> Error "Did not match and of the evalExpression end case options"
+                    | false -> Error "evalExpression: Did not match and of the evalExpression end case options"
                     | true -> symTabTryFindMonad item
                 match (exp.Trim()) with 
                 | Match @"(0x[0-9]+)" [_; ex] -> ex.Value |> uint32 |> Ok //Matching a hex number, Eg 0x5
@@ -305,7 +303,7 @@ module MemInstructions
                 | Match @"(0b[0-1]+)" [_; ex] -> ex.Value |> uint32 |> Ok //Matching binary number, Eg 0b11
                 | Match @"([0-9]+)" [_; ex]   -> ex.Value |> uint32 |> Ok //Matching a decimal number  try (^[0-9]|(([^a-z]| )[0-9]+([^a-z]| |$)))
                 | Match @"(\w+)" [_; lab]     -> labelsOrNot (exp.Trim()) labels 
-                | _ -> Error "Did not match any of the evalExpression end case options"
+                | _ -> Error "evalExpression: End case did not match any of the evalExpression end case options (0x4, 2, 0b11, label2 etc)"
         evalExpression' exp0
 
 
@@ -314,7 +312,6 @@ module MemInstructions
 
     let parseAdrIns root ls =
         let ADRInstrTypeTmp =
-            // printfn "\nparseAdrIns\nroot: %A\nls: %A" root ls
             match root with
             | "ADR" -> Ok ADRm
             | _     -> Error (sprintf "parseAdrIns: root passed to
@@ -403,8 +400,7 @@ module MemInstructions
         match uint32Res with
         | Error m -> Error m
         | Ok x -> if (((x|>int) % 4 =0)&&((x|>int)>=0)) then Ok x
-                //   else Error (sprintf "parseLabelIns: Fill expression (%A) does not evaluate to something which is a positive multiple of four" x)
-                  else Error (sprintf "parseLabelIns: Fill expression (%A) >0 and divisible by four" x)
+                  else Error (sprintf "parseLabelIns: Fill expression (%A) <0 or not divisible by four" x)
 
     ///Parse function for Label based instructions such as EQU
     /// FILL and DCD. Returns a record with all the information
@@ -496,8 +492,6 @@ module MemInstructions
     /// otherwise it is Ok Parse or Error (parse error string)
     let parse (ls: LineData) = //: Result<Parse<Instr>,string> option =
         let parse' (instrC, (root,suffix,pCond)) =
-
-            // printfn "\n\nparse Testing\ninstrC: %A\nroot: %A\nsuffix: %A\npCond: %A\n\n" instrC root suffix pCond
 
             let (WA la) = ls.LoadAddr // address this instruction is loaded into memory
             // this does the real work of parsing
@@ -658,7 +652,6 @@ module MemInstructions
         | (Ok x, Ok y) -> Ok (symbolTab.Add(x,y))
 
 
-
     let updateMemoryDataPath (inputRecord: labelInstr) (dP: DataPath<'INS>) =
         let dataValList = 
             let fillNf = 
@@ -675,51 +668,60 @@ module MemInstructions
             | Ok x ->   match x with
                         | DCD ->    match inputRecord.DCDValueList with
                                     | Some z -> match z with
-                                                | Ok u -> Ok (List.map (fun y -> (y|>uint32)) u)
+                                                | Ok u -> Ok (List.map (fun y -> (y|>int|>uint32)) u)
                                                 | Error m -> Error m
                                     | None -> Error "updateMemoryDataPath-dataValList: DCDValueList = None"
-                        | FILL -> Ok (makeZeroList fillNf)
+                        | FILL -> match inputRecord.FillN with
+                                  | Some y -> match y with 
+                                              | Ok z -> Ok (makeZeroList fillNf)
+                                              | Error m -> Error m
+                                  | None -> Error "updateMemoryDataPath-dataValList: FillN = None" 
+                        | EQU -> match inputRecord.EQUExpr with
+                                 | Some y -> match y with 
+                                             | Ok z -> Ok []
+                                             | Error m -> Error m
+                                 | None -> Error "updateMemoryDataPath-dataValList: EQUExpr = None" 
             | Error m -> Error m
-
 
         let getAddrList lst length =
             let rec getAddrList' list len =
                 match len with 
+                | 0 -> list
                 | 1 -> list
                 | _ ->  getAddrList' (List.append list [((List.last list)+4u)]) (len-1)
             match length with
             | Ok x -> Ok (getAddrList' lst x)
             | Error m -> Error m
-            
 
         let findMaxAddr (dP: DataPath<'INS>) = 
-            let waToUin32 (k,l) =
+            let waToUint32 (k,_) =
                 match k with
                 | WA y -> y
+
             dP.MM
             |> Map.toSeq
-            |> Seq.map waToUin32
+            |> Seq.map waToUint32
             |> Seq.max 
 
         let findAddrs (dP: DataPath<'INS>) :Result<uint32 list, string>=
             if ((dP.MM).IsEmpty) then
-                getAddrList [100u] (Result.map (List.length) dataValList)
+                getAddrList [0x100u] (Result.map (List.length) dataValList)
             else 
                 getAddrList [findMaxAddr dP] (Result.map (List.length) dataValList)
 
-        let rec updateMachineMemory' addrListRes (dPMM: MachineMemory<'INS>) (dataValListRes') =
+        let rec updateMachineMemory' (addrListRes: Result<uint32 list,string>) (dPMM: MachineMemory<'INS>) (dataValListRes') =
             match (addrListRes, dataValListRes') with
-            | (Error x, Error y) -> Error (x+"\n"+y)
+            | (Error x, Error y) -> if (x <> y) then Error (x+"\n"+y)
+                                    else Error x
             | (Error x, _) -> Error x
             | (_, Error y) -> Error y
-            | (Ok addrList, Ok (dataValList': uint32 list)) -> match addrList with
+            | (Ok addrList, Ok (dataValList': uint32 list)) ->  match dataValList' with
                                                                 | [] -> Ok dPMM
                                                                 | _ ->  
-                                                                    let remainingAddrList = Ok addrList.[1..(List.length addrList)-1]
-                                                                    let remainingValueList = Ok dataValList'.[1..(List.length dataValList')-1]
-                                                                    let updatedMachineMem = dPMM.Add(WA addrList.[0], DataLoc dataValList'.[0])
-                                                                    updateMachineMemory' remainingAddrList updatedMachineMem remainingValueList
-        
+                                                                        let remainingAddrList = Ok addrList.[1..(List.length addrList)-1]
+                                                                        let remainingValueList = Ok dataValList'.[1..(List.length dataValList')-1]
+                                                                        let updatedMachineMem = dPMM.Add(WA (addrList.[0]+4u), DataLoc dataValList'.[0])
+                                                                        updateMachineMemory' remainingAddrList updatedMachineMem remainingValueList
         match (updateMachineMemory' (findAddrs dP) dP.MM dataValList) with
         | Ok x -> Ok {Fl = dP.Fl; Regs = dP.Regs; MM = x}
         | Error m -> Error m
@@ -744,7 +746,9 @@ module MemInstructions
         match x with
         | Some y -> removeResult y
         | _ -> None
-
+    ///Executes the DCD instruction, taking in the symbol table,
+    /// DataPath and labelInstr record and outputing updated 
+    /// Symbol tables and DataPaths
     let DCDexec (symbolTab: SymbolTable) (dP: DataPath<'INS>) (inputRecord: labelInstr) = 
         //Takes a label and a list of values, it then stores 
         // the values in memory, they can be accessed using

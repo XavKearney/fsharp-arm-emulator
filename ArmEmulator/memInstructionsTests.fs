@@ -59,17 +59,16 @@ module memInstructionsTests
                     //Fill Error Message Tests
                     makeTest "FILL" (ldFunc "labelT" "3") "FILL 3" (Ok {InstructionType = Ok FILL; Name = (Ok (Some "labelT"));
                                                                                     EQUExpr = None; DCDValueList = None;
-                                                                                    // FillN = Some (Error "parseLabelIns: Fill expression (3u) does not evaluate to something which is a positive multiple of four")})
-                                                                                    FillN = Some (Error "parseLabelIns: Fill expression (3u) >0 and divisible by four")})
+                                                                                    FillN = Some (Error "parseLabelIns: Fill expression (3u) <0 or not divisible by four")})
                     makeTest "FILL" (ldFunc "labelT" "123") "FILL 123" (Ok {InstructionType = Ok FILL; Name = (Ok (Some "labelT"));
                                                                                     EQUExpr = None; DCDValueList = None;
-                                                                                    FillN = Some (Error "parseLabelIns: Fill expression (123u) >0 and divisible by four")})
+                                                                                    FillN = Some (Error "parseLabelIns: Fill expression (123u) <0 or not divisible by four")})
                     makeTest "FILL" (ldFunc "labelT" "-1") "FILL -1" (Ok {InstructionType = Ok FILL; Name = (Ok (Some "labelT"));
                                                                                     EQUExpr = None; DCDValueList = None;
-                                                                                    FillN = Some (Error "parseLabelIns: Fill expression (4294967295u) >0 and divisible by four")})
+                                                                                    FillN = Some (Error "parseLabelIns: Fill expression (4294967295u) <0 or not divisible by four")})
                     makeTest "FILL" (ldFunc "labelT" "-4") "FILL -4" (Ok {InstructionType = Ok FILL; Name = (Ok (Some "labelT"));
                                                                                     EQUExpr = None; DCDValueList = None;
-                                                                                    FillN = Some (Error "parseLabelIns: Fill expression (4294967292u) >0 and divisible by four")})
+                                                                                    FillN = Some (Error "parseLabelIns: Fill expression (4294967292u) <0 or not divisible by four")})
                     
                     //DCD Working Tests
                     makeTest "DCD" (ldFunc "labelT" "1") "DCD 1" (Ok {InstructionType = Ok DCD; Name = (Ok (Some "labelT"));
@@ -537,7 +536,7 @@ module memInstructionsTests
                                                                     PSize = 4u; PCond = Cal}))
                     makeTest (ldFuncAll 100u "labelTest" st "FILL" "-1") "Fill Error Case" (Some (Ok {PInstr = LabelO (Ok {InstructionType = Ok FILL; Name = (Ok (Some "labelTest"));
                                                                                     EQUExpr = None; DCDValueList = None;
-                                                                                    FillN = Some (Error "parseLabelIns: Fill expression (4294967295u) >0 and divisible by four")});
+                                                                                    FillN = Some (Error "parseLabelIns: Fill expression (4294967295u) <0 or not divisible by four")});
                                                                     PLabel = Some ("labelTest", 100u);
                                                                     PSize = 4u; PCond = Cal}))
 
@@ -575,8 +574,8 @@ module memInstructionsTests
             |> removeRecord 
         let makeTest symTab inpRec field name output =
             testCase name <| fun () ->
-                Expect.equal (updateSymbolTable symTab inpRec field) output (sprintf "checkLiteral Tests\nTest: %A" name)
-        Expecto.Tests.testList "checkLiteralMonad Tests"
+                Expect.equal (updateSymbolTable symTab inpRec field) output (sprintf "checkUpdateSymbolTable Tests\nTest: %A" name)
+        Expecto.Tests.testList "checkUpdateSymbolTable Tests"
                 [   
                     //EQU Working tests
                     makeTest stOneItem ((baseEquFunc "labelT" 2u)) ((baseEquFunc "labelT" 2u).EQUExpr) "updateSymbolTable EQU 2 Base Test" (["testL",256u; "labelT",2u] |> Map.ofList |> Ok)
@@ -584,7 +583,7 @@ module memInstructionsTests
                     makeTest stOneItem (makeLabelInstr "labelT" "EQU" "2") ((makeLabelInstr "labelT" "EQU" "2").EQUExpr) "updateSymbolTable EQU parseLabelIns generation Test" (["testL",256u; "labelT",2u] |> Map.ofList |> Ok)
                     makeTest stOneItem (makeLabelInstr "labelT2" "EQU" "5-4*3-1*1+2*2*2") ((makeLabelInstr "labelT" "EQU" "5-4*3-1*1+2*2*2").EQUExpr) "updateSymbolTable EQU +*- Test" (["testL",256u; "labelT2",0u] |> Map.ofList |> Ok)
                     //EQU Error Message tests
-                    makeTest stOneItem (makeLabelInstr "labelT2" "EQU" "") ((makeLabelInstr "labelT" "EQU" "").EQUExpr) "updateSymbolTable EQU Invalid Input Test" (Error "Did not match any of the evalExpression end case options")
+                    makeTest stOneItem (makeLabelInstr "labelT2" "EQU" "") ((makeLabelInstr "labelT" "EQU" "").EQUExpr) "updateSymbolTable EQU Invalid Input Test" (Error "evalExpression: End case did not match any of the evalExpression end case options (0x4, 2, 0b11, label2 etc)")
 
 
                     //FILL Working tests
@@ -592,7 +591,7 @@ module memInstructionsTests
                     makeTest stOneItem (makeLabelInstr "labelT" "FILL" "4*3") ((makeLabelInstr "labelT" "FILL" "4*3").FillN) "updateSymbolTable FILL Mult Case" (["testL",256u; "labelT",0u] |> Map.ofList |> Ok)
                     makeTest stOneItem (makeLabelInstr "labelT" "FILL" "0") ((makeLabelInstr "labelT" "FILL" "0").FillN) "updateSymbolTable FILL Zero Case" (["testL",256u; "labelT",0u] |> Map.ofList |> Ok)
                     //Fill Error Message Tests
-                    makeTest stOneItem (makeLabelInstr "labelT" "FILL" "-4") ((makeLabelInstr "labelT" "FILL" "-4").FillN) "updateSymbolTable FILL -4 Case" (Error "parseLabelIns: Fill expression (4294967292u) >0 and divisible by four" )
+                    makeTest stOneItem (makeLabelInstr "labelT" "FILL" "-4") ((makeLabelInstr "labelT" "FILL" "-4").FillN) "updateSymbolTable FILL -4 Case" (Error "parseLabelIns: Fill expression (4294967292u) <0 or not divisible by four" )
 
                     //DCD Working tests
                     makeTest stOneItem (makeLabelInstr "labelT" "DCD" "1") (removeOptionD ((makeLabelInstr "labelT" "DCD" "1").DCDValueList)) "updateSymbolTable DCD Base Case" (["testL",256u; "labelT",1u] |> Map.ofList |> Ok)
@@ -606,19 +605,103 @@ module memInstructionsTests
 
                 ]
 
-    // [<Tests>]
-    // let updateMemoryDataPathTest =
-    //     let st:SymbolTable = ["testL",256u; "testL2",260u] |> Map.ofList
-    //     let makeEvalExpTest name input labels output =
-    //         testCase name <| fun () ->
-    //             Expect.equal (evalExpression input st labels) output (sprintf "evalExpression Test '%s'" input)
-    //     Expecto.Tests.testList "evalExpressions Tests"
-    //             [   
-    //                 //evalExpression Working Tests
-    //             ]
+    [<Tests>]
+    let updateMemoryDataPathTest =
+        let makeLabelInstr label root input =
+            let (stOneItem: SymbolTable) = ["testL",256u] |> Map.ofList
+            let ldFuncEQU Lab Ops = 
+                    {LoadAddr= WA 200u; 
+                        Label= Some Lab; 
+                        SymTab= Some stOneItem;
+                        OpCode= "";
+                        Operands= Ops}
+            let removeRecord x =
+                match x with
+                | Ok y -> y 
+            ldFuncEQU label input
+            |> parseLabelIns root
+            |> removeRecord 
+        let BaseDataPath : DataPath<'INS> =
+            let memory : MachineMemory<'INS> = [WA 0x100u,DataLoc 5u] |> Map.ofList
+            let registers : Map<RName,uint32> = [(R0: RName), 2u] |> Map.ofList
+            let flags : Flags = { N= false; C=false; Z=false; V=false}
+            {Fl= flags; Regs= registers; MM = memory}
+
+        let makeTest name inputRec inpDataPath output =
+            testCase name <| fun () ->
+                Expect.equal (updateMemoryDataPath inputRec inpDataPath) output (sprintf "updateMemoryDataPathTest Test '%s'" name)
+        Expecto.Tests.testList "updateMemoryDataPathTest Tests"
+                [   
+                    //DCD Working Tests
+                    makeTest "DCD Base Case" (makeLabelInstr "labelT" "DCD" "1") BaseDataPath (Ok {BaseDataPath with MM = ([WA 0x100u,DataLoc 5u; WA 0x104u, DataLoc 1u] |> Map.ofList)})
+                    makeTest "DCD List Base Case" (makeLabelInstr "labelT" "DCD" "1,3,5") BaseDataPath (Ok {BaseDataPath with MM = ([WA 0x100u,DataLoc 5u; WA 0x104u, DataLoc 1u; WA 0x108u, DataLoc 3u; WA 0x10Cu, DataLoc 5u] |> Map.ofList)})
+                    //DCD Error Message Tests
+                    makeTest "DCD No Input" (makeLabelInstr "labelT" "DCD" "") BaseDataPath (Error "parseLabelIns: Input to DCD function not valid (No input etc)")
+                    makeTest "DCD Invalid Input" (makeLabelInstr "labelT" "DCD" "a") BaseDataPath (Error "parseLabelIns: Input to DCD function not valid (No input etc)")
+
+                    //Fill Working Tests
+                    makeTest "Fill Base Case" (makeLabelInstr "labelT" "FILL" "4") BaseDataPath (Ok {BaseDataPath with MM = ([WA 0x100u,DataLoc 5u; WA 0x104u, DataLoc 0u; WA 0x108u, DataLoc 0u; WA 0x10Cu, DataLoc 0u; WA 0x110u, DataLoc 0u] |> Map.ofList)})
+                    makeTest "Fill Changed given address" (makeLabelInstr "labelT" "FILL" "4") {BaseDataPath with MM =([WA 0x0u,DataLoc 4u] |> Map.ofList)} (Ok {BaseDataPath with MM = ([WA 0x0u,DataLoc 4u; WA 0x4u, DataLoc 0u; WA 0x8u, DataLoc 0u; WA 0xCu, DataLoc 0u; WA 0x10u, DataLoc 0u] |> Map.ofList)})
+                    //Fill Error Message Tests
+                    makeTest "Fill input/4 != int" (makeLabelInstr "labelT" "FILL" "1") {BaseDataPath with MM =([WA 0x10u,DataLoc 3u] |> Map.ofList)} (Error "parseLabelIns: Fill expression (1u) <0 or not divisible by four")
+                    makeTest "Fill input/4 != int and negative" (makeLabelInstr "labelT" "FILL" "-3") {BaseDataPath with MM =([WA 0x100u,DataLoc 7u] |> Map.ofList)} (Error "parseLabelIns: Fill expression (4294967293u) <0 or not divisible by four")
+                    makeTest "Fill No Input" (makeLabelInstr "labelT" "FILL" "") BaseDataPath (Error "evalExpression: End case did not match any of the evalExpression end case options (0x4, 2, 0b11, label2 etc)")
+
+                    //EQU Working Tests
+                    makeTest "EQU Base Case" (makeLabelInstr "labelT" "EQU" "2") BaseDataPath (Ok BaseDataPath)
+                    //EQU Error Message Tests
+                    makeTest "EQU No Input" (makeLabelInstr "labelT" "EQU" "") BaseDataPath (Error "evalExpression: End case did not match any of the evalExpression end case options (0x4, 2, 0b11, label2 etc)")
+
+                ]
+
+
+
+    [<Tests>]
+    let DCDexecTest =
+        let (stOneItem: SymbolTable) = ["testL",256u] |> Map.ofList
+        let makeLabelInstr label root input =
+            let ldFuncEQU Lab Ops = 
+                    {LoadAddr= WA 200u; 
+                        Label= Some Lab; 
+                        SymTab= Some stOneItem;
+                        OpCode= "";
+                        Operands= Ops}
+            let removeRecord x =
+                match x with
+                | Ok y -> y 
+            ldFuncEQU label input
+            |> parseLabelIns root
+            |> removeRecord 
+        let BaseDataPath : DataPath<'INS> =
+            let memory : MachineMemory<'INS> = [WA 0x100u,DataLoc 5u] |> Map.ofList
+            let registers : Map<RName,uint32> = [(R0: RName), 2u] |> Map.ofList
+            let flags : Flags = { N= false; C=false; Z=false; V=false}
+            {Fl= flags; Regs= registers; MM = memory}
+
+        let makeTest name inputSymTab inputRec inpDataPath output =
+            testCase name <| fun () ->
+                Expect.equal (DCDexec inputSymTab inpDataPath inputRec) output (sprintf "DCDexecTest Test '%s'" name)
+        Expecto.Tests.testList "DCDexecTest Tests"
+                [   
+                    //DCD Working Tests
+                    makeTest "DCDexec: DCD Base Case" stOneItem (makeLabelInstr "labelT" "DCD" "1") BaseDataPath ((["testL",256u; "labelT",1u] |> Map.ofList |> Ok),(Ok {BaseDataPath with MM = ([WA 0x100u,DataLoc 5u; WA 0x104u, DataLoc 1u] |> Map.ofList)}))
+                    makeTest "DCDexec: DCD List Base Case" stOneItem (makeLabelInstr "labelT" "DCD" "1, 3, 5") BaseDataPath ((["testL",256u; "labelT",1u] |> Map.ofList |> Ok),(Ok {BaseDataPath with MM = ([WA 0x100u,DataLoc 5u; WA 0x104u, DataLoc 1u; WA 0x108u, DataLoc 3u; WA 0x10Cu, DataLoc 5u] |> Map.ofList)}))
+                    makeTest "DCDexec: DCD Negative List" stOneItem (makeLabelInstr "labelT" "DCD" "1, -3, 5") BaseDataPath ((["testL",256u; "labelT",1u] |> Map.ofList |> Ok),(Ok {BaseDataPath with MM = ([WA 0x100u,DataLoc 5u; WA 0x104u, DataLoc 1u; WA 0x108u, DataLoc 4294967293u; WA 0x10Cu, DataLoc 5u] |> Map.ofList)}))
+
+                    // //DCD Error Message Tests
+                    makeTest "DCDexec: DCD No Input" stOneItem (makeLabelInstr "labelT" "DCD" "") BaseDataPath ((Error "parseLabelIns: Input to DCD function not valid (No input etc)"),(Error "parseLabelIns: Input to DCD function not valid (No input etc)"))
+                    makeTest "DCDexec: DCD Invalid Input" stOneItem (makeLabelInstr "labelT" "DCD" "a") BaseDataPath ((Error "parseLabelIns: Input to DCD function not valid (No input etc)"),(Error "parseLabelIns: Input to DCD function not valid (No input etc)"))
+                    makeTest "DCDexec: DCD No Input List" stOneItem (makeLabelInstr "labelT" "DCD" "1, ,5") BaseDataPath ((Error "parseLabelIns: Input to DCD function not valid (No input etc)"),(Error "parseLabelIns: Input to DCD function not valid (No input etc)"))
+                    makeTest "DCDexec: DCD Invalid List Input" stOneItem (makeLabelInstr "labelT" "DCD" "1,a,5") BaseDataPath ((Error "parseLabelIns: Input to DCD function not valid (No input etc)"),(Error "parseLabelIns: Input to DCD function not valid (No input etc)"))
+
+                ]
+
+
+
+
+
+
 
 //Functions to test
-//  - updatedMemoryDataPath
-//  - DCDexec
 //  - EQUexec
-//  - FILLexec
+//  - FILLexec 
