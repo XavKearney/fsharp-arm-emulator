@@ -222,7 +222,7 @@ module BitArithmetic
             -> Ok {baseInstr with opA = toReg ops.[0] ; opB = Some (Reg (toReg ops.[1])) ; opC = Some (Flex (toFlexOp ops.[2..]))}
 
         | LSL | LSR | ASR | ROR when ops.Length = 3
-            -> Ok {baseInstr with opA = toReg ops.[0] ; opB = Some (Reg (toReg ops.[1])) ; opC = Some (Reg (toReg ops.[2]))}
+            -> Ok {baseInstr with opA = toReg ops.[0] ; opB = Some (Reg (toReg ops.[1])) ; opC = Some (Flex (toFlexOp ops.[2..]))}
 
         | RRX when ops.Length = 2
             -> Ok {baseInstr with opA = toReg ops.[0] ; opB = Some(Reg (toReg ops.[1]))}
@@ -264,7 +264,7 @@ module BitArithmetic
     let EorTeq a b = a ^^^ b
     let Bic a b = a &&& (~~~ b)
     let Lsl n shiftVal = n <<< int32 shiftVal
-    let Lsr n shiftVal = uint32 n >>> int32 shiftVal
+    let Lsr n shiftVal = n >>> int32 shiftVal
     let Ror n rotateVal = (n>>> int32 rotateVal) ||| (n<<<(32- int32 rotateVal))
     let Asr n shiftVal = uint32 (int32 n >>> int32 shiftVal)
     let Rrx n carry = (n >>> 1) + (carry <<< 31)
@@ -454,18 +454,18 @@ module BitArithmetic
                         | _ -> None                                      
                     | LSR -> 
                         match calcOp opb,calcOp opc,suffix with 
-                        | Some n1,Some n2,"" -> Some (Lsl n1 n2,carryNum) 
-                        | Some n1,Some n2,"S" -> Some (Lsl n1 n2,shiftCarry n1 n2 Lsr selectLSB)
+                        | Some n1,Some n2,"" -> Some (Lsr n1 n2,carryNum) 
+                        | Some n1,Some n2,"S" -> Some (Lsr n1 n2,shiftCarry n1 n2 Lsr selectLSB)
                         | _ -> None                          
                     | ROR -> 
                         match calcOp opb,calcOp opc,suffix with
-                        | Some n1,Some n2,"" -> Some (Lsl n1 n2,carryNum)  
-                        | Some n1,Some n2,"S" -> Some (Lsl n1 n2,shiftCarry n1 n2 Ror selectLSB)
+                        | Some n1,Some n2,"" -> Some (Ror n1 n2,carryNum)  
+                        | Some n1,Some n2,"S" -> Some (Ror n1 n2,shiftCarry n1 n2 Ror selectLSB)
                         | _ -> None                       
                     | ASR -> 
                         match calcOp opb,calcOp opc,suffix with
-                        | Some n1,Some n2,"" -> Some (Lsl n1 n2,carryNum)  
-                        | Some n1,Some n2,"S" -> Some (Lsl n1 n2,shiftCarry n1 n2 Asr selectLSB)
+                        | Some n1,Some n2,"" -> Some (Asr n1 n2,carryNum)  
+                        | Some n1,Some n2,"S" -> Some (Asr n1 n2,shiftCarry n1 n2 Asr selectLSB)
                         | _ -> None                      
                     | MOV -> 
                         match calcOp opb,calcCarry opb,suffix with
