@@ -381,7 +381,7 @@ module MultMemTests
                 // RSC and RSB prove difficult to test with runtime errors for negative second operand
                 | RSC, _, _, _, _ | RSB, _, _, _, _ -> false
 
-                | ADD, _, _, _, _ | ADC, _, _, _, _ -> false
+                | SUB, _, _, _, _ | SBC, _, _, _, _ -> false
 
                 | _ -> true
 
@@ -389,7 +389,7 @@ module MultMemTests
             | false -> ()
             | true -> 
                 let randomRegs = 
-                    genRandomUint32List (0, 10) 15
+                    genRandomUint32List (-0x7FFFFFFF, 0xFFFFFFFF) 15
                 
                 let testParas = {
                     defaultParas with
@@ -439,8 +439,12 @@ module MultMemTests
                 let results = doArithmetic parsed cpuData
 
                 let resCpu = results
+                let localRegs = 
+                    resCpu.Regs
+                    |> Map.toList
+                    |> List.map (fun (_, x) -> x)
 
-                //Expect.equal regsActual.[..regsActual.Length - 2] localRegs.[..localRegs.Length - 2] "Registers"
-                Expect.equal flagsActual resCpu.Fl "Flags"
+                Expect.equal regsActual.[..regsActual.Length - 2] localRegs.[..localRegs.Length - 2] "Registers"
+                //Expect.equal flagsActual resCpu.Fl "Flags"
         
 

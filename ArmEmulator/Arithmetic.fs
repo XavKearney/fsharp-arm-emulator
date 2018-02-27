@@ -525,14 +525,14 @@ module Arithmetic
         let setFlags result op1Num op2Num flags opcode = 
             result 
             |> function
-            | x when x = uint64 0 ->
+            | x when uint64 x = uint64 0 ->
                 let newFlags = {flags with Z = true}
                 x, newFlags
             | x ->
                 let newFlags = {flags with Z = false}
                 x, newFlags
             |> function
-            | (x, flags) when int32 x < int32 0 ->
+            | (x, flags) when int64 x < int64 0 ->
                 let newFlags = {flags with N = true}
                 x, newFlags
             | (x, flags) -> 
@@ -540,60 +540,16 @@ module Arithmetic
                 x, newFlags
             |> function 
             // Inputs are both positive
-            | (x, flags) when int32 op1Num >= 0 && int32 op2Num >= 0 ->
-                match opcode with
-                | ADD | ADC ->             
-                    let newFlags = if int32 x < int32 op1Num && int32 x < int32 op2Num then {flags with V = true} else {flags with V = false}
-                    x, newFlags
-                | SUB | SBC ->
-                    let newFlags = if uint32 x < uint32 op1Num && uint32 x < uint32 op2Num && op2Num > op1Num then {flags with V = true} else {flags with V = false}
-                    x, newFlags
-                | _ ->             
-                    let newFlags = {flags with V = false}
-                    x, newFlags
-            // Inputs are both negative
-            | (x, flags) when int32 op1Num < 0 && int32 op2Num < 0 ->
-                match opcode with
-                | ADD | ADC ->             
-                    let newFlags = if int32 x > int32 op1Num && int32 x > int32 op2Num then {flags with V = true} else {flags with V = false}
-                    x, newFlags
-                | SUB | SBC ->
-                    let newFlags = if uint32 x < uint32 op1Num && uint32 x < uint32 op2Num then {flags with V = true} else {flags with V = false}
-                    x, newFlags
-                | _ ->             
-                    let newFlags = {flags with V = false}
-                    x, newFlags
-            // Op1 is positve, op2 is negative
-            | (x, flags) when int32 op1Num >= 0 && int32 op2Num < 0 ->
-                match opcode with
-                | ADD | ADC ->             
-                    let newFlags = if uint32 x < uint32 op1Num && uint32 x < uint32 op2Num then {flags with V = true} else {flags with V = false}
-                    x, newFlags
-                | SUB | SBC ->             
-                    let newFlags = if (uint32 x <= uint32 op1Num && uint32 x < uint32 op2Num) || int32 x - int32 op2Num >= - int32 op1Num then {flags with V = true} else {flags with V = false}
-                    x, newFlags
-                | _ ->             
-                    let newFlags = {flags with V = false}
-                    x, newFlags
-            // Op1 is negative, op2 is positive
-            | (x, flags) when int32 op1Num < 0 && int32 op2Num >= 0 ->
-                match opcode with
-                | ADD | ADC ->             
-                    let newFlags = if uint32 x < uint32 op1Num && uint32 x < uint32 op2Num then {flags with V = true} else {flags with V = false}
-                    x, newFlags
-                | SUB | SBC ->             
-                    let newFlags = if int32 x > int32 op1Num && int32 x > int32 op2Num then {flags with V = true} else {flags with V = false}
-                    x, newFlags
-                | _ ->             
-                    let newFlags = {flags with V = false}
-                    x, newFlags
-            
+            | (x, flags) when int64 (int32 op1Num + int32 op2Num) <> int64 (int32 op1Num) + int64 (int32 op2Num) ->
+                let newFlags = {flags with V = true}
+                x, newFlags
+
                 
             | (x, flags) ->
                 let newFlags = {flags with V = false}
                 x, newFlags
             |> function
-            | (x, flags) when x > uint64 4294967296L -> 
+            | (x, flags) when int64 x >= int64 4294967296L -> 
                 match opcode with
                 | ADD | ADC ->
                     let newFlags = {flags with C = true}                           
@@ -636,28 +592,28 @@ module Arithmetic
                     | Some _, Some op1Num, Some op2Num -> 
                         match opcode with
                         | ADD -> 
-                            let result = (uint64 op1Num + uint64 op2Num)
-                            match suffix with
-                            | true -> 
-                                setFlags result op1Num op2Num flags ADD
-                            | false ->
-                                Ok (result, flags)
+                            let result = int32 op1Num + int32 op2Num
+                            //match suffix with
+                           // | true -> 
+                           //     setFlags result op1Num op2Num flags ADD
+                            //| false ->
+                            Ok (result, flags)
                         | ADC -> 
-                            let result = (uint64 op1Num + uint64 op2Num + uint64 carryVal)
-                            match suffix with
-                            | true -> 
-                                setFlags result op1Num op2Num flags ADC
-                            | false ->
-                                Ok (result, flags)
+                            let result = int32 op1Num + int32 op2Num + int32 carryVal
+                            //match suffix with
+                            //| true -> 
+                            //   setFlags result op1Num op2Num flags ADC
+                           // | false ->
+                            Ok (result, flags)
                         | SUB -> 
-                            let result = (uint64 op1Num - uint64 op2Num)
+                            let result = int32 (uint64 op1Num - uint64 op2Num)
                             match suffix with
                             | true -> 
                                 setFlags result op1Num op2Num flags SUB
                             | false ->
                                 Ok (result, flags)
                         | SBC -> 
-                            let result = (uint64 op1Num - uint64 op2Num + uint64 (int32 carryVal - 1))
+                            let result = int32 (uint64 op1Num - uint64 op2Num + uint64 (int32 carryVal - 1))
                             match suffix with
                             | true -> 
                                 setFlags result op1Num op2Num flags SBC
@@ -668,7 +624,7 @@ module Arithmetic
                             | x when x < 0 ->
                                 Error ("Invalid immediate operand value")
                             | _ ->
-                                let result = (uint64 op2Num - uint64 op1Num)
+                                let result = int32 (uint64 op2Num - uint64 op1Num)
                                 match suffix with
                                 | true -> 
                                     setFlags result op1Num op2Num flags RSB
@@ -679,7 +635,7 @@ module Arithmetic
                             | x when x < 0 ->
                                 Error ("Invalid immediate operand value")
                             | _ ->
-                                let result = (uint64 op2Num - uint64 op1Num + uint64 (int32 carryVal - 1))
+                                let result = int32 (uint64 op2Num - uint64 op1Num + uint64 (int32 carryVal - 1))
                                 match suffix with
                                 | true -> 
                                     setFlags result op1Num op2Num flags RSC
