@@ -453,7 +453,7 @@ module MultMemTests
                     |> Map.toList
                     |> List.map (fun (_, x) -> x)
 
-                Expect.equal regsActual.[..regsActual.Length - 2] localRegs.[..localRegs.Length - 2] "Registers"
-                //Expect.equal flagsActual resCpu.Fl "Flags"
+                //Expect.equal regsActual.[..regsActual.Length - 2] localRegs.[..localRegs.Length - 2] "Registers"
+                Expect.equal flagsActual resCpu.Fl "Flags"
         
 

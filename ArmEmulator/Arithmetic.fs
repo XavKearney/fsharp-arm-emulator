@@ -606,7 +606,11 @@ module Arithmetic
                             let result = op1Num - op2Num
                             match suffix with
                             | true -> 
-                                setFlags result op1Num (~~~op2Num + 1u) flags SUB
+                                match op2Num with
+                                | 0u ->
+                                    setFlags result op1Num (~~~op2Num) flags SUB
+                                | _ ->
+                                    setFlags result op1Num (~~~op2Num + 1u) flags SUB
                             | false ->
                                 Ok (result, flags)
                         | SBC -> 
@@ -619,7 +623,12 @@ module Arithmetic
                             let result = op1Num - extra
                             match suffix with
                             | true -> 
-                                setFlags result op1Num (~~~extra + 1u) flags SBC
+                                match extra with
+                                | 0u ->
+                                    setFlags result op1Num (~~~extra) flags SUB
+                                | _ ->
+                                    setFlags result op1Num (~~~extra + 1u) flags SBC
+                                
                             | false ->
                                 Ok (result, flags)
                         | RSB -> 
