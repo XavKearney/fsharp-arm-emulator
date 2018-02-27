@@ -389,7 +389,7 @@ module MultMemTests
                 | _, _, _, RegisterShift(_,_, x), _ when uint32 x >= 32u -> false
                 | _, _, _, RegisterRegisterShift(_), _ -> false
 
-                //| SUB, _, _, _, _ | SBC, _, _, _, _ -> false
+                | SUB, _, _, _, _ | SBC, _, _, _, _ -> false
 
                 | _ -> true
 
@@ -452,7 +452,7 @@ module MultMemTests
                     |> Map.toList
                     |> List.map (fun (_, x) -> x)
 
-                Expect.equal regsActual.[..regsActual.Length - 2] localRegs.[..localRegs.Length - 2] "Registers"
-                //Expect.equal flagsActual resCpu.Fl "Flags"
+                //Expect.equal regsActual.[..regsActual.Length - 2] localRegs.[..localRegs.Length - 2] "Registers"
+                Expect.equal flagsActual resCpu.Fl "Flags"
         
 
