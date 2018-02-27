@@ -298,6 +298,9 @@ module MultMemTests
         fun opcode suffix target op1 op2 (flags: CommonData.Flags) ->
             let instrStr = makeTestExecStr opcode suffix target op1 op2
             
+            // Place restrictions on input data
+            // visUAL has a lot of restrictions on inputs, so this next section
+            // conforms to these.
             let valid = 
                 match opcode, target, op1, op2, flags with
                 | _, _, _, _, f when f.N && f.Z -> false
@@ -370,9 +373,10 @@ module MultMemTests
                 | ADC, R13, _, _, _ | ADC, R15, _, _, _ -> false
                 | RSB, R13, _, _, _ | RSB, R15, _, _, _ -> false
                 | RSC, R13, _, _, _ | RSC, R15, _, _, _ -> false
-                // TODO
+
                 | SUB, _, R15, _, _ -> false
                 | SUB, _, _, RegisterShift(R15, _, _), _ -> false
+                
                 // visUAL restriction on ADC with RRX -> This is not in my implementation
                 | ADC, _, _, RegisterShift(_, RRX, _), _ -> false
                 | ADC, _, _, RegisterRegisterShift(_, RRX, _), _ -> false
@@ -384,6 +388,9 @@ module MultMemTests
                 | _, _, R15, _, _ | _, _, _, Register R15, _ -> false
 
                 // RSC and RSB prove difficult to test with runtime errors for negative second operand
+                // Comment the below line to perform some automated testing
+                // NOTE: Will likely result in runtime errors in its current form
+                
                 | RSC, _, _, _, _ | RSB, _, _, _, _ -> false
                 
                 // Shift of more than 32 will be 0 in my implementation
@@ -425,6 +432,7 @@ module MultMemTests
                     PCond = Cal;
                 }
 
+                // Run visualTest with flagsOut to compare to my implementation
                 let visFlags, visRegs, _ = RunVisualWithFlagsOut testParas instrStr
 
                 let flagsActual = {
@@ -446,6 +454,7 @@ module MultMemTests
                     MM = Map.empty;
                 }
 
+                // Use my code with the same input values to obtain hopefully the same output
                 let results = doArithmetic parsed cpuData
 
                 let resCpu = results
@@ -454,6 +463,7 @@ module MultMemTests
                     |> Map.toList
                     |> List.map (fun (_, x) -> x)
 
+                // Expecto checks
                 Expect.equal regsActual.[..regsActual.Length - 2] localRegs.[..localRegs.Length - 2] "Registers"
                 Expect.equal flagsActual resCpu.Fl "Flags"
 

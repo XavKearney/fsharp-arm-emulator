@@ -530,7 +530,10 @@ module Arithmetic
         // Register map
         let regMap = cpuData.Regs
 
-        let setFlags result op1Num op2Num flags opcode = 
+        // Sets the flags from the instructions
+        // Pipe input and output all the way through to set each individual flag
+        // and compound the result
+        let setFlags result op1Num op2Num flags = 
             result 
             |> function
             | x when int32 x = 0 ->
@@ -547,12 +550,9 @@ module Arithmetic
                 let newFlags = {flags with N = false}
                 x, newFlags
             |> function 
-            // Inputs are both positive
             | (x, flags) when (int64 (int32 op1Num + int32 op2Num)) <> (int64 (int32 op1Num) + int64 (int32 op2Num)) ->
                 let newFlags = {flags with V = true}
                 x, newFlags
-
-                
             | (x, flags) ->
                 let newFlags = {flags with V = false}
                 x, newFlags
@@ -560,7 +560,6 @@ module Arithmetic
             | (x, flags) when (uint64 op1Num + uint64 op2Num) <> (uint64 (op1Num + op2Num)) -> 
                 let newFlags = {flags with C = true}                           
                 x, newFlags
-
             | (x, flags) -> 
                 let newFlags = {flags with C = false}
                 x, newFlags
@@ -583,6 +582,7 @@ module Arithmetic
                 | true -> 1u
                 | false -> 0u
 
+            // Perform the actual logic operation depending on the opcode
             let logicOp = 
                 match targetVal, op1Val, op2Val with
                     | Some _, Some op1Num, Some op2Num -> 
@@ -591,7 +591,7 @@ module Arithmetic
                             let result = op1Num + op2Num
                             match suffix with
                             | true -> 
-                                setFlags result op1Num op2Num flags ADD
+                                setFlags result op1Num op2Num flags
                             | false ->
                                 Ok (result, flags)
                         | ADC -> 
@@ -599,7 +599,7 @@ module Arithmetic
                             let result = op1Num + extra
                             match suffix with
                             | true -> 
-                               setFlags result op1Num extra flags ADC
+                               setFlags result op1Num extra flags
                             | false ->
                                 Ok (result, flags)
                         | SUB -> 
@@ -608,9 +608,9 @@ module Arithmetic
                             | true -> 
                                 match op2Num with
                                 | 0u ->
-                                    setFlags result op1Num (~~~op2Num) flags SUB
+                                    setFlags result op1Num (~~~op2Num) flags
                                 | _ ->
-                                    setFlags result op1Num (~~~op2Num + 1u) flags SUB
+                                    setFlags result op1Num (~~~op2Num + 1u) flags
                             | false ->
                                 Ok (result, flags)
                         | SBC -> 
@@ -625,14 +625,15 @@ module Arithmetic
                             | true -> 
                                 match extra with
                                 | 0u ->
-                                    setFlags result op1Num (~~~extra) flags SUB
+                                    setFlags result op1Num (~~~extra) flags
                                 | _ ->
-                                    setFlags result op1Num (~~~extra + 1u) flags SBC
+                                    setFlags result op1Num (~~~extra + 1u) flags
                                 
                             | false ->
                                 Ok (result, flags)
                         | RSB -> 
                             match int32 op2Num with
+                            // visUAL restriction that op2 has to be a positive number
                             | x when x < 0 ->
                                 Error ("Invalid immediate operand value")
                             | _ ->
@@ -641,9 +642,9 @@ module Arithmetic
                                 | true -> 
                                     match op2Num with
                                     | 0u ->
-                                        setFlags result op2Num (~~~op1Num) flags SUB
+                                        setFlags result op2Num (~~~op1Num) flags
                                     | _ ->
-                                        setFlags result op2Num (~~~op1Num + 1u) flags SUB
+                                        setFlags result op2Num (~~~op1Num + 1u) flags
                                 | false ->
                                     Ok (result, flags)
                         | RSC -> 
@@ -662,9 +663,9 @@ module Arithmetic
                                 | true -> 
                                     match op2Num with
                                     | 0u ->
-                                        setFlags result op2Num (~~~op1Num) flags SUB
+                                        setFlags result op2Num (~~~extra) flags
                                     | _ ->
-                                        setFlags result op2Num (~~~op1Num + 1u) flags SUB
+                                        setFlags result op2Num (~~~extra + 1u) flags
                                 | false ->
                                     Ok (result, flags)
                     | _ -> Error ("The instruction is invalid")
@@ -675,6 +676,9 @@ module Arithmetic
                 {Regs = Map.add target (uint32 outVal) regMap; Fl = outFlags; MM = cpuData.MM}
             | Error _ -> failwithf "The instruction is invalid"
 
+        // Computational code for CMP and CMN
+        // Has the same basic stucture as for the above function with small
+        // necessary changed to reflect CompI type
         let compLogic opcode op1 op2 (flags:Flags) = 
             let op1Val = regMap.TryFind op1
             let op2Val = 
@@ -692,12 +696,12 @@ module Arithmetic
                             let result = op1Num - op2Num
                             match op2Num with
                             | 0u ->
-                                setFlags result op1Num (~~~op2Num) flags SUB
+                                setFlags result op1Num (~~~op2Num) flags
                             | _ ->
-                                setFlags result op1Num (~~~op2Num + 1u) flags SUB
+                                setFlags result op1Num (~~~op2Num + 1u) flags
                         | CMN -> 
                             let result = op1Num + op2Num
-                            setFlags result op1Num op2Num flags ADD
+                            setFlags result op1Num op2Num flags
 
                     | _ -> Error ("The instruction is invalid")
             
@@ -711,6 +715,7 @@ module Arithmetic
 
         let instr = input.PInstr
 
+        // Get instruction from cpuData and perform the corresponding 
         match instr with
         | ArithI instr ->
             let arithInstr = instr.InstrType
@@ -723,6 +728,7 @@ module Arithmetic
             match arithInstr with
             | Some(ins) -> arithLogic ins suffix target op1 op2 flags
             | None -> failwithf "No instruction specified"
+        
         | CompI instr ->
             let compInstr = instr.InstrType
             let op1 = instr.Op1
