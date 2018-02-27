@@ -845,11 +845,32 @@ module memInstructionsTests
             ldFuncEQU input
             |> parseMemIns root suffix
             |> removeRecord 
-        let BaseDataPath : DataPath<'INS> =
-            let memory : MachineMemory<'INS> = [WA 0x100u,DataLoc 5u] |> Map.ofList
-            let registers : Map<RName,uint32> = [(R0: RName), 2u; R1, 0x100u] |> Map.ofList
+        let BaseDataPath1 : DataPath<'INS> =
+            let memory : MachineMemory<'INS> = [WA 0x100u,DataLoc 5u; WA 0x104u, DataLoc 7u; WA 0x108u, DataLoc 9u] |> Map.ofList
+            let registers : Map<RName,uint32> = [R0, 2u; R1, 0x100u] |> Map.ofList
             let flags : Flags = { N= false; C=false; Z=false; V=false}
             {Fl= flags; Regs= registers; MM = memory}
+        let BaseDataPath2 : DataPath<'INS> =
+            let memory : MachineMemory<'INS> = [WA 0x100u,DataLoc 5u; WA 0x104u, DataLoc 7u; WA 0x108u, DataLoc 9u; WA 0x10Cu, DataLoc 11u] |> Map.ofList
+            let registers : Map<RName,uint32> = [R10, 2u; R11, 0xCu; R15, 0x100u] |> Map.ofList
+            let flags : Flags = { N= false; C=false; Z=false; V=false}
+            {Fl= flags; Regs= registers; MM = memory}
+        let BaseDataPath3 : DataPath<'INS> =
+            let memory : MachineMemory<'INS> = [WA 0x100u,DataLoc 5u; WA 0x104u, DataLoc 7u; WA 0x108u, DataLoc 9u; WA 0x10Cu, DataLoc 11u] |> Map.ofList
+            let registers : Map<RName,uint32> = [R10, 2u; R11, 0x100u; R15, 0x1u] |> Map.ofList
+            let flags : Flags = { N= false; C=false; Z=false; V=false}
+            {Fl= flags; Regs= registers; MM = memory}
+        let BaseDataPath4 : DataPath<'INS> =
+            let memory : MachineMemory<'INS> = [WA 0x100u,DataLoc 5u; WA 0x104u, DataLoc 7u; WA 0x108u, DataLoc 9u; WA 0x10Cu, DataLoc 11u] |> Map.ofList
+            let registers : Map<RName,uint32> = [R10, 2u; R11, 0x100u; R15, 0x4u] |> Map.ofList
+            let flags : Flags = { N= false; C=false; Z=false; V=false}
+            {Fl= flags; Regs= registers; MM = memory}
+        let BaseDataPath5 : DataPath<'INS> =
+            let memory : MachineMemory<'INS> = [WA 0x100u,DataLoc 5u; WA 0x104u, DataLoc 7u; WA 0x108u, DataLoc 9u; WA 0x10Cu, DataLoc 11u] |> Map.ofList
+            let registers : Map<RName,uint32> = [R10, 2u; R11, 0x100u; R15, 0x4u] |> Map.ofList
+            let flags : Flags = { N= false; C=false; Z=false; V=false}
+            {Fl= flags; Regs= registers; MM = memory}
+
 
         let makeTest name symTab inpDataPath inputRec output =
             testCase name <| fun () ->
@@ -857,8 +878,61 @@ module memInstructionsTests
         Expecto.Tests.testList "LDRexecTest Tests"
                 [   
                     //LDR Working Tests
-                    makeTest "LDRexec: LDR Base Case" stOneItem (makeMemInstr "LDR" "" "R0, [R1]") BaseDataPath (Ok stOneItem,(Ok {BaseDataPath with Regs = ([(R0: RName), 5u; R1, 0x100u] |> Map.ofList)}))
+                    makeTest "LDRexec: LDR Base Case" stOneItem (makeMemInstr "LDR" "" "R0, [R1]") BaseDataPath1 (Ok stOneItem,(Ok {BaseDataPath1 with Regs = ([(R0: RName), 5u; R1, 0x100u] |> Map.ofList)}))
+                    makeTest "LDRexec: LDR two digit Registers" stOneItem (makeMemInstr "LDR" "" "R10, [R15]") BaseDataPath2 (Ok stOneItem,(Ok {BaseDataPath2 with Regs = ([R10, 5u; R11, 0xCu; R15, 0x100u] |> Map.ofList)}))
+                    makeTest "LDRexec: LDR Num Increment" stOneItem (makeMemInstr "LDR" "" "R0, [R1, #4]") BaseDataPath1 (Ok stOneItem,(Ok {BaseDataPath1 with Regs = ([R0, 7u; R1, 0x100u] |> Map.ofList)}))
+                    makeTest "LDRexec: LDR Post Increment" stOneItem (makeMemInstr "LDR" "" "R0, [R1], #4") BaseDataPath1 (Ok stOneItem,(Ok {BaseDataPath1 with Regs = ([R0, 5u; R1, 0x104u] |> Map.ofList)}))
+                    makeTest "LDRexec: LDR Pre Increment" stOneItem (makeMemInstr "LDR" "" "R0, [R1, #4]!") BaseDataPath1 (Ok stOneItem,(Ok {BaseDataPath1 with Regs = ([R0, 7u; R1, 0x104u] |> Map.ofList)}))
+                    makeTest "LDRexec: LDR Adding Registers" stOneItem (makeMemInstr "LDR" "" "R10, [R11, R15]") BaseDataPath2 (Ok stOneItem,(Ok {BaseDataPath2 with Regs = ([R10, 11u; R11, 0xCu; R15, 0x100u] |> Map.ofList)}))
+                    makeTest "LDRexec: LDR Adding Shifted Register" stOneItem (makeMemInstr "LDR" "" "R10, [R11, R15, LSL #2]") BaseDataPath3 (Ok stOneItem,(Ok {BaseDataPath3 with Regs = ([R10, 7u; R11, 0x100u; R15, 0x1u] |> Map.ofList)}))
+                    makeTest "LDRexec: LDR Shifted and Pre" stOneItem (makeMemInstr "LDR" "" "R10, [R11, R15, LSL #2]!") BaseDataPath3 (Ok stOneItem,(Ok {BaseDataPath3 with Regs = ([R10, 7u; R11, 0x104u; R15, 0x1u] |> Map.ofList)}))
+                    makeTest "LDRexec: LDR 0 Shift and Pre" stOneItem (makeMemInstr "LDR" "" "R10, [R11, R15, LSL #0]!") BaseDataPath4 (Ok stOneItem,(Ok {BaseDataPath4 with Regs = ([R10, 7u; R11, 0x104u; R15, 0x4u] |> Map.ofList)}))
+
 
                     //LDR Error Message Tests
+                    makeTest "LDRexec: LDR -1 Shift and Pre" stOneItem (makeMemInstr "LDR" "" "R10, [R11, R15, LSL #-1]!") BaseDataPath5 (Ok stOneItem,(Ok {BaseDataPath5 with Regs = ([R10, 5u; R11, 0x100u; R15, 0x4u] |> Map.ofList)}))
+
 
                 ]
+
+
+
+
+
+
+    [<Tests>]
+    let STRexecTest =
+        let (stOneItem: SymbolTable) = ["testL",256u; "testL2",260u] |> Map.ofList
+        let makeMemInstr root suffix input =
+            let ldFuncEQU Ops = 
+                    {LoadAddr= WA 200u; 
+                        Label= Some "labelT"; 
+                        SymTab= Some stOneItem;
+                        OpCode= "";
+                        Operands= Ops}
+            let removeRecord x =
+                match x with
+                | Ok y -> y 
+            ldFuncEQU input
+            |> parseMemIns root suffix
+            |> removeRecord 
+        let BaseDataPath1 : DataPath<'INS> =
+            let memory : MachineMemory<'INS> = [WA 0x100u,DataLoc 5u] |> Map.ofList
+            let registers : Map<RName,uint32> = [R0, 2u; R1, 0x100u] |> Map.ofList
+            let flags : Flags = { N= false; C=false; Z=false; V=false}
+            {Fl= flags; Regs= registers; MM = memory}
+
+
+        let makeTest name symTab inpDataPath inputRec output =
+            testCase name <| fun () ->
+                Expect.equal (STRexec symTab inputRec inpDataPath) output (sprintf "STRexecTest Test '%s'" name)
+        Expecto.Tests.testList "STRexecTest Tests"
+                [   
+                    //STR Working Tests
+                    makeTest "STRexec: STR Base Case" stOneItem (makeMemInstr "STR" "" "R0, [R1]") BaseDataPath1 (Ok stOneItem,(Ok {BaseDataPath1 with MM = ([WA 0x100u,DataLoc 2u] |> Map.ofList)}))
+
+                    //STR Error Message Tests
+
+                ]
+
+
