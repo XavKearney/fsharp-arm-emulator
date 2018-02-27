@@ -231,21 +231,21 @@ module BitArithmetic
 
         | _ -> Error "Not valid input"
 
-    // need to deal with upper and lower case
+
     /// main function to parse a line of assembler
     /// ls contains the line input
     /// and other state needed to generate output
     /// the result is None if the opcode does not match
     /// otherwise it is Ok Parse or Error (parse error string)
     let parse (ls: LineData) =
-        let parse' (instrC, (root,suffix,pCond)) =
+        let parse' (_, (root,suffix,pCond)) =
             let pLab = 
                 match ls.Label,ls.LoadAddr with
                 | Some lab, WA addr -> Some (lab,addr)
                 | _ -> None 
             match parseInstr root ls.Operands suffix with 
             | Ok pInst -> Ok { PInstr=pInst; PLabel = pLab; PSize = 4u; PCond = pCond }
-            | _ -> Error "Parse Error"
+            | _ -> Error "Parse error"
         Map.tryFind ls.OpCode opCodes
         |> Option.map parse'
 
