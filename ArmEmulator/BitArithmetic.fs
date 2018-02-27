@@ -129,7 +129,7 @@ module BitArithmetic
                     match n >= 0 with
                     | true -> allowedLiterals n
                     | false ->
-                        match allowedLiterals (-n) with
+                        match allowedLiterals (~~~ n) with
                         | Some _ -> Some (uint32 n)
                         | _ -> None
                 | _ -> None
@@ -361,8 +361,8 @@ module BitArithmetic
             match z with
             | true -> exeDecide n (not v)
             | false -> false
-        | Cnv -> true
-        | Cal -> false
+        | Cnv -> false                           // always execute 
+        | Cal -> true                            // never execute
 
     /// updates N Z C flags
     let updateNZC flgs result carry =
@@ -517,6 +517,6 @@ module BitArithmetic
                         | _ -> Error "failed when updating flags in TST or TEQ" 
                     | "" -> Ok {cpuData with Regs = regsUpdate}
                     | _ -> Error ""
-                | _ -> Error ""
+                | _ -> Error "Could not evaluate instruction or opA is not a valid register"
 
-        | _ -> Error ""
+        | _ -> Error "Result from parse is an error"

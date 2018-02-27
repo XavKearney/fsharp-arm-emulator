@@ -174,30 +174,30 @@ module BitArithmeticTests
 
 
 
-    [<Tests>]
-    let tests = 
-        testList "Minimal Visual Unit Tests"
-            [
-            // MOV tests with decimals
-            vTest "MOV test 1" "MOV R0, #1" "0000" [R 0, 1]
-            vTest "MOV test 2" "MOVS R1, #0" "0100" [R 1, 0]
-            vTest "MOV test 3" "MOV R2, #137" "0000" [R 2, 137]
-            vTest "MOV test 4" "MOV R3, #4080" "0000" [R 3, 4080]
-            // MOV tests with hex numbers
-            vTest "MOV test 5" "MOV R4, #0x0" "0000" [R 4, 0]
-            vTest "MOV tes 6" "MOV R5, #0xA" "0000" [R 5, 10]
-            vTest "MOV test 7" "MOV R6, #0x2300" "0000" [R 6, 8960]
-            // MOV tests with hex binary
-            vTest "MOV test 8" "MOV R4, #0b0" "0000" [R 4, 0]
-            vTest "MOV test 9" "MOV R0, #0b1010" "0000" [R 0, 10]
-            vTest "MOV test 10" "MOV R0, #0b10001100000000" "0000" [R 0, 8960]
+    // [<Tests>]
+    // let tests = 
+    //     testList "Minimal Visual Unit Tests"
+    //         [
+    //         // MOV tests with decimals
+    //         vTest "MOV test 1" "MOV R0, #1" "0000" [R 0, 1]
+    //         vTest "MOV test 2" "MOVS R1, #0" "0100" [R 1, 0]
+    //         vTest "MOV test 3" "MOV R2, #137" "0000" [R 2, 137]
+    //         vTest "MOV test 4" "MOV R3, #4080" "0000" [R 3, 4080]
+    //         // MOV tests with hex numbers
+    //         vTest "MOV test 5" "MOV R4, #0x0" "0000" [R 4, 0]
+    //         vTest "MOV tes 6" "MOV R5, #0xA" "0000" [R 5, 10]
+    //         vTest "MOV test 7" "MOV R6, #0x2300" "0000" [R 6, 8960]
+    //         // MOV tests with hex binary
+    //         vTest "MOV test 8" "MOV R4, #0b0" "0000" [R 4, 0]
+    //         vTest "MOV test 9" "MOV R0, #0b1010" "0000" [R 0, 10]
+    //         vTest "MOV test 10" "MOV R0, #0b10001100000000" "0000" [R 0, 8960]
 
-            // // AND tests with decimals (commented out because failing)
-            // vTest "AND test 1" "AND R2, R1, R0" "0000" [R 0, -2]
-            // vTest "AND test 2" "AND R3, R2, R0" "0000" [R 0, -2]
-            // vTest "AND test 3" "AND R2, R2, R0" "0000" [R 2, -138]
-            // vTest "AND test 4" "AND R3, R3, R3" "0000" [R 3, -4081]  
-            ]
+    //         // AND tests with decimals
+    //         vTest "AND test" "AND R2, R1, R0" "0000" [R 0, -2]
+    //         vTest "AND test" "AND R3, R2, R0" "0000" [R 0, -2]
+    //         vTest "AND test" "AND R2, R2, R0" "0000" [R 2, -138]
+    //         vTest "AND test" "AND R3, R3, R3" "0000" [R 3, -4081]  
+    //         ]
     
 
 
@@ -233,35 +233,98 @@ module BitArithmeticTests
                 let specRegConts = 
                     Map.find rName instExe.Regs
                     |> int32
-                flgs,[R rName.RegNum,specRegConts]
+                [R rName.RegNum,specRegConts] // flgs, ..
             | _ -> failwithf "exeOut is an error"
 
     let parseThenExe cpuData destReg = parse >> exeInstr cpuData >> convExe destReg
 
 
+        /// ARM Status bits
+    let flagsNCZV = { N=false; C=false; Z=false; V=false}
+    let regMap =
+             Map.ofList [ 
+                R0,0u ; R1,10u ; R2,20u ; R3,30u ; R4,40u ; R5,50u
+                R6,60u ; R7,70u ; R8,80u ; R9,90u ; R10,100u ; R11,110u ; 
+                R12,120u ; R13,130u ; R14,140u ; R15,80u
+            ] 
+
+    let cpuDat = {Fl = flagsNCZV ; Regs = regMap ; MM = Map.empty}
+
+    
+    // /// ARM state as values of all registers and status bits
+    // /// NB PC can be found as R15 - 8. (Pipelining)
+    // type DataPath<'INS> = {
+    //     Fl: Flags; // Flags
+    //     Regs:Map<RName,uint32> // map representing registers. 
+    //                            // Must be correctly initialised
+    //     MM: MachineMemory<'INS> // map showing the contents of all memory
+    //     }
+
     [<Tests>]
     let testsExe = 
         testList "Execution tests"
             [
-            // MOV tests with decimals
-            // vTest "MOV test 1" "MOV R0, #1" "0000" (parseThenExe `cpuData` R0) 
-            vTest "MOV test 2" "MOVS R1, #0" "0100" [R 1, 0]
-            vTest "MOV test 3" "MOV R2, #137" "0000" [R 2, 137]
-            vTest "MOV test 4" "MOV R3, #4080" "0000" [R 3, 4080]
-            // MOV tests with hex numbers
-            vTest "MOV test 5" "MOV R4, #0x0" "0000" [R 4, 0]
-            vTest "MOV tes 6" "MOV R5, #0xA" "0000" [R 5, 10]
-            vTest "MOV test 7" "MOV R6, #0x2300" "0000" [R 6, 8960]
-            // MOV tests with hex binary
-            vTest "MOV test 8" "MOV R4, #0b0" "0000" [R 4, 0]
-            vTest "MOV test 9" "MOV R0, #0b1010" "0000" [R 0, 10]
-            vTest "MOV test 10" "MOV R0, #0b10001100000000" "0000" [R 0, 8960]
 
-            // // AND tests with decimals (commented out because failing)
-            // vTest "AND test 1" "AND R2, R1, R0" "0000" [R 0, -2]
-            // vTest "AND test 2" "AND R3, R2, R0" "0000" [R 0, -2]
-            // vTest "AND test 3" "AND R2, R2, R0" "0000" [R 2, -138]
-            // vTest "AND test 4" "AND R3, R3, R3" "0000" [R 3, -4081]  
+            // valid input tests
+
+            // MOV tests with decimals
+            vTest "MOV test 1" "MOV R0, #1" "0000"      (parseThenExe cpuDat R0 ({ld with OpCode = "MOV" ; Operands = "R0, #1"})) 
+            vTest "MOV test 2" "MOV R1, #0" "0000"      (parseThenExe cpuDat R1 ({ld with OpCode = "MOV" ; Operands = "R1, #0"}))
+            vTest "MOV test 3" "MOV R2, #137" "0000"    (parseThenExe cpuDat R2 ({ld with OpCode = "MOV" ; Operands = "R2, #137"}))
+            vTest "MOV test 4" "MOV R3, #4080" "0000"   (parseThenExe cpuDat R3 ({ld with OpCode = "MOV" ; Operands = "R3, #4080"}))
+            // MOV tests with hex numbers
+            vTest "MOV test 5" "MOV R4, #0x0" "0000"    (parseThenExe cpuDat R4 ({ld with OpCode = "MOV" ; Operands = "R4, #0x0"}))
+            vTest "MOV test 6" "MOV R5, #0xA" "0000"    (parseThenExe cpuDat R5 ({ld with OpCode = "MOV" ; Operands = "R5, #0xA"}))
+            vTest "MOV test 7" "MOV R6, #0x2300" "0000" (parseThenExe cpuDat R6 ({ld with OpCode = "MOV" ; Operands = "R6, #0x2300"}))
+            vTest "MOV test 8" "MOV R6, #-0xA" "0000"   (parseThenExe cpuDat R6 ({ld with OpCode = "MOV" ; Operands = "R6, #-0xA"}))
+            vTest "MOV test 9" "MOV R6, #-0x2301" "0000"(parseThenExe cpuDat R6 ({ld with OpCode = "MOV" ; Operands = "R6, #-0x2301"}))
+            // MOV tests with binary numbers
+            vTest "MOV test 10" "MOV R4, #0b0" "0000"               (parseThenExe cpuDat R4 ({ld with OpCode = "MOV" ; Operands = "R4, #0b0"}))
+            vTest "MOV test 11" "MOV R0, #0b1010" "0000"            (parseThenExe cpuDat R0 ({ld with OpCode = "MOV" ; Operands = "R0, #0b1010"}))
+            vTest "MOV test 12" "MOV R0, #0b10001100000000" "0000"  (parseThenExe cpuDat R0 ({ld with OpCode = "MOV" ; Operands = "R0, #0b10001100000000"}))
+            vTest "MOV test 13" "MOV R4, #-0b10101001" "0000"       (parseThenExe cpuDat R4 ({ld with OpCode = "MOV" ; Operands = "R4, #-0b10101001"}))
+            // MOV tests with flexible opperators
+            vTest "MOV test 14" "MOV R0, R5" "0000"          (parseThenExe cpuDat R0 ({ld with OpCode = "MOV" ; Operands = "R0, R5"})) 
+            vTest "MOV test 15" "MOV R1, R7, LSL #12" "0000" (parseThenExe cpuDat R1 ({ld with OpCode = "MOV" ; Operands = "R1, R7, LSL #12"}))
+            vTest "MOV test 16" "MOV R2, R9, RRX" "0000"     (parseThenExe cpuDat R2 ({ld with OpCode = "MOV" ; Operands = "R2, R9, RRX"}))
+            vTest "MOV test 17" "MOV R3, R10, ASR R3" "0000" (parseThenExe cpuDat R3 ({ld with OpCode = "MOV" ; Operands = "R3, R10, ASR R3"}))            
+
+            // MVN tests with decimals
+            vTest "MVN test 1" "MVN R0, #1" "0000"      (parseThenExe cpuDat R0 ({ld with OpCode = "MVN" ; Operands = "R0, #1"})) 
+            vTest "MVN test 2" "MVN R1, #0" "0000"      (parseThenExe cpuDat R1 ({ld with OpCode = "MVN" ; Operands = "R1, #0"}))
+            vTest "MVN test 3" "MVN R2, #137" "0000"    (parseThenExe cpuDat R2 ({ld with OpCode = "MVN" ; Operands = "R2, #137"}))
+            vTest "MVN test 4" "MVN R3, #4080" "0000"   (parseThenExe cpuDat R3 ({ld with OpCode = "MVN" ; Operands = "R3, #4080"}))
+            // MVN tests with hex numbers
+            vTest "MVN test 5" "MVN R4, #0x0" "0000"    (parseThenExe cpuDat R4 ({ld with OpCode = "MVN" ; Operands = "R4, #0x0"}))
+            vTest "MVN test 6" "MVN R5, #0xA" "0000"    (parseThenExe cpuDat R5 ({ld with OpCode = "MVN" ; Operands = "R5, #0xA"}))
+            vTest "MVN test 7" "MVN R6, #0x2300" "0000" (parseThenExe cpuDat R6 ({ld with OpCode = "MVN" ; Operands = "R6, #0x2300"}))
+            vTest "MVN test 8" "MVN R6, #-0xA" "0000"   (parseThenExe cpuDat R6 ({ld with OpCode = "MVN" ; Operands = "R6, #-0xA"}))
+            vTest "MVN test 9" "MVN R6, #-0x2301" "0000"(parseThenExe cpuDat R6 ({ld with OpCode = "MVN" ; Operands = "R6, #-0x2301"}))
+            // // MVN tests with binary numbers
+            vTest "MVN test 10" "MVN R4, #0b0" "0000"               (parseThenExe cpuDat R4 ({ld with OpCode = "MVN" ; Operands = "R4, #0b0"}))
+            vTest "MVN test 11" "MVN R0, #0b1010" "0000"            (parseThenExe cpuDat R0 ({ld with OpCode = "MVN" ; Operands = "R0, #0b1010"}))
+            vTest "MVN test 12" "MVN R0, #0b10001100000000" "0000"  (parseThenExe cpuDat R0 ({ld with OpCode = "MVN" ; Operands = "R0, #0b10001100000000"}))
+            vTest "MVN test 13" "MVN R4, #-0b10101001" "0000"       (parseThenExe cpuDat R4 ({ld with OpCode = "MVN" ; Operands = "R4, #-0b10101001"}))            
+            // MVN tests with flexible opperators
+            vTest "MVN test 14" "MVN R0, R5" "0000"          (parseThenExe cpuDat R0 ({ld with OpCode = "MVN" ; Operands = "R0, R5"})) 
+            vTest "MVN test 15" "MVN R1, R7, LSL #12" "0000" (parseThenExe cpuDat R1 ({ld with OpCode = "MVN" ; Operands = "R1, R7, LSL #12"}))
+            vTest "MVN test 16" "MVN R2, R9, RRX" "0000"     (parseThenExe cpuDat R2 ({ld with OpCode = "MVN" ; Operands = "R2, R9, RRX"}))
+            vTest "MVN test 17" "MVN R3, R10, ASR R3" "0000" (parseThenExe cpuDat R3 ({ld with OpCode = "MVN" ; Operands = "R3, R10, ASR R3"}))            
+
+
+            // AND tests with literals
+            vTest "AND test 1" "AND R2, R1, #0" "0000"      (parseThenExe cpuDat R2 ({ld with OpCode = "AND" ; Operands = "R2, R1, #0"}))
+            vTest "AND test 2" "AND R3, R2, #1" "0000"      (parseThenExe cpuDat R3 ({ld with OpCode = "AND" ; Operands = "R3, R2, #1"}))
+            vTest "AND test 3" "AND R2, R2, #137" "0000"    (parseThenExe cpuDat R2 ({ld with OpCode = "AND" ; Operands = "R2, R2, #137"}))
+            vTest "AND test 4" "AND R3, R3, #4080" "0000"   (parseThenExe cpuDat R3 ({ld with OpCode = "AND" ; Operands = "R3, R3, #4080"}))
+            // AND tests with registers
+            vTest "AND test 5" "AND R2, R1, R3" "0000"      (parseThenExe cpuDat R2 ({ld with OpCode = "AND" ; Operands = "R2, R1, R3"}))
+            vTest "AND test 6" "AND R3, R2, R7" "0000"      (parseThenExe cpuDat R3 ({ld with OpCode = "AND" ; Operands = "R3, R2, R7"}))
+            vTest "AND test 7" "AND R2, R2, R12" "0000"     (parseThenExe cpuDat R2 ({ld with OpCode = "AND" ; Operands = "R2, R2, R12"}))
+            // AND tests with flexible opperators
+            vTest "AND test 8" "AND R2, R1, R8, LSL #17" "0000" (parseThenExe cpuDat R2 ({ld with OpCode = "AND" ; Operands = "R2, R1, R8, LSL #17"}))
+            vTest "AND test 9" "AND R3, R2, R6, ASR R7" "0000"  (parseThenExe cpuDat R3 ({ld with OpCode = "AND" ; Operands = "R3, R2, R6, ASR R7"}))
+            vTest "AND test 10" "AND R2, R2, R5, RRX" "0000"    (parseThenExe cpuDat R2 ({ld with OpCode = "AND" ; Operands = "R2, R2, R5, RRX"})) 
             ]
 
 
