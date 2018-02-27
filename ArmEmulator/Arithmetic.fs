@@ -557,7 +557,7 @@ module Arithmetic
                 let newFlags = {flags with V = false}
                 x, newFlags
             |> function
-            | (x, flags) when (uint64 op1Num + uint64 op2Num) <> (uint64 x) -> 
+            | (x, flags) when (uint64 op1Num + uint64 op2Num) <> (uint64 (op1Num + op2Num)) -> 
                 let newFlags = {flags with C = true}                           
                 x, newFlags
 
@@ -606,15 +606,20 @@ module Arithmetic
                             let result = op1Num - op2Num
                             match suffix with
                             | true -> 
-                                setFlags result op1Num op2Num flags SUB
+                                setFlags result op1Num (~~~op2Num + 1u) flags SUB
                             | false ->
                                 Ok (result, flags)
                         | SBC -> 
-                            let extra = op2Num + uint32 (int32 carryVal - 1)
+                            let extra = 
+                                match carryVal with
+                                | 0u ->
+                                    op2Num + 1u
+                                | _ ->
+                                    op2Num
                             let result = op1Num - extra
                             match suffix with
                             | true -> 
-                                setFlags result op1Num extra flags SBC
+                                setFlags result op1Num (~~~extra + 1u) flags SBC
                             | false ->
                                 Ok (result, flags)
                         | RSB -> 
