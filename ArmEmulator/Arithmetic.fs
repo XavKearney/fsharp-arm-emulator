@@ -137,7 +137,7 @@ module Arithmetic
             let integer = 
                 match cpuData with 
                 | {Fl = _ ; Regs = regmap } -> 
-                    int32(Map.find reg2 regmap &&& uint32(31))
+                    int32(Map.find reg2 regmap)
 
             match op with
             | LSL _ -> 
