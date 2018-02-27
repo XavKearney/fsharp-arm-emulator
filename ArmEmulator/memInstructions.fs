@@ -554,6 +554,8 @@ module MemInstructions
     let updateRegister (dP: DataPath<'INS>) (regName: RName) (val0:uint32) = (dP.Regs).Add(regName,val0)
     let updateDataPathRegs (dP: DataPath<'INS>) x = {dP with Regs = x}
 
+    ///Returns a value from memory as a result. Called by
+    /// LDRexec
     let accessMemoryLocation (dP: DataPath<'INS>) (wordAddress: WAddr) =
         match (dP.MM).TryFind wordAddress with
         | Some x -> match x with
@@ -561,13 +563,14 @@ module MemInstructions
                     | _ -> Error (sprintf "LDRexec-accessMemoryLocation: MemLoc value (%A) at %A was not of type DataLoc" x wordAddress)
         | _ -> Error (sprintf "LDRexec-accessMemoryLocation: %A was not present in memory" wordAddress)
 
-
+    ///Adds a value to memory. Called by STRexec
     let updatedMachineMemory (dP: DataPath<'INS>) (wordAddress: WAddr) val0 =
         match System.UInt32.TryParse val0 with
         | (true, x) -> (Ok ((dP.MM).Add(wordAddress, DataLoc x)))
         | (false,_) -> Error (sprintf "STRexec-updateMemoryLocation: val0 (%A) could not be converted to a uint32" val0)
 
-    ///Returns end value of Ra, Rb
+    ///Returns end value of Ra, Rb. Called by STRexec and 
+    /// LRD exec
     let interpretingRecord (dP: DataPath<'INS>) (inputRecord: MemInstr) =
         ///Finds Original Ra and Rb values
         let getOrigVal inputRecord (dP: DataPath<'INS>) = 
@@ -651,6 +654,7 @@ module MemInstructions
     let STRexec (symbolTab: SymbolTable) (dP: DataPath<'INS>) (inputRecord: MemInstr) = 
 
         let interpretedRecord = interpretingRecord dP inputRecord
+        printfn "interpretedRecord = %A" interpretedRecord
 
         let updatedSTRMachineMem (tuple: Result<(uint32 * uint32),string>) =
             match tuple with
