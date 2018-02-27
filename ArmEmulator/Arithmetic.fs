@@ -594,28 +594,28 @@ module Arithmetic
                     | Some _, Some op1Num, Some op2Num -> 
                         match opcode with
                         | ADD -> 
-                            let result = int32 op1Num + int32 op2Num
+                            let result = op1Num + op2Num
                             //match suffix with
                            // | true -> 
                            //     setFlags result op1Num op2Num flags ADD
                             //| false ->
                             Ok (result, flags)
                         | ADC -> 
-                            let result = int32 op1Num + int32 op2Num + int32 carryVal
+                            let result = op1Num + op2Num + carryVal
                             //match suffix with
                             //| true -> 
                             //   setFlags result op1Num op2Num flags ADC
                            // | false ->
                             Ok (result, flags)
                         | SUB -> 
-                            let result = int32 (uint64 op1Num - uint64 op2Num)
+                            let result = uint32 (uint64 op1Num - uint64 op2Num)
                             match suffix with
                             | true -> 
                                 setFlags result op1Num op2Num flags SUB
                             | false ->
                                 Ok (result, flags)
                         | SBC -> 
-                            let result = int32 (uint64 op1Num - uint64 op2Num + uint64 (int32 carryVal - 1))
+                            let result = uint32 (uint64 op1Num - uint64 op2Num + uint64 (int32 carryVal - 1))
                             match suffix with
                             | true -> 
                                 setFlags result op1Num op2Num flags SBC
@@ -626,7 +626,7 @@ module Arithmetic
                             | x when x < 0 ->
                                 Error ("Invalid immediate operand value")
                             | _ ->
-                                let result = int32 (uint64 op2Num - uint64 op1Num)
+                                let result = uint32 (uint64 op2Num - uint64 op1Num)
                                 match suffix with
                                 | true -> 
                                     setFlags result op1Num op2Num flags RSB
@@ -637,7 +637,7 @@ module Arithmetic
                             | x when x < 0 ->
                                 Error ("Invalid immediate operand value")
                             | _ ->
-                                let result = int32 (uint64 op2Num - uint64 op1Num + uint64 (int32 carryVal - 1))
+                                let result = uint32 (uint64 op2Num - uint64 op1Num + uint64 (int32 carryVal - 1))
                                 match suffix with
                                 | true -> 
                                     setFlags result op1Num op2Num flags RSC
