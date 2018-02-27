@@ -394,7 +394,7 @@ module MultMemTests
             | false -> ()
             | true -> 
                 let randomRegs = 
-                    genRandomUint32List (-0x7FFFFFFF, 0xFFFFFFFF) 15
+                    genRandomUint32List (-0x7FFFFFFF, 0x7FFFFFFF) 15
                 
                 let testParas = {
                     defaultParas with
