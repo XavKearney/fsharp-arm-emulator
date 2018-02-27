@@ -116,37 +116,39 @@ module memInstructionsTests
     [<Tests>]
     let evalExpressionTest =
         let st:SymbolTable = ["testL",256u; "testL2",260u] |> Map.ofList
-        let makeEvalExpTest name input labels output =
+        let makeEvalExpTest name input output =
             testCase name <| fun () ->
-                Expect.equal (evalExpression input st labels) output (sprintf "evalExpression Test '%s'" input)
+                Expect.equal (evalExpression input st) output (sprintf "evalExpression Test '%s'" input)
         Expecto.Tests.testList "evalExpressions Tests"
                 [   
                     //evalExpression Working Tests
-                    makeEvalExpTest "Mult Only" "1*2*3*4" true (Ok 24u)
-                    makeEvalExpTest "Add Only" "1+2" true (Ok 3u)
-                    makeEvalExpTest "Subtract Only" "3-1" true (Ok 2u)
-                    makeEvalExpTest "All" "1*2*3*4+5*3-2" true (Ok 37u)
-                    makeEvalExpTest "All2" "5-4*3-1*1+2*2*2" true (Ok 0u)
-                    makeEvalExpTest "Num Only" "3" true (Ok 3u)
-                    makeEvalExpTest "Label Only" "testL" true (Ok 256u)
-                    makeEvalExpTest "Label + 2" "testL + 2" true (Ok 258u)
-                    makeEvalExpTest "Label Right Multiply" "testL + 2*2" true (Ok 260u)
-                    makeEvalExpTest "Label Left Multiply" "2*2 + testL" true (Ok 260u)
-                    makeEvalExpTest "Label Add Hex" "testL + 0x4" true (Ok 260u)
-                    makeEvalExpTest "Label Add Hex&" "testL + &4" true (Ok 260u)
-                    makeEvalExpTest "Label Add Bin" "testL + 0b100" true (Ok 260u)
-                    makeEvalExpTest "Brackets1" "(4*2)+3" true (Ok 11u)
-                    makeEvalExpTest "Brackets2" "testL + (2*2)" true (Ok 260u)
-                    makeEvalExpTest "Label Right Left Multiply" "4*2 + testL + 2*2" true (Ok 268u)
-                    makeEvalExpTest "* first character" "*3+7" true (Ok 10u)
-                    makeEvalExpTest "+ first character" "+3+7" true (Ok 10u)
-                    makeEvalExpTest "- first character" "-3+7" true (Ok 4u)
-                    makeEvalExpTest "Negative Output" "3-7" true (Ok 4294967292u)
+                    makeEvalExpTest "evalExpressions: Mult Only" "1*2*3*4" (Ok 24u)
+                    makeEvalExpTest "evalExpressions: Add Only" "1+2" (Ok 3u)
+                    makeEvalExpTest "evalExpressions: Subtract Only" "3-1" (Ok 2u)
+                    makeEvalExpTest "evalExpressions: All" "1*2*3*4+5*3-2" (Ok 37u)
+                    makeEvalExpTest "evalExpressions: All2" "5-4*3-1*1+2*2*2" (Ok 0u)
+                    makeEvalExpTest "evalExpressions: Num Only" "3" (Ok 3u)
+                    makeEvalExpTest "evalExpressions: Label Only" "testL" (Ok 256u)
+                    makeEvalExpTest "evalExpressions: Label + 2" "testL + 2" (Ok 258u)
+                    makeEvalExpTest "evalExpressions: Label Right Multiply" "testL + 2*2" (Ok 260u)
+                    makeEvalExpTest "evalExpressions: Label Left Multiply" "2*2 + testL" (Ok 260u)
+                    makeEvalExpTest "evalExpressions: Label Add Hex" "testL + 0x4" (Ok 260u)
+                    makeEvalExpTest "evalExpressions: Label Add Hex&" "testL + &4" (Ok 260u)
+                    makeEvalExpTest "evalExpressions: Label Add Bin" "testL + 0b100" (Ok 260u)
+                    makeEvalExpTest "evalExpressions: Brackets1" "(4*2)+3" (Ok 11u)
+                    makeEvalExpTest "evalExpressions: Brackets2" "testL + (2*2)" (Ok 260u)
+                    makeEvalExpTest "evalExpressions: Label Right Left Multiply" "4*2 + testL + 2*2" (Ok 268u)
+                    makeEvalExpTest "evalExpressions: * first character" "*3+7" (Ok 10u)
+                    makeEvalExpTest "evalExpressions: + first character" "+3+7" (Ok 10u)
+                    makeEvalExpTest "evalExpressions: - first character" "-3+7" (Ok 4u)
+                    makeEvalExpTest "evalExpressions: Negative Output" "3-7" (Ok 4294967292u)
+                    makeEvalExpTest "evalExpressions: NumLabel Only" "testL2" (Ok 260u)
                     // makeEvalExpTest "Brackets test" "2*(6+(3*4)-(6+3))*5" 90u
-                    // makeEvalExpTest "NumLabel Only" "testL2" 260u
 
                 
                     //evalExpression Error Message Tests
+                    makeEvalExpTest "No Input" "" (Error "evalExpression: End case did not match any of the evalExpression end case options (0x4, 2, 0b11, label2 etc)")
+
                 ]
 
 
@@ -696,12 +698,81 @@ module memInstructionsTests
 
                 ]
 
+    [<Tests>]
+    let EQUexecTest =
+        let (stOneItem: SymbolTable) = ["testL",256u; "testL2",260u] |> Map.ofList
+        let makeLabelInstr label root input =
+            let ldFuncEQU Lab Ops = 
+                    {LoadAddr= WA 200u; 
+                        Label= Some Lab; 
+                        SymTab= Some stOneItem;
+                        OpCode= "";
+                        Operands= Ops}
+            let removeRecord x =
+                match x with
+                | Ok y -> y 
+            ldFuncEQU label input
+            |> parseLabelIns root
+            |> removeRecord 
+        let BaseDataPath : DataPath<'INS> =
+            let memory : MachineMemory<'INS> = [WA 0x100u,DataLoc 5u] |> Map.ofList
+            let registers : Map<RName,uint32> = [(R0: RName), 2u] |> Map.ofList
+            let flags : Flags = { N= false; C=false; Z=false; V=false}
+            {Fl= flags; Regs= registers; MM = memory}
+
+        let makeTest name inputSymTab inputRec inpDataPath output =
+            testCase name <| fun () ->
+                Expect.equal (EQUexec inputSymTab inpDataPath inputRec) output (sprintf "EQUexecTest Test '%s'" name)
+        Expecto.Tests.testList "EQUexecTest Tests"
+                [   
+                    //EQU Working Tests
+                    makeTest "EQUexec: EQU Base Case" stOneItem (makeLabelInstr "labelT" "EQU" "2") BaseDataPath ((["testL",256u; "testL2",260u; "labelT",2u] |> Map.ofList |> Ok),(Ok BaseDataPath))
+                    makeTest "EQUexec: EQU *+- Test" stOneItem (makeLabelInstr "labelT" "EQU" "5-4*3-1*1+2*2*2") BaseDataPath ((["testL",256u; "testL2",260u; "labelT",0u] |> Map.ofList |> Ok),(Ok BaseDataPath))
+                    makeTest "EQUexec: EQU label test" stOneItem (makeLabelInstr "labelT" "EQU" "testL") BaseDataPath ((["testL",256u; "testL2",260u; "labelT",256u] |> Map.ofList |> Ok),(Ok BaseDataPath))
+                    makeTest "EQUexec: EQU number label addition test" stOneItem (makeLabelInstr "labelT" "EQU" "testL + testL2") BaseDataPath ((["testL",256u; "testL2",260u; "labelT",516u] |> Map.ofList |> Ok),(Ok BaseDataPath))
+
+
+                    //EQU Error Message Tests
+                    makeTest "EQUexec: EQU No Input test" stOneItem (makeLabelInstr "labelT" "EQU" "") BaseDataPath ((Error "evalExpression: End case did not match any of the evalExpression end case options (0x4, 2, 0b11, label2 etc)"),(Ok BaseDataPath))
+
+                ]
 
 
 
+    [<Tests>]
+    let FILLexecTest =
+        let (stOneItem: SymbolTable) = ["testL",256u; "testL2",260u] |> Map.ofList
+        let makeLabelInstr label root input =
+            let ldFuncEQU Lab Ops = 
+                    {LoadAddr= WA 200u; 
+                        Label= Some Lab; 
+                        SymTab= Some stOneItem;
+                        OpCode= "";
+                        Operands= Ops}
+            let removeRecord x =
+                match x with
+                | Ok y -> y 
+            ldFuncEQU label input
+            |> parseLabelIns root
+            |> removeRecord 
+        let BaseDataPath : DataPath<'INS> =
+            let memory : MachineMemory<'INS> = [WA 0x100u,DataLoc 5u] |> Map.ofList
+            let registers : Map<RName,uint32> = [(R0: RName), 2u] |> Map.ofList
+            let flags : Flags = { N= false; C=false; Z=false; V=false}
+            {Fl= flags; Regs= registers; MM = memory}
 
+        let makeTest name inputSymTab inputRec inpDataPath output =
+            testCase name <| fun () ->
+                Expect.equal (FILLexec inputSymTab inpDataPath inputRec) output (sprintf "FILLexecTest Test '%s'" name)
+        Expecto.Tests.testList "FILLexecTest Tests"
+                [   
+                    //FILL Working Tests
+                    makeTest "FILLexec: FILL Base Case" stOneItem (makeLabelInstr "labelT" "FILL" "4") BaseDataPath ((["testL",256u; "testL2",260u; "labelT",0u] |> Map.ofList |> Ok),(Ok {BaseDataPath with MM = ([WA 0x100u,DataLoc 5u; WA 0x104u, DataLoc 0u; WA 0x108u, DataLoc 0u; WA 0x10Cu, DataLoc 0u; WA 0x110u, DataLoc 0u] |> Map.ofList)}))
+                    makeTest "FILLexec: FILL Changed base address" stOneItem (makeLabelInstr "labelT" "FILL" "4") {BaseDataPath with MM =([WA 0x0u,DataLoc 5u] |> Map.ofList)} ((["testL",256u; "testL2",260u; "labelT",0u] |> Map.ofList |> Ok),(Ok {BaseDataPath with MM = ([WA 0x0u,DataLoc 5u; WA 0x4u, DataLoc 0u; WA 0x8u, DataLoc 0u; WA 0xCu, DataLoc 0u; WA 0x10u, DataLoc 0u] |> Map.ofList)}))
 
+                    //FILL Error Message Tests
+                    makeTest "FILLexec: Fill input/4 != int" stOneItem (makeLabelInstr "labelT" "FILL" "1") BaseDataPath ((Error "parseLabelIns: Fill expression (1u) <0 or not divisible by four"),(Error "parseLabelIns: Fill expression (1u) <0 or not divisible by four"))
+                    makeTest "FILLexec: Fill input/4 != int and negative" stOneItem (makeLabelInstr "labelT" "FILL" "-3") BaseDataPath ((Error "parseLabelIns: Fill expression (4294967293u) <0 or not divisible by four"),(Error "parseLabelIns: Fill expression (4294967293u) <0 or not divisible by four"))
+                    makeTest "FILLexec: No Input" stOneItem (makeLabelInstr "labelT" "FILL" "") BaseDataPath ((Error "evalExpression: End case did not match any of the evalExpression end case options (0x4, 2, 0b11, label2 etc)"),(Error "evalExpression: End case did not match any of the evalExpression end case options (0x4, 2, 0b11, label2 etc)"))
+                ]
 
-//Functions to test
-//  - EQUexec
-//  - FILLexec 

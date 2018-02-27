@@ -1,11 +1,10 @@
 # ARM Assembler Instructions - APSW
 ## To do List
-  - Add check to parseLabelIns so that DCD returns an error if it is given a number and not a literal
   - Get a systematic testing section added for all unit testing sections
   - Get execution working for STR, LDR and ADR
-  - Get unit testing done for label execution functions
   - Add visual testing for most of the unit testing sections
-  - Make non valid inputs to FILL for updateMemoryDataPathTest return an error monad instead of just not doing anything (Probably change FillNf funtion)
+  - Edit parseLabelIns so that if DCDValueList returns as an error then the whole output record will return as an error
+  - Check requirements for READ_ME.md file
 
 This section covers six instructions seperated into three groups:
 
@@ -128,7 +127,10 @@ The Fill instruction declares a series of empty consecutive words in memory. Bec
 ### Documentation of visUAL implementation
 
 ### visUAL Quirks 
-It is interesting that you can use the EQU instruction to assign the same symbol multiple values. 
+
+1. It is interesting that you can use the EQU instruction to assign the same symbol multiple values.
+2. Very interstingly you can evaluate the expression to form any number that can be represented by a uint32. For example -257 can be assigned to a label using EQU, however it cannot be loaded into a register using ADR.
+    - This means that you will not be able access all addresses in memory as the expression in ADR cannot evaluate to all the possible uint32 addresses.
 
 ### Parsing
 

@@ -212,7 +212,7 @@ module MemInstructions
     /// - Add multiple bracket functionality 
     ///   Eg 2*(6+(3*4)-(6+3))*5
     /// - Add working CheckLiteral function which works for -ve's
-    let evalExpression (exp0: string) (symTab: SymbolTable) (labels: bool) =
+    let evalExpression (exp0: string) (symTab: SymbolTable) =
         let rec evalExpression' (exp: string) = 
             if String.exists (fun c -> (c ='(')||(c =')')) exp then
                 let mapFunction (x: string) = 
@@ -293,23 +293,24 @@ module MemInstructions
                     | None -> Error (sprintf "evalExpression: Couldn't find label (%A)
                               in the Symbol Table" item)
                     | Some x -> x |> string |> uint32 |> Ok
-                let labelsOrNot item labs =
-                    match labs with
-                    | false -> Error "evalExpression: Did not match and of the evalExpression end case options"
-                    | true -> symTabTryFindMonad item
+                let numberOrLabel (item: string) =
+                    match (System.UInt32.TryParse item) with
+                    | (true, num) -> Ok num
+                    | (false, _) -> symTabTryFindMonad item
                 match (exp.Trim()) with 
                 | Match @"(0x[0-9]+)" [_; ex] -> ex.Value |> uint32 |> Ok //Matching a hex number, Eg 0x5
                 | Match @"(&[0-9]+)" [_; ex]  -> ("0x"+(ex.Value).[1..(ex.Length-1)]) |> uint32 |> Ok //Matching a hex number, Eg &5
                 | Match @"(0b[0-1]+)" [_; ex] -> ex.Value |> uint32 |> Ok //Matching binary number, Eg 0b11
-                | Match @"([0-9]+)" [_; ex]   -> ex.Value |> uint32 |> Ok //Matching a decimal number  try (^[0-9]|(([^a-z]| )[0-9]+([^a-z]| |$)))
-                | Match @"(\w+)" [_; lab]     -> labelsOrNot (exp.Trim()) labels 
+                | Match @"(\w+)" [_; lab]     -> numberOrLabel (exp.Trim()) //Matching decimal numbers and labels
                 | _ -> Error "evalExpression: End case did not match any of the evalExpression end case options (0x4, 2, 0b11, label2 etc)"
         evalExpression' exp0
 
 
 
     
-
+    ///Parses and ADR instruction and returns a result of
+    /// a record which contains all the information needed
+    /// to execute an ADR instruction.
     let parseAdrIns root ls =
         let ADRInstrTypeTmp =
             match root with
@@ -329,7 +330,7 @@ module MemInstructions
             | None   -> Error "parseAdrIns: ls.SymTab = None"
             | Some x -> match ((ls.Operands).Trim()) with
                         | Match @"(R[0-9]|1[0-5]) *, *(.*)" [_; rA; expression] -> 
-                            evalExpression expression.Value x true
+                            evalExpression expression.Value x
                         | _ -> Error (sprintf "parseAdrIns: Line Data in incorrect form\n
                           ls.Operands: %A" ls.Operands)
         match (errorMessage1, labelExpVal) with
@@ -410,7 +411,7 @@ module MemInstructions
             match symT with 
             | None -> Error (sprintf "parseLabelIns: ls.SymTab = None
                       \nroot: %A\nls: %A" root ls)
-            | Some x -> (evalExpression ops x labels)
+            | Some x -> (evalExpression ops x)
         let instTypeTmp = 
             match root with
             | "EQU"  -> Ok EQU 
@@ -432,7 +433,7 @@ module MemInstructions
                                 let symTab:SymbolTable = ["irrelevant",256u] |> Map.ofList
                                 let checkAllLiterals = 
                                     let checkLiteral x =
-                                        match (evalExpression x symTab false) with
+                                        match (evalExpression x symTab) with
                                         | Ok y -> 0
                                         | Error m -> 1
                                     List.map (checkLiteral) valList
@@ -469,7 +470,9 @@ module MemInstructions
 
 
     
-
+    ///Finds the amount of memory that the instruction 
+    /// will use for the PSize field of the record returned
+    /// by parse.
     let findDcdPSize pInstr =
         let removeRes x =
             let removeOpt y =
@@ -540,18 +543,12 @@ module MemInstructions
                 PCond = pCond 
                 }
             else Error "parse: Should never happen, just setting the type"
-        // Map.tryFind ls.OpCode opCodesLabel // lookup opcode to see if it is known
-        // |> Option.map parse' // if unknown keep none, if known parse it.
         if (Map.tryFind ls.OpCode opCodesLabel |> Option.map parse') <> None 
         then (Map.tryFind ls.OpCode opCodesLabel |> Option.map parse')
         elif (Map.tryFind ls.OpCode opCodesMem |> Option.map parse') <> None 
         then (Map.tryFind ls.OpCode opCodesMem |> Option.map parse')
         else 
         (Map.tryFind ls.OpCode opCodesADR |> Option.map parse')
-        // elif (Map.tryFind ls.OpCode opCodesADR |> Option.map parse') <> None 
-        // then (Map.tryFind ls.OpCode opCodesADR |> Option.map parse')
-        // else Error (sprintf "Could not find the OpCode in any of the possible
-        //      maps\nls.OpCode: %A" ls.OpCode)
 
 
 
@@ -564,13 +561,6 @@ module MemInstructions
 
 
 
-
-    //General inforRecord Extractor
-    // constructor = LabelO, instrName = "EQU"
-    // let infoRecordRes constructor instrName =
-    //     match inputRecord with
-    //     | constructor m -> m
-    //     | x -> Error (sprintf "%Aexec: Wrong type of LabelAndMemGeneralParse passed to function (%A)" instrName x)
 
 
 
@@ -651,7 +641,8 @@ module MemInstructions
         | (_, Error y) -> Error y
         | (Ok x, Ok y) -> Ok (symbolTab.Add(x,y))
 
-
+    ///Updates the Memory in the DataPath (Adds something
+    /// to memory). Called by DCDexec and FILLexec
     let updateMemoryDataPath (inputRecord: labelInstr) (dP: DataPath<'INS>) =
         let dataValList = 
             let fillNf = 
@@ -727,7 +718,9 @@ module MemInstructions
         | Error m -> Error m
         
 
-    //Taken out for testing
+    ///Taken out for testing - (Could not reference it in
+    /// memInstructionTests when it was a subfunction of
+    /// DCDexec)
     let removeOptionD (x:Result<ValueList,string> option) =   
         let makeType (x:ValueList)  =
             let y = (x.[0])|>uint32
@@ -787,7 +780,10 @@ module MemInstructions
 
         (updateSymbolTable symbolTab inputRecord (removeOptionD (inputRecord.DCDValueList)), (updateMemoryDataPath inputRecord dP))                
 
-
+    ///Takes in the current state of the program in the form
+    /// of the SymbolTable and DataPath, as well as the 
+    /// information record labelInstr and updates the current
+    /// state of the program by executing an EQU instruction
     let EQUexec (symbolTab: SymbolTable) (dP: DataPath<'INS>) (inputRecord: labelInstr) = 
         //Eg: abc EQU 2 
         // this line assigns the value 2 to the label abc
@@ -798,9 +794,8 @@ module MemInstructions
         // Memory
         
         (updateSymbolTable symbolTab inputRecord inputRecord.EQUExpr, Ok dP)                
-
+    ///Executes a Fill instruction
     let FILLexec (symbolTab: SymbolTable) (dP: DataPath<'INS>) (inputRecord: labelInstr) = 
-        //insert psuedo code here
         //Eg:   data4	Fill		12
         // fills 12 data slots with 0. It basically initialises
         // the memory. The value or expression at the end must
