@@ -18,6 +18,8 @@ I created 2 new `InstrClass` values - `ARITH` and `COMP` - to represent the 2 se
 
 My code should integrate well with the group as I tried to use the same general code structure as some of the other members of my group.  This will make it easier for the others to pick up my code and make edits to it if needed.  The return types should also integrate fairly easily with top level group code.
 
+My parsing code assumes capital letters for all inputs (excluding labels).  The assumption is that each line will be capitalised in top level group code.
+
 ## Table of Features
 | Feature | Tests |  
 | :---:|:---:|
