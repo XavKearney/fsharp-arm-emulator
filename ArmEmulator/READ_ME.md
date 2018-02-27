@@ -1,15 +1,26 @@
 # ARM Assembler Instructions - APSW
-## To do List
-  - Get a systematic testing section added for all unit testing sections
-  - Get execution working for STR, LDR and ADR
-  - Add visual testing for most of the unit testing sections
-  - Edit parseLabelIns so that if DCDValueList returns as an error then the whole output record will return as an error
-  - Check requirements for READ_ME.md file
-  - Solve exceptions caused by: 
-    - returning Error "blah" from parseLabelIns, the same as below
-    - parseAdrIns Giving a non valid input to ADRexec. Non valid inputs work for parseAdrIns, but not for ADRexec so there must be an error monad pipeline which needs to be added somewhere.
-  - Swap matches for resultDotBindTwoInp throughout code
 
+## How my code will contribute to the group deliverable
+My code will contribute to the group deliverable in that it supplies six crucial instructions (EQU, DCD, Fill, LDR, STR and ADR). Without these instructions you can do nothing with memory other than using the stack.
+To make sure my code is compatible I have used Reuslt monads everywhere to avoid using any exceptions whatsover and have tried to write useful error messages. For instance I start my error messages with the function where they are occuring and include useful vairable to show what is wrong.
+I also have tried to use intuitve function names and give useful comments so that my code is easy to understand. 
+
+## What is the specification of my code
+Details of the visual specification for my code and how it differs from what I have implemented can be found for each function in the "General Description of how my Code works" section
+
+## A description of my testing
+My testing is unfinished. I prioritised getting the execution for each instruction working and rudimentally tested using unit test over adding systematic testing and testing against visual however I intended to add these at the end but I ran out of time.
+I have 161 unit tests and evidence of the passing can be found in a screenshot in the images folder for the READ_ME.
+<br />
+<br />
+<br />
+<br />
+<br />
+<br />
+<br />
+<br />
+
+# General Description of how the Code works
 This section covers six instructions seperated into three groups:
 
   - Memory Instructions - LDR and STR
