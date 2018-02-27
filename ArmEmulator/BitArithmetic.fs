@@ -117,7 +117,6 @@ module BitArithmetic
             | false -> None
         | _ -> None
 
-    // need to deal with hex and bin numbers
     /// converts string to some litteral or none
     /// string number must start with #
     let toLit (str : string) =  
@@ -215,7 +214,6 @@ module BitArithmetic
                           opC = None
                         }
             
-        // need to deal with literal followed by shift
         match instrNames.[root] with 
         | MOV | MVN | TST | TEQ when (ops.Length = 2) || (ops.Length = 3)
             -> Ok {baseInstr with opA = toReg ops.[0] ; opB = Some (Flex (toFlexOp ops.[1..]))}
@@ -260,7 +258,7 @@ module BitArithmetic
 
 
 
-
+    // functions that carry out the bit manipulation
     let AndTst a b = a &&& b
     let Orr a b = a ||| b
     let EorTeq a b = a ^^^ b
@@ -279,7 +277,7 @@ module BitArithmetic
         let penVal = shift n (shiftVal- 1u)
         msbOrLsb penVal
 
-    // can do extra check i.e make sure reg, lit, shift is allowed
+
     /// evaluates flexible operator 
     /// if suffix is "S" then update C flag
     let flexEval cpuData (suffix : string) (flexOp : FlexOp) =  
@@ -380,7 +378,7 @@ module BitArithmetic
         | _ -> Error "can't be both negative and zero"
 
 
-    /// 
+    /// executes the instruction
     let exeInstr cpuData parseOut =
 
         match parseOut with
@@ -501,7 +499,7 @@ module BitArithmetic
                 | false -> None
 
             match instrRoot with 
-            | TST | TEQ -> //"cpuData with flags updated on result - no destination"
+            | TST | TEQ ->
                 match evalInstruction with 
                 | Some (num,c) ->
                     match updateNZC cpuData.Fl num c with 
@@ -522,33 +520,3 @@ module BitArithmetic
                 | _ -> Error ""
 
         | _ -> Error ""
-
-
-(*
-
-        flags that are updated by each instruction:
-
-            N,Z,C   TST, TEQ, MOV, MVN, AND, ORR, EOR, BIC
-
-            If S is specified, these instructions:
-
-            update the N and Z flags according to the result
-
-            can update the C flag during the calculation of Operand2
-
-            do not affect the V flag.
-
-
-
-        	N,Z,C	ASR, LSL, LSR, ROR, and RRX
-
-            If S is specified:
-
-            these instructions update the N and Z flags according to the result
-
-            the C flag is updated to the last bit shifted out, except when the shift length is 0, see Shift Operations.
-
-
-        }
-
-*)
