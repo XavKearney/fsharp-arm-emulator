@@ -661,6 +661,40 @@ module Arithmetic
                 {Regs = Map.add target (uint32 outVal) regMap; Fl = outFlags; MM = cpuData.MM}
             | Error _ -> failwithf "The instruction is invalid"
 
+        let compLogic opcode op1 op2 (flags:Flags) = 
+            let op1Val = regMap.TryFind op1
+            let op2Val = 
+                match op2 with
+                    | Literal num -> Some num
+                    | Register reg -> regMap.TryFind reg
+                    | RegisterShift (op2, shift, num) -> Some (flexOp2 (RegisterShift (op2, shift, num)) cpuData)
+                    | RegisterRegisterShift (op2, shift, num) -> Some (flexOp2 (RegisterRegisterShift(op2, shift, num)) cpuData)
+            
+            let logicOp = 
+                match op1Val, op2Val with
+                    | Some op1Num, Some op2Num -> 
+                        match opcode with
+                        | CMP -> 
+                            let result = op1Num - op2Num
+                            match op2Num with
+                            | 0u ->
+                                setFlags result op1Num (~~~op2Num) flags SUB
+                            | _ ->
+                                setFlags result op1Num (~~~op2Num + 1u) flags SUB
+                        | CMN -> 
+                            let result = op1Num + op2Num
+                            setFlags result op1Num op2Num flags ADD
+
+                    | _ -> Error ("The instruction is invalid")
+            
+            match logicOp with
+            | Ok regVal -> 
+                let _, outFlags = regVal
+                {Regs = regMap; Fl = outFlags; MM = cpuData.MM}
+            | Error _ -> failwithf "The instruction is invalid"
+
+        
+
         let instr = input.PInstr
 
         match instr with
@@ -675,8 +709,15 @@ module Arithmetic
             match arithInstr with
             | Some(ins) -> arithLogic ins suffix target op1 op2 flags
             | None -> failwithf "No instruction specified"
-        | _ -> 
-            failwithf "Not completed comp instruction"
+        | CompI instr ->
+            let compInstr = instr.InstrType
+            let op1 = instr.Op1
+            let op2 = instr.Op2
+            let flags = cpuData.Fl
+
+            match compInstr with
+            | Some (ins) -> compLogic ins op1 op2 flags
+            | None -> failwithf "No instruction specified"
 
 
     let (|IMatch|_|) = parse

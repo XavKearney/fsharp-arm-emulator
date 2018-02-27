@@ -453,7 +453,99 @@ module MultMemTests
                     |> Map.toList
                     |> List.map (fun (_, x) -> x)
 
-                //Expect.equal regsActual.[..regsActual.Length - 2] localRegs.[..localRegs.Length - 2] "Registers"
+                Expect.equal regsActual.[..regsActual.Length - 2] localRegs.[..localRegs.Length - 2] "Registers"
+                Expect.equal flagsActual resCpu.Fl "Flags"
+
+    [<Tests>]
+    let testCompExec =
+        let makeTestExecStr opcode op1 op2 = 
+            let opcodeStr, operandStr = makeCompInstrString opcode op1 op2
+            //Return full instruction string of opcode + suffix + operands
+            opcodeStr + " " + operandStr
+
+
+        testPropertyWithConfig config "Test Arithmetic Execution" <|
+        fun opcode op1 op2 (flags: CommonData.Flags) ->
+            let instrStr = makeTestExecStr opcode op1 op2
+            
+            let valid = 
+                match opcode, op1, op2, flags with
+                | _, _, _, f when f.N && f.Z -> false
+                
+                | CMP, _, Register R15, _ -> false
+                | CMN, _, Register R15, _ -> false
+                | CMP, _, Register R13, _ -> false
+                | CMN, _, Register R13, _ -> false
+
+                | CMP, _, RegisterShift (R15,_,_), _ -> false
+                | CMN, _, RegisterShift (R15,_,_), _ -> false
+                | CMP, _, RegisterShift (R13,_,_), _ -> false
+                | CMN, _, RegisterShift (R13,_,_), _ -> false
+
+                | CMP, _, RegisterRegisterShift (R15,_,_), _ -> false
+                | CMN, _, RegisterRegisterShift (R15,_,_), _ -> false
+                | CMP, _, RegisterRegisterShift (R13,_,_), _ -> false
+                | CMN, _, RegisterRegisterShift (R13,_,_), _ -> false
+
+                | CMP, _, RegisterRegisterShift (_,_,R15), _ -> false
+                | CMN, _, RegisterRegisterShift (_,_,R15), _ -> false
+
+                // Shift of more than 32 will be 0 in my implementation
+                | _, _, RegisterShift(_,_, x), _ when uint32 x >= 32u -> false
+                | _, _, RegisterRegisterShift(_), _ -> false
+
+                // First operand cannot be PC
+                | _, R15, _, _ -> false
+               
+                | _ -> true
+
+            match valid with
+            | false -> ()
+            | true -> 
+                let randomRegs = 
+                    genRandomUint32List (-0x7FFFFFFF, 0x7FFFFFFF) 15
+                
+                let testParas = {
+                    defaultParas with
+                        InitRegs = randomRegs; 
+                        //initialise flags
+                        InitFlags = {FN=flags.N;FZ=flags.Z; FC=flags.C;FV=flags.V}
+                    }
+                
+                let randomRegsLocal = randomRegs |> fun lst -> List.concat [lst; [0u;]]
+                let initTestRegs = List.mapi (fun i x -> (inverseRegNums.[i], x)) randomRegsLocal |> Map.ofList;
+
+                let parsed = {
+                    PInstr = CompI
+                            {
+                            InstrType = Some opcode;
+                            Op1 = op1;
+                            Op2 = op2;
+                            }
+                    PLabel = None;
+                    PSize = 4u;
+                    PCond = Cal;
+                }
+
+                let visFlags, _, _ = RunVisualWithFlagsOut testParas instrStr
+
+                let flagsActual = {
+                    N = visFlags.FN;
+                    Z = visFlags.FZ;
+                    C = visFlags.FC;
+                    V = visFlags.FV;
+                }
+
+                let cpuData = {
+                    Fl = flags;
+                    Regs = initTestRegs
+                    MM = Map.empty;
+                }
+
+                let results = doArithmetic parsed cpuData
+
+                let resCpu = results
+
                 Expect.equal flagsActual resCpu.Fl "Flags"
         
 
