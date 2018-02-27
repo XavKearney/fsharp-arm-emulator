@@ -20,7 +20,7 @@ My code should integrate well with the group as I tried to use the same general 
 
 ## Table of Features
 | Feature | Tests |  
-| :---:|:---:|:---:|
+| :---:|:---:|
 | Basic ADD/ADC/SUB/SBC | ✔️
 | Basic CMP/CMN | ✔️
 | Expressions in op2 | ✔️
