@@ -427,12 +427,17 @@ module memInstructionsTests
                     makeTest "ADR" (ldFunc st "R15, testL") "ADR R15 Test" (Ok {InstructionType= Ok ADRm;
                                                                                 DestReg= Ok R15;
                                                                                 SecondOp= Ok 256u;})
+                    makeTest "ADR" (ldFunc st "R2, testL2") "ADR NumLabel Test" (Ok {InstructionType= Ok ADRm;
+                                                                                DestReg= Ok R2;
+                                                                                SecondOp= Ok 260u;})
                     makeTest "ADR" (ldFunc st "R0, 4") "ADR Number Only Exp" (Ok {InstructionType= Ok ADRm;
                                                                                 DestReg= Ok R0;
                                                                                 SecondOp= Ok 4u;})
-
-
                     //ADR Error Message Tests
+                    makeTest "ADR" (ldFunc st "R0, ") "ADR No Input" (Error "evalExpression: End case did not match any of the evalExpression end case options (0x4, 2, 0b11, label2 etc)" )
+                    makeTest "ADR" (ldFunc st ", 4") "ADR No Register" (Error "parseAdrIns: Line Data in incorrect form\nls.Operands: \", 4\"\nparseAdrIns: No destination register identified in parseAdrIns\nls.Operands: \", 4\"")
+
+
                 ]
 
 
@@ -776,3 +781,84 @@ module memInstructionsTests
                     makeTest "FILLexec: No Input" stOneItem (makeLabelInstr "labelT" "FILL" "") BaseDataPath ((Error "evalExpression: End case did not match any of the evalExpression end case options (0x4, 2, 0b11, label2 etc)"),(Error "evalExpression: End case did not match any of the evalExpression end case options (0x4, 2, 0b11, label2 etc)"))
                 ]
 
+
+
+
+
+    [<Tests>]
+    let ADRexecTest =
+        let (stOneItem: SymbolTable) = ["testL",256u; "testL2",260u] |> Map.ofList
+        let makeADRInstr label root input =
+            let ldFuncEQU Lab Ops = 
+                    {LoadAddr= WA 200u; 
+                        Label= Some Lab; 
+                        SymTab= Some stOneItem;
+                        OpCode= "";
+                        Operands= Ops}
+            let removeRecord x =
+                match x with
+                | Ok y -> y 
+            ldFuncEQU label input
+            |> parseAdrIns root
+            |> removeRecord 
+        let BaseDataPath : DataPath<'INS> =
+            let memory : MachineMemory<'INS> = [WA 0x100u,DataLoc 5u] |> Map.ofList
+            let registers : Map<RName,uint32> = [(R0: RName), 2u] |> Map.ofList
+            let flags : Flags = { N= false; C=false; Z=false; V=false}
+            {Fl= flags; Regs= registers; MM = memory}
+
+        let makeTest name symTab inpDataPath inputRec output =
+            testCase name <| fun () ->
+                Expect.equal (ADRexec symTab inputRec inpDataPath) output (sprintf "ADRexecTest Test '%s'" name)
+        Expecto.Tests.testList "ADRexecTest Tests"
+                [   
+            //ADRexec (dP: DataPath<'INS>) (inputRecord: ADRInstr)
+                    //ADR Working Tests
+                    makeTest "ADRexec: ADR Base Case" stOneItem (makeADRInstr "labelT" "ADR" "R1, 4") BaseDataPath (Ok stOneItem,(Ok {BaseDataPath with Regs = ([(R0: RName), 2u; R1, 4u] |> Map.ofList)}))
+                    makeTest "ADRexec: ADR Label Base Case" stOneItem (makeADRInstr "labelT" "ADR" "R1, testL") BaseDataPath (Ok stOneItem,(Ok {BaseDataPath with Regs = ([(R0: RName), 2u; R1, 256u] |> Map.ofList)}))
+                    makeTest "ADRexec: ADR Replacing Reg Value" stOneItem (makeADRInstr "labelT" "ADR" "R0, testL") BaseDataPath (Ok stOneItem,(Ok {BaseDataPath with Regs = ([(R0: RName), 256u] |> Map.ofList)}))
+
+                    //ADR Error Message Tests
+                    // makeTest "ADRexec: ADR No Input" (makeADRInstr "labelT" "ADR" "R0, ") BaseDataPath (Ok {BaseDataPath with Regs = ([(R0: RName), 256u] |> Map.ofList)})
+
+                ]
+
+
+
+
+
+
+
+    [<Tests>]
+    let LDRexecTest =
+        let (stOneItem: SymbolTable) = ["testL",256u; "testL2",260u] |> Map.ofList
+        let makeMemInstr root suffix input =
+            let ldFuncEQU Ops = 
+                    {LoadAddr= WA 200u; 
+                        Label= Some "labelT"; 
+                        SymTab= Some stOneItem;
+                        OpCode= "";
+                        Operands= Ops}
+            let removeRecord x =
+                match x with
+                | Ok y -> y 
+            ldFuncEQU input
+            |> parseMemIns root suffix
+            |> removeRecord 
+        let BaseDataPath : DataPath<'INS> =
+            let memory : MachineMemory<'INS> = [WA 0x100u,DataLoc 5u] |> Map.ofList
+            let registers : Map<RName,uint32> = [(R0: RName), 2u; R1, 0x100u] |> Map.ofList
+            let flags : Flags = { N= false; C=false; Z=false; V=false}
+            {Fl= flags; Regs= registers; MM = memory}
+
+        let makeTest name symTab inpDataPath inputRec output =
+            testCase name <| fun () ->
+                Expect.equal (LDRexec symTab inputRec inpDataPath) output (sprintf "LDRexecTest Test '%s'" name)
+        Expecto.Tests.testList "LDRexecTest Tests"
+                [   
+                    //LDR Working Tests
+                    makeTest "LDRexec: LDR Base Case" stOneItem (makeMemInstr "LDR" "" "R0, [R1]") BaseDataPath (Ok stOneItem,(Ok {BaseDataPath with Regs = ([(R0: RName), 5u; R1, 0x100u] |> Map.ofList)}))
+
+                    //LDR Error Message Tests
+
+                ]

@@ -75,13 +75,16 @@ module MemInstructions
                     not present in regNames" item)
         | Some x -> Ok x
                 
-    let checkDoubleError x y = 
-        match (x, y) with
-        | (Error x, Error y) -> Error (x+"\n"+y)
+    let resultDotBindTwoInp operator u v = 
+        match (u,v) with
+        | (Error x, Error y) -> if x <> y then Error (x+"\n"+y)
+                                else Error x
         | (Error x, _) -> Error x
         | (_, Error y) -> Error y
-        | (Ok x, Ok y) -> Ok x
+        | (Ok x, Ok y) -> Ok (operator x y)
 
+    let selectFirst x _ = x
+    
 
     let (|GreaterThanZero|ErrorGZ|) x = if (x>=0) then GreaterThanZero else ErrorGZ
     let isPos (x: Group) (y: Group) = match (x.Value|>int) with GreaterThanZero -> (Some (x.Value|>int),(Some regNames.[y.Value])) | ErrorGZ -> (None,None)
@@ -101,7 +104,7 @@ module MemInstructions
             | "B" -> Ok true
             | _   -> Error (sprintf "parseMemIns: Unexpected suffix (%A)\nls: %A" suffix ls)
         let pre = ((ls.Operands).Trim()).LastIndexOf("!") = (((ls.Operands).Trim()).Length-1)
-        let errorMessage1 = checkDoubleError instTypeTmp bytes
+        let errorMessage1 = resultDotBindTwoInp selectFirst instTypeTmp bytes 
         let parseOps ops =
             match ops with
             | Match @"(R[0-9]|1[0-5]) *, *\[ *(R[0-9]|1[0-5]) *] *, *#([0-9]+)" [_; rA; rB; incV] -> //Post Increment
@@ -118,17 +121,14 @@ module MemInstructions
             | _ -> 
                 Error (sprintf "ops didn't match anything\nops: %A\n" ops)
 
-        match ((parseOps ((ls.Operands).Trim())), errorMessage1) with
-        | (Error x, Error y) -> Error (x+"\n"+y)
-        | (Error x, _) -> Error x
-        | (_, Error y) -> Error y
-        | (Ok x, Ok y) ->  let regExMatVal = x
-                           Ok {InstructionType= instTypeTmp;
-                    DestSourceReg= regExMatVal.Ra; AddressReg= regExMatVal.Rb;
-                    BytesNotWords= bytes; IncrementValue= regExMatVal.IncrVal;
-                    PreIndexRb= pre; PostIndexRb= regExMatVal.Post; 
-                    ExtraAddressReg= regExMatVal.Rc;
-                    ShiftExtraRegBy= regExMatVal.Shift;}
+        let makeOutFromParseOps (x: FromOps) _ =
+            {InstructionType= instTypeTmp;
+                DestSourceReg= x.Ra; AddressReg= x.Rb;
+                BytesNotWords= bytes; IncrementValue= x.IncrVal;
+                PreIndexRb= pre; PostIndexRb= x.Post; 
+                ExtraAddressReg= x.Rc;
+                ShiftExtraRegBy= x.Shift;}
+        resultDotBindTwoInp makeOutFromParseOps (parseOps ((ls.Operands).Trim())) errorMessage1 
 
         
 
@@ -146,7 +146,6 @@ module MemInstructions
 //----------ADR INSTRUCTION DEFINITION AND PARSING-------------------------------------------------
 
     type ADRInstrType = ADRm 
-    type LabelAdrExpr = Result<uint32,String>
 
 
     /// instruction (dummy: must change)
@@ -154,7 +153,7 @@ module MemInstructions
         {
             InstructionType: Result<ADRInstrType,String>;
             DestReg: Result<RName,String>;
-            SecondOp: LabelAdrExpr;
+            SecondOp: Result<uint32,String>;
         }
 
     /// parse error (dummy, but will do)
@@ -220,30 +219,18 @@ module MemInstructions
                     match ((evalExpression' x.[1..(x.Length-2)])) with
                     | (Ok y)  -> Ok (y|>string)
                     | Error m -> Error m
-                    else (Ok x)   
-                let resultStringConcat (aIn: Result<string,String>) (bIn: Result<string,String>) = 
-                    match (aIn, bIn) with
-                    | ((Ok x), (Ok y))       -> (Ok (x+y))
-                    | ((Error x), (Error y)) -> Error (x+"\n"+y)
-                    | (Error x, _)           -> Error x 
-                    | (_, Error y)           -> Error y 
+                    else (Ok x)                   
                 match exp with 
                 | Matches @"((\([^)]*\)*)|[^()]*)" tl -> 
                                                         let bracketsEvaled = 
                                                             tl
                                                             |> List.map (mapFunction)
-                                                            |> List.reduce (resultStringConcat)
+                                                            |> List.reduce (resultDotBindTwoInp (+))
                                                         match bracketsEvaled with
                                                         | (Ok x)  -> evalExpression' x
                                                         | Error m -> Error m
             elif String.exists (fun c -> (c ='+')) exp then
                 let list = exp.Split('+') |> Seq.toList
-                let resultAdd (aIn: Result<uint32,String>) (bIn: Result<uint32,String>) = 
-                    match (aIn, bIn) with
-                    | ((Ok x), (Ok y))       -> (Ok (x+y))
-                    | ((Error x), (Error y)) -> Error (x+"\n"+y)
-                    | (Error x, _)           -> Error x 
-                    | (_, Error y)           -> Error y 
                 if ((list.[0]="")&&((List.last list)="")) 
                 then list.[1..(List.length list)-2]
                 elif (list.[0]="")
@@ -252,15 +239,9 @@ module MemInstructions
                 then list.[0..(List.length list)-2]
                 else list //Should return an error monad above here
                 |> List.map (fun x -> evalExpression' x)
-                |> List.reduce (resultAdd)
+                |> List.reduce (resultDotBindTwoInp (+))
             elif String.exists (fun c -> (c ='-')) exp then
                 let list = exp.Split('-') |> Seq.toList
-                let resultMinus (aIn: Result<uint32,String>) (bIn: Result<uint32,String>) = 
-                    match (aIn, bIn) with
-                    | ((Ok x), (Ok y))       -> (Ok (x-y))
-                    | ((Error x), (Error y)) -> Error (x+"\n"+y)
-                    | (Error x, _)           -> Error x 
-                    | (_, Error y)           -> Error y 
                 if ((list.[0]="")&&((List.last list)="")) 
                 then List.append ["0"] list.[1..(List.length list)-2]
                 elif (list.[0]="")
@@ -269,15 +250,9 @@ module MemInstructions
                 then list.[0..(List.length list)-2]
                 else list //Should return an error monad above here
                 |> List.map (fun x -> evalExpression' x)
-                |> List.reduce (resultMinus)
+                |> List.reduce (resultDotBindTwoInp (-))
             elif String.exists (fun c -> (c ='*')) exp then
                 let list = exp.Split('*') |> Seq.toList
-                let resultMult (aIn: Result<uint32,String>) (bIn: Result<uint32,String>) = 
-                    match (aIn, bIn) with
-                    | ((Ok x), (Ok y))       -> (Ok (x*y))
-                    | ((Error x), (Error y)) -> Error (x+"\n"+y)
-                    | (Error x, _)           -> Error x 
-                    | (_, Error y)           -> Error y 
                 if ((list.[0]="")&&((List.last list)="")) 
                 then list.[1..(List.length list)-2]
                 elif (list.[0]="")
@@ -286,14 +261,14 @@ module MemInstructions
                 then list.[0..(List.length list)-2]
                 else list //Should return an error monad above here
                 |> List.map (fun x -> evalExpression' x)
-                |> List.reduce (resultMult)
+                |> List.reduce (resultDotBindTwoInp (*))
             else 
-                let symTabTryFindMonad item =
-                    match symTab.TryFind item with
-                    | None -> Error (sprintf "evalExpression: Couldn't find label (%A)
-                              in the Symbol Table" item)
-                    | Some x -> x |> string |> uint32 |> Ok
                 let numberOrLabel (item: string) =
+                    let symTabTryFindMonad item =
+                        match symTab.TryFind item with
+                        | None -> Error (sprintf "evalExpression: Couldn't find label (%A)
+                                  in the Symbol Table" item)
+                        | Some x -> x |> string |> uint32 |> Ok
                     match (System.UInt32.TryParse item) with
                     | (true, num) -> Ok num
                     | (false, _) -> symTabTryFindMonad item
@@ -322,26 +297,21 @@ module MemInstructions
             | Match @"(R1[0-5]|R[0-9])" [_; rA] -> //Indentifying Destination Register
                 regNamesTryFindMonad rA
             | _ ->
-                Error (sprintf "parseAdrIns: No destination register 
-                identified in parseAdrIns\nls.Operands: %A" (ls.Operands))
-        let errorMessage1 = checkDoubleError ADRInstrTypeTmp Rd
+                Error (sprintf "parseAdrIns: No destination register identified in parseAdrIns\nls.Operands: %A" (ls.Operands))
         let labelExpVal = 
             match ls.SymTab with
             | None   -> Error "parseAdrIns: ls.SymTab = None"
             | Some x -> match ((ls.Operands).Trim()) with
                         | Match @"(R[0-9]|1[0-5]) *, *(.*)" [_; rA; expression] -> 
                             evalExpression expression.Value x
-                        | _ -> Error (sprintf "parseAdrIns: Line Data in incorrect form\n
-                          ls.Operands: %A" ls.Operands)
-        match (errorMessage1, labelExpVal) with
-        | (Error x, Error y) -> Error (x+"\n"+y)
-        | (Error x, _) -> Error x
-        | (_, Error y) -> Error y
-        | (Ok x, Ok y) -> Ok {InstructionType= ADRInstrTypeTmp;
-                            DestReg= Rd;
-                            SecondOp= labelExpVal;}
+                        | _ -> Error (sprintf "parseAdrIns: Line Data in incorrect form\nls.Operands: %A" ls.Operands)
+        let makeOutFrom x _ =
+            {InstructionType= ADRInstrTypeTmp;
+                DestReg= Rd;
+                SecondOp= Ok x;}
+        let errorMessage1 = resultDotBindTwoInp selectFirst ADRInstrTypeTmp Rd  
+        resultDotBindTwoInp makeOutFrom (labelExpVal) errorMessage1 
 
-        
 
 
 
@@ -453,14 +423,33 @@ module MemInstructions
                            instructions (%A) must have a label\nls: %A" root ls)
                       else Ok None
             | Some _ -> Ok ls.Label
-        match (instTypeTmp, nameOut) with
-        | (Error x, Error y) -> Error (x+"\n"+y)
-        | (Error x, _) -> Error x
-        | (_, Error y) -> Error y
-        | (Ok x, Ok y) ->  Ok {InstructionType = instTypeTmp; Name = nameOut; 
-                            EQUExpr = equExp; DCDValueList = valList; 
-                            FillN = fillN}
-
+        let errorMessage1 =
+            let checkRes x = 
+                match x with
+                | Ok y -> Ok 1
+                | _ -> Error (sprintf "parseLabelIns: One of fillN, valList and equExp is an Error")
+            match (fillN, valList, equExp) with
+            | (Some x, None, None) -> checkRes x
+            | (None, Some x, None) -> checkRes x
+            | (None, None, Some x) -> checkRes x
+            | _ -> Error (sprintf "parseLabelIns: should never happen, more or less than one of fillN(%A), valList(%A) and equExp(%A) are Some x" fillN valList equExp)
+        let errorMessage2 = resultDotBindTwoInp selectFirst errorMessage1 instTypeTmp 
+        let makeLabelOut (nO: string option) _ =
+            {InstructionType = instTypeTmp; Name = Ok nO; 
+                EQUExpr = equExp; DCDValueList = valList; 
+                FillN = fillN}
+        let out = resultDotBindTwoInp makeLabelOut nameOut errorMessage2 
+        let realOut =
+            match (instTypeTmp, nameOut) with
+            | (Error x, Error y) -> Error (x+"\n"+y)
+            | (Error x, _) -> Error x
+            | (_, Error y) -> Error y
+            | (Ok x, Ok y) ->  Ok {InstructionType = instTypeTmp; Name = nameOut; 
+                                EQUExpr = equExp; DCDValueList = valList; 
+                                FillN = fillN}
+        // printfn "\n\n\nout = %A\nrealOut = %A" out realOut
+        // if out <> realOut then printfn "out and realOut not equal: \nout = %A\nrealOut = %A\nroot = %A\nls = %A" out realOut root ls
+        realOut
 
 
 
@@ -559,56 +548,97 @@ module MemInstructions
 
 
 
+    ///I have already checked regName and val0 in 
+    /// resultDotBindTwoInp so I don't need to again.
+    /// Will update the register regName with val0
+    let updateRegister (dP: DataPath<'INS>) (regName: RName) (val0:uint32) = (dP.Regs).Add(regName,val0)
+    let updateDataPathRegs (dP: DataPath<'INS>) x = {dP with Regs = x}
 
 
-
-
-
-
-    let LDRexec (inputRecord: LabelAndMemGeneralParse) dP = 
-        //insert psuedo code here
-        //Eg: LDR r8, [r10]     //Loads r8 with the value 
-                                // from the address in r10
-        //Eg:LDR r2, [r5,#960]! //Loads r2 with the value
-                                // from the address 960 bytes
-                                // above the address stored
-                                // in r5 and increments r5 by
-                                // 960  
-        //See below link for all 6 LDR uses
-        //https://intranet.ee.ic.ac.uk/t.clarke/arch/html16/CT6.html
-        //Needs to change the DataPath Record of identifier MM
-        // MM is of type MachineMemory<'INS>
-        //This has two part, WAddr is a address of uin32 
-        // the other is MemLoc<'INS> which is the content of the
-        // memory address. It can either be a uint32 or it can
-        // be an instruction. I think this is just for storing 
-        // the program in memory but apparently it is also used
-        // for branching.
-        0
-
-    let STRexec (inputRecord: LabelAndMemGeneralParse) dP = 
-        //insert psuedo code here
-        0
-
-    let ADRexec (inputRecord: LabelAndMemGeneralParse) (dP: DataPath<'INS>) = 
-        //Takes the address of a label and puts it into the 
-        // register. 
-        //Eg: ADR		R0, BUFFIN1
-        //Eg2: start		MOV		r0,#10
-        //                  ADR		r4,start 
-        //                  (; => SUB r4,pc,#0xc)
+    ///Will just update the DataPath, SymbolTable is untouched
+    let LDRexec (symbolTab: SymbolTable) (dP: DataPath<'INS>) (inputRecord: MemInstr) = 
+        let accessMemoryLocation dP (wordAddress: WAddr) =
+            match (dP.MM).TryFind wordAddress with
+            | Some x -> match x with
+                        | DataLoc y -> Ok y
+                        | _ -> Error (sprintf "STRexec-accessMemoryLocation: MemLoc value (%A) at %A was not of type DataLoc" x wordAddress)
+            | _ -> Error (sprintf "STRexec-accessMemoryLocation: %A was not present in memory" wordAddress)
         
-        // let infoRecordRes  =
-        //     match inputRecord with
-        //     | LabelO m -> m
-        //     | x -> Error (sprintf "EQUexec: Wrong type of LabelAndMemGeneralParse passed to function (%A)" x)
-        // let updateDataPath = 
 
-        // match infoRecordRes with
-        // | Error m -> dP
-        // | Ok _ -> updatedDataPath
+        //Returns end value of Ra, Rb
+        let interpretingRecord inputRecord =
+            let makeBytes (bytes: bool) (x,y) =
+                match bytes with
+                | false -> (x,y)
+                | true -> (x&&&0xFFu,y&&&0xFFu)
+            let incrementRbValue =
+                let powerF (baseF: uint32) (expF: uint32) = 
+                        ((baseF|>float)**(expF|>float))|>uint32
+                match inputRecord.ExtraAddressReg with
+                | None -> Ok (inputRecord.IncrementValue |> uint32)
+                | Some x -> let Rc = Map.find x dP.Regs
+                            match inputRecord.ShiftExtraRegBy with
+                            | None -> Ok Rc
+                            | Some y -> Ok (powerF Rc (y|>uint32))
 
-        0
+            ///Finds Original Ra and Rb values
+            let getOrigVal = 
+                let getOriginalRegisterVals (Ra: RName) (Rb: RName) =
+                    (Map.find Ra dP.Regs, Map.find Rb dP.Regs)
+                resultDotBindTwoInp getOriginalRegisterVals inputRecord.DestSourceReg inputRecord.AddressReg
+            
+            ///Returns the Ra and Rb values
+            let preOrPost pre post x (rABTup: (uint32 * uint32)) =
+                let Ra = fst rABTup
+                let Rb = snd rABTup
+                match (pre,post) with
+                | (true,true) -> Error "LDRexec-interpretingRecord: pre and post can't both be true"
+                | (true, _) -> Ok (accessMemoryLocation dP (WA (Rb+x)), Rb+x)
+                | (_, true) -> Ok (accessMemoryLocation dP (WA (Rb)), Rb+x)
+                | (false,false) -> Ok (accessMemoryLocation dP (WA (Rb+x)), Rb)
+            
+            ///Removes unnecessary levels of Result
+            let changeType (v: Result<Result<(Result<uint32,string> * uint32),string>,string>) = 
+                match v with
+                | Ok x ->   match x with
+                            | Ok y -> match y with
+                                      | (Ok z, u) -> Ok (z,u)
+                                      | (_, u) -> Error "LDRexec-interpretingRecord: Error accesing memory location"
+                            | Error m -> Error m
+                | Error m -> Error m
+            let changedToBytes (a: Result<(uint32 * uint32),string>) =
+                resultDotBindTwoInp makeBytes inputRecord.BytesNotWords a 
+            changedToBytes (changeType (resultDotBindTwoInp (preOrPost inputRecord.PreIndexRb inputRecord.PostIndexRb) incrementRbValue getOrigVal))
+        
+        let fstRecTuple x =
+            match x with 
+            | Ok (a,_) -> Ok a
+            | Error m -> Error m 
+        let sndRecTuple x =
+            match x with 
+            | Ok (_,b) -> Ok b
+            | Error m -> Error m 
+        let regsMapF (dPF: Result<DataPath<'INS>,string>) reg x = 
+            match dPF with 
+            | Ok y -> (resultDotBindTwoInp (updateRegister y) reg x)
+            | Error m -> Error m
+        let interpretedRecord = interpretingRecord inputRecord
+
+        let updatedDP1 = resultDotBindTwoInp updateDataPathRegs (Ok dP) (regsMapF (Ok dP) (inputRecord.DestSourceReg) (fstRecTuple interpretedRecord))
+        let updatedDP2 = resultDotBindTwoInp updateDataPathRegs updatedDP1 (regsMapF updatedDP1 (inputRecord.AddressReg) (sndRecTuple interpretedRecord))
+
+
+        (Ok symbolTab, updatedDP2)
+
+
+
+    ///Will just update the DataPath, SymbolTable is untouched
+    let STRexec (symbolTab: SymbolTable) (dP: DataPath<'INS>) (inputRecord: MemInstr) = 
+        //insert psuedo code here
+        //Expect to return a uint32
+
+        (Ok symbolTab, Ok dP)
+
 
 
     ///Updates the symbol table
@@ -634,12 +664,8 @@ module MemInstructions
                         | Some y -> y
                         | None -> Error (sprintf "updateSymbolTable-getValue: (Ok (%A).FillN) = None" field)
             | _ -> Error (sprintf "updateSymbolTable-getValue: InstructionType (%A) not EQU, DCD or FILL" inputRecord.InstructionType)
-
-        match ((getLabel inputRecord),(getValue field inputRecord)) with
-        | (Error x, Error y) -> Error (x+"\n"+y)
-        | (Error x, _) -> Error x
-        | (_, Error y) -> Error y
-        | (Ok x, Ok y) -> Ok (symbolTab.Add(x,y))
+        let addToSymTab x y = symbolTab.Add(x,y)
+        resultDotBindTwoInp addToSymTab (getLabel inputRecord) (getValue field inputRecord)
 
     ///Updates the Memory in the DataPath (Adds something
     /// to memory). Called by DCDexec and FILLexec
@@ -713,6 +739,17 @@ module MemInstructions
                                                                         let remainingValueList = Ok dataValList'.[1..(List.length dataValList')-1]
                                                                         let updatedMachineMem = dPMM.Add(WA (addrList.[0]+4u), DataLoc dataValList'.[0])
                                                                         updateMachineMemory' remainingAddrList updatedMachineMem remainingValueList
+            // let doProcessing (dPMMf: MachineMemory<'INS>) (x: uint32 list) y = 
+            //     match y with
+            //     | [] -> Ok dPMMf
+            //     | _ ->  
+            //             let remainingAddrList = Ok x.[1..(List.length x)-1]
+            //             let remainingValueList = Ok y.[1..(List.length y)-1]
+            //             let updatedMachineMem = dPMMf.Add(WA (x.[0]+4u), DataLoc y.[0])
+            //             updateMachineMemory' remainingAddrList updatedMachineMem remainingValueList
+            // resultDotBindTwoInp (doProcessing dPMM) addrListRes dataValListRes'
+
+
         match (updateMachineMemory' (findAddrs dP) dP.MM dataValList) with
         | Ok x -> Ok {Fl = dP.Fl; Regs = dP.Regs; MM = x}
         | Error m -> Error m
@@ -739,26 +776,11 @@ module MemInstructions
         match x with
         | Some y -> removeResult y
         | _ -> None
+
     ///Executes the DCD instruction, taking in the symbol table,
     /// DataPath and labelInstr record and outputing updated 
     /// Symbol tables and DataPaths
     let DCDexec (symbolTab: SymbolTable) (dP: DataPath<'INS>) (inputRecord: labelInstr) = 
-        //Takes a label and a list of values, it then stores 
-        // the values in memory, they can be accessed using
-        // the label.
-        //Eg: test		DCD		1,3,5
-        // test is the label, 1,3 and 5 are the stored values
-        //Eg2: data3   DCDU    1,5,20
-        // this line defines these three values at the label 
-        // data3, however the U means that the values are not
-        // word aligned.
-        //NOTE: this line will not run in visual but it should
-        
-        //Update Symbol Table and update the DataPath.MM
-        
-        //Making the value list of correct type to feed into 
-        // updateSymbolTable
-
         let removeOptionD (x:Result<ValueList,string> option) =   
             let makeType (x:ValueList)  =
                 let y = (x.[0])|>uint32
@@ -784,41 +806,42 @@ module MemInstructions
     /// of the SymbolTable and DataPath, as well as the 
     /// information record labelInstr and updates the current
     /// state of the program by executing an EQU instruction
+    ///Updates SymbolTable only
     let EQUexec (symbolTab: SymbolTable) (dP: DataPath<'INS>) (inputRecord: labelInstr) = 
-        //Eg: abc EQU 2 
-        // this line assigns the value 2 to the label abc
-        //Eg2: xyz EQU label+8
-        // this assigns the address (label+8) to the label xyz
-        // checkAndMatchInputRecord inputRecord LabelO
-        //Update Symbol Table, no need to update Machine
-        // Memory
-        
         (updateSymbolTable symbolTab inputRecord inputRecord.EQUExpr, Ok dP)                
-    ///Executes a Fill instruction
+    
+    ///Executes a Fill instruction, updates Symbol Table and DataPath
     let FILLexec (symbolTab: SymbolTable) (dP: DataPath<'INS>) (inputRecord: labelInstr) = 
-        //Eg:   data4	Fill		12
-        // fills 12 data slots with 0. It basically initialises
-        // the memory. The value or expression at the end must
-        // evaluate to a multiple of 4.
-        //Eg2:   data4	Fill		4*3
-        //As you can see, the last operand can be an expression
-        
-        //Update Symbol Table and update the DataPath.MM
         (updateSymbolTable symbolTab inputRecord ((inputRecord.FillN)), (updateMemoryDataPath inputRecord dP))                
 
 
 
 
+    let ADRexec (symbolTab: SymbolTable) (dP: DataPath<'INS>) (inputRecord: ADRInstr) = 
+        let updateRegMap (dP: DataPath<'INS>) (inputRecord: ADRInstr) = 
+            resultDotBindTwoInp (updateRegister dP) inputRecord.DestReg inputRecord.SecondOp 
+        (Ok symbolTab,Result.map (updateDataPathRegs dP) (updateRegMap dP inputRecord))
+    
+
+
     let generalExecHandler (inputRecord: LabelAndMemGeneralParse) (symbolTab: SymbolTable) (dP: DataPath<'INS>) =
         let labelInstructionsHandler (symbolTab: SymbolTable) (dP: DataPath<'INS>) (inputRecord: labelInstr) =
-            match inputRecord.InstructionType with
-            | Ok x -> match x with
-                      | EQU -> Ok (EQUexec symbolTab dP inputRecord)
-                      | DCD -> Ok (DCDexec symbolTab dP inputRecord)
-                      | FILL -> Ok (FILLexec symbolTab dP inputRecord)
-                      | _ -> Error (sprintf "labelInstructionsHandler: InstructionType (%A) not recognised" x)
-            | Error m -> Error m
+            let matchLabIns x =
+                match x with
+                | EQU -> Ok (EQUexec symbolTab dP inputRecord)
+                | DCD -> Ok (DCDexec symbolTab dP inputRecord)
+                | FILL -> Ok (FILLexec symbolTab dP inputRecord)
+                | _ -> Error (sprintf "labelInstructionsHandler: InstructionType (%A) not recognised" x)
+            Result.bind matchLabIns inputRecord.InstructionType
+        let memInstructionsHandler (symbolTab: SymbolTable) (dP: DataPath<'INS>) (inputRecord: MemInstr) =
+            let matchMemIns x =
+                match x with
+                | LDR -> Ok (LDRexec symbolTab dP inputRecord)
+                | STR -> Ok (STRexec symbolTab dP inputRecord)
+                | _ -> Error (sprintf "memInstructionsHandler: InstructionType (%A) not recognised" x)
+            Result.bind matchMemIns inputRecord.InstructionType
+
         match inputRecord with
         | LabelO x -> Result.bind (labelInstructionsHandler symbolTab dP) x
+        | AdrO x -> Result.map (ADRexec symbolTab dP) x
         // | MemO x -> 
-        // | AdrO x -> 
