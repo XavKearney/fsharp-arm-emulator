@@ -1,13 +1,11 @@
 module ArmEmulator
 
 open Expecto
-open Expecto.ExpectoFsCheck
-open System
-open MemInstructions
+open VisualTest
 
 [<EntryPoint>]
 let main argv =
-    Tests.runTestsInAssembly defaultConfig argv
-    printfn "enter any key to finish"
-    Console.ReadKey() |> ignore
+    Visual.initCaches VTest.defaultParas |> ignore
+    Tests.runTestsInAssembly defaultConfig argv |> ignore
+    Visual.finaliseCaches VTest.defaultParas |> ignore
     0
