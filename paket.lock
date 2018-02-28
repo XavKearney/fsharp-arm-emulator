@@ -8,7 +8,6 @@ NUGET
       FSharp.Core (>= 4.1.18)
       Mono.Cecil (>= 0.10.0-beta7)
       System.ValueTuple (>= 4.4)
-<<<<<<< HEAD
     Expecto.FsCheck (5.1.2)
       Expecto (>= 5.1.2)
       FsCheck (>= 2.10.4)
@@ -16,14 +15,11 @@ NUGET
       System.ValueTuple (>= 4.4)
     FsCheck (2.10.7)
       FSharp.Core (>= 4.0.0.1)
-    FSharp.Core (4.3.3)
-=======
     FSharp.Core (4.3.4)
->>>>>>> master
     Mono.Cecil (0.10.0-beta7)
     System.ValueTuple (4.4)
 
 GROUP Build
 NUGET
   remote: https://www.nuget.org/api/v2
-    FAKE (4.64.4)
+    FAKE (4.64.6)
