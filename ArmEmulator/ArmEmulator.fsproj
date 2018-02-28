@@ -12,6 +12,8 @@
     <Compile Include="ParseExpr.fs" />
     <Compile Include="Arithmetic.fs" />
     <Compile Include="ArithmeticTests.fs" />
+    <Compile Include="memInstructions.fs" />
+    <Compile Include="memInstructionsTests.fs" />
     <Compile Include="MultMem.fs" />
     <Compile Include="MultMemTests.fs" />
     <Compile Include="ParseExprTests.fs" />

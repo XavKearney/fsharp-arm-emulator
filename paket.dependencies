@@ -2,6 +2,7 @@ source https://www.nuget.org/api/v2
 
 framework: >= net461
 nuget Expecto
+nuget Expecto.FsCheck
 nuget FSharp.Core
 
 group Build
