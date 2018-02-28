@@ -17,7 +17,6 @@
     <Compile Include="MultMem.fs" />
     <Compile Include="MultMemTests.fs" />
     <Compile Include="ParseExprTests.fs" />
-    <Compile Include="Tests.fs" />
     <Compile Include="Main.fs" />
     <None Include="App.config" />
   </ItemGroup>
