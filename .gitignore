@@ -298,3 +298,5 @@ initProjectLexer.fs
 ArmEmulator/VisualTesting/visualWork/**
 !ArmEmulator/VisualTesting/visualWork/.gitkeep
 
+# DS_Store for Mac
+.DS_Store
