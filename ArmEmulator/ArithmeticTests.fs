@@ -1,9 +1,8 @@
-module MultMemTests
+module ArithmeticTests
     open CommonData
     open CommonLex
     open Arithmetic
     open Expecto
-    open FsCheck
     open VisualTest.Visual
     open VisualTest.VTest
     open VisualTest.VCommon
