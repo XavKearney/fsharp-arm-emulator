@@ -297,3 +297,4 @@ initProjectLexer.fs
 # VisualTest
 ArmEmulator/VisualTesting/visualWork/**
 !ArmEmulator/VisualTesting/visualWork/.gitkeep
+
