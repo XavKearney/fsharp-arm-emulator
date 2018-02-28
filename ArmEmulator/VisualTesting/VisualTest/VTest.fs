@@ -415,7 +415,17 @@ module Visual =
         //printfn "%s" cmdArgs
         File.WriteAllText(paras.WorkFileDir + "comstr.txt", cmdArgs)
         try 
-            let proc = System.Diagnostics.Process.Start("cmd", cmdArgs)
+            let procStartInfo = 
+                // silence output
+                System.Diagnostics.ProcessStartInfo(
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    FileName = "cmd",
+                    Arguments = cmdArgs
+                )
+            let proc = new System.Diagnostics.Process(StartInfo = procStartInfo)
+            proc.Start() |> ignore
             proc.WaitForExit()
         with e -> ()//printfn "%s" e.Message
         let visLog = File.ReadAllLines outputF
@@ -549,11 +559,11 @@ module VTest =
         Cached = true                // true if results are stored in a cache on disk and reused to speed 
                                      // up future repeat simulations
         VisualPath =  
-            @"\Users\dirkj\Desktop\fsharp-arm-emulator\ArmEmulator\VisualTesting\visualapp\visual\"  // the directory in which the downloaded VisUAL.exe can be found
+            @".\ArmEmulator\VisualTesting\visualapp\visual\"  // the directory in which the downloaded VisUAL.exe can be found
         WorkFileDir = 
-            @"\Users\dirkj\Desktop\fsharp-arm-emulator\ArmEmulator\VisualTesting\visualWork\"        // the directory in which both temporary files and the persistent cache file are put
+            @".\ArmEmulator\VisualTesting\visualWork\"        // the directory in which both temporary files and the persistent cache file are put
         CacheFileName = 
-            @"\Users\dirkj\Desktop\fsharp-arm-emulator\ArmEmulator\VisualTesting\visualWork\Cache"   // the file name of the global cache
+            @".\ArmEmulator\VisualTesting\visualWork\Cache"   // the file name of the global cache
         CacheLimit = 10               // the number of results before adding to global cache
         InitFlags = {FN=false;FZ=false; FC=false;FV=false}
         InitRegs = [0u..10u..140u]          // initial values of registers R0..R14
@@ -571,7 +581,6 @@ module VTest =
     let VisualUnitTest paras name src (flagsExpected:string) (outExpected: (Out * int) list) =
         testCase name <| fun () ->
             let flagsActual, outActual, memActual = RunVisualWithFlagsOut paras src
-            (printfn "%A" memActual)
             Expecto.Expect.equal flagsActual (flagsExpected |> strToFlags) "Status flags don't match"
             let outRegsNoted = 
                 outExpected 
@@ -590,7 +599,7 @@ module VTest =
                 |> List.indexed
                 |> List.map (fun (n,v) -> R n, int v)
 
-            let flagsActual, outActual, memActual = RunVisualWithFlagsOut paras ""
+            let flagsActual, outActual, _ = RunVisualWithFlagsOut paras ""
             let outSorted = 
                 outActual.Regs
                 |> List.sort
@@ -621,7 +630,7 @@ module VTest =
                 |> List.indexed
                 |> List.map (fun (n,v) -> R n, int v)
 
-            let flagsActual, outActual, memActual = 
+            let flagsActual, outActual, _ = 
                     RunVisualWithFlagsOut { 
                         defaultParas with 
                             InitFlags=flags;

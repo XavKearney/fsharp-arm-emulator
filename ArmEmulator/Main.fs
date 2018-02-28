@@ -7,7 +7,5 @@ open VisualTest
 let main argv =
     Visual.initCaches VTest.defaultParas |> ignore
     Tests.runTestsInAssembly defaultConfig argv |> ignore
-    //Visual.finaliseCaches VTest.defaultParas |> ignore
+    Visual.finaliseCaches VTest.defaultParas |> ignore
     0
-
-    
