@@ -9,4 +9,3 @@ let main argv =
     Tests.runTestsInAssembly defaultConfig argv |> ignore
     Visual.finaliseCaches VTest.defaultParas |> ignore
     0
-

@@ -293,3 +293,10 @@ packages/**
 
 # Custom
 initProjectLexer.fs
+
+# VisualTest
+ArmEmulator/VisualTesting/visualWork/**
+!ArmEmulator/VisualTesting/visualWork/.gitkeep
+
+# DS_Store for Mac
+.DS_Store
