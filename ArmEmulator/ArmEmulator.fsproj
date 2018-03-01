@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
@@ -12,6 +12,8 @@
     <Compile Include="ParseExpr.fs" />
     <Compile Include="Arithmetic.fs" />
     <Compile Include="ArithmeticTests.fs" />
+    <Compile Include="BitArithmetic.fs" />
+    <Compile Include="BitArithmeticTests.fs" />
     <Compile Include="memInstructions.fs" />
     <Compile Include="memInstructionsTests.fs" />
     <Compile Include="MultMem.fs" />
@@ -25,4 +27,4 @@
     <PackageReference Include="Expecto.FsCheck" Version="5.1.1" />
   </ItemGroup>
   <Import Project="..\.paket\Paket.Restore.targets" />
-</Project>
+ </Project>
