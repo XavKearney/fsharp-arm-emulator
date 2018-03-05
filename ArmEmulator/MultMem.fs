@@ -31,7 +31,7 @@ module MultMem
         {   
             // address to branch to
             // optional because it can require 2nd pass
-            BranchAddr: uint32 option;
+            BranchAddr: uint32;
             // if optional link "L" suffix set
             // this stores the address of the next instruction
             LinkAddr: WAddr option;
@@ -188,29 +188,23 @@ module MultMem
 
     /// takes a suffix and operands as strings
     /// determines whether the branch corresponds to a link ("L")
-    /// and gets the addres corresponding to the expression in the operands
-    /// will return None for all fields if symbol table not given (1st pass)
-    let makeBranchInstr (suffix, operands:string, WA loadaddr, symTab:Map<string,uint32> option) =
-        match symTab with
-        // symbol table given (2nd pass), so can process expression
-        | Some syms ->
-            let branchAddr = evalExpr syms operands
-            let linkAddr = 
-                match suffix with
-                // link address is address of next instruction (current address + 4)
-                | "L" -> Some(WA (loadaddr + 4u))
-                | _ -> None
-            // if valid, and symtable not none, try find address of label
-            branchAddr
-            // if valid, return branch instruction
-            |> Result.map (fun bAddr ->
-                BranchI {
-                    BranchAddr = Some (bAddr + 8u); // +8 to account for pipelining
-                    LinkAddr = linkAddr;
-                }
-            )
-        // no symbol table given, must be first pass
-        | None -> BranchI { BranchAddr = None; LinkAddr = None;} |> Ok
+    /// and gets the address corresponding to the expression in the operands
+    /// requires that the symbol table is given (2nd pass)
+    let makeBranchInstr (suffix, operands:string, WA loadaddr, symTab:Map<string,uint32>) =
+        let branchAddr = evalExpr symTab operands
+        let linkAddr = 
+            match suffix with
+            // link address is address of next instruction (current address + 4)
+            | "L" -> Some(WA (loadaddr + 4u))
+            | _ -> None
+        branchAddr
+        // if valid, return branch instruction
+        |> Result.map (fun bAddr ->
+            BranchI {
+                BranchAddr = (bAddr + 8u); // +8 to account for pipelining
+                LinkAddr = linkAddr;
+            }
+        )
 
     /// main function to parse a line of assembler
     /// ls contains the line input
@@ -224,9 +218,12 @@ module MultMem
             match instrC with
             | MEM -> makeMultMemInstr root suffix ls.Operands
             | MISC -> 
-                match root with
-                | "B" -> makeBranchInstr (suffix, ls.Operands, ls.LoadAddr, ls.SymTab)
-                | "END" -> Ok (EndI END)
+                match root, ls.SymTab with
+                | "B", Some (symtab) -> makeBranchInstr (suffix, ls.Operands, ls.LoadAddr, symtab)
+                | "B", None -> 
+                    // this error gets translated to None later
+                    Error "Cannot parse branch instruction without symbol table."
+                | "END", _ -> Ok (EndI END)
                 | _ -> Error "Invalid instruction root."
             | _ -> Error "Instruction class not supported."
             // if valid instruction, wrap in Parse type
@@ -243,7 +240,11 @@ module MultMem
         |> List.choose (Map.tryFind ls.OpCode)
         |> function 
             // should only be a single result, if so, parse it
-            | [instr] -> Some(parse' instr)
+            | [instr] ->
+                parse' instr
+                |> function
+                    | Error "Cannot parse branch instruction without symbol table." -> None
+                    | x -> Some x
             | _ -> None
 
 
@@ -325,15 +326,14 @@ module MultMem
             | BranchI x -> x
             | _ -> failwithf "Should never happen."
         match instr.BranchAddr, instr.LinkAddr with
-        | Some bAddr, None ->
+        | bAddr, None ->
             // set PC to branch address
             Ok {cpuData with Regs = cpuData.Regs.Add (R15, bAddr)}
-        | Some bAddr, Some (WA lAddr) ->
+        | bAddr, Some (WA lAddr) ->
             // set PC to branch address 
             let branchedCpu = {cpuData with Regs = cpuData.Regs.Add (R15, bAddr)}
             // and set LR to link address
             Ok {branchedCpu with Regs = cpuData.Regs.Add (R14, lAddr)}
-        | _ -> Error "Invalid branch instruction."
 
     /// execution function to take result of parse
     /// and return the correct execution function        
