@@ -72,40 +72,30 @@ module MultMemTests
         makeUnitTestList makeBranchInstr "makeBranchInstr Unit" 
             [
                 // test valid input with symbol table (2nd pass)
-                ("", "testLab", (WA 0u), Some testSymTab), 
-                    Ok (BranchI {BranchAddr = Some(45u); LinkAddr = None;})
-                ("L", "testLab", (WA 0u), Some testSymTab), 
-                    Ok (BranchI {BranchAddr = Some(45u); LinkAddr = Some(WA 4u);})
-                ("", "otherLab", (WA 0u), Some testSymTab), 
-                    Ok (BranchI {BranchAddr = Some(102u); LinkAddr = None;})
-                ("L", "otherLab", (WA 0u), Some testSymTab), 
-                    Ok (BranchI {BranchAddr = Some(102u); LinkAddr = Some(WA 4u);})
-                ("", "testLab*2-1", (WA 0u), Some testSymTab), 
-                    Ok (BranchI {BranchAddr = Some(37u*2u-1u+8u); LinkAddr = None;})
-                ("", "testLab+otherLab*2", (WA 0u), Some testSymTab), 
-                    Ok (BranchI {BranchAddr = Some(45u+94u*2u); LinkAddr = None;})
-                ("", "29*0xFF", (WA 0u), Some testSymTab), 
-                    Ok (BranchI {BranchAddr = Some(29u*0xFFu+8u); LinkAddr = None;})
-                ("", "otherLab*0xF*&F*0b11", (WA 0u), Some testSymTab), 
-                    Ok (BranchI {BranchAddr = Some(94u*0xFu*0xFu*0b11u+8u); LinkAddr = None;})
-                    
-                // test valid input but no symbol table (1st pass)
-                ("", "testLab", (WA 0u), None), 
-                    Ok (BranchI {BranchAddr = None; LinkAddr = None;})
-                ("L", "testLab", (WA 0u), None), 
-                    Ok (BranchI {BranchAddr = None; LinkAddr = None;})
-                ("", "otherLab", (WA 0u), None), 
-                    Ok (BranchI {BranchAddr = None; LinkAddr = None;})
-                ("L", "otherLab", (WA 0u), None), 
-                    Ok (BranchI {BranchAddr = None; LinkAddr = None;})
+                ("", "testLab", (WA 0u), testSymTab), 
+                    Ok (BranchI {BranchAddr = (45u); LinkAddr = None;})
+                ("L", "testLab", (WA 0u), testSymTab), 
+                    Ok (BranchI {BranchAddr = (45u); LinkAddr = Some(WA 4u);})
+                ("", "otherLab", (WA 0u), testSymTab), 
+                    Ok (BranchI {BranchAddr = (102u); LinkAddr = None;})
+                ("L", "otherLab", (WA 0u), testSymTab), 
+                    Ok (BranchI {BranchAddr = (102u); LinkAddr = Some(WA 4u);})
+                ("", "testLab*2-1", (WA 0u), testSymTab), 
+                    Ok (BranchI {BranchAddr = (37u*2u-1u+8u); LinkAddr = None;})
+                ("", "testLab+otherLab*2", (WA 0u), testSymTab), 
+                    Ok (BranchI {BranchAddr = (45u+94u*2u); LinkAddr = None;})
+                ("", "29*0xFF", (WA 0u), testSymTab), 
+                    Ok (BranchI {BranchAddr = (29u*0xFFu+8u); LinkAddr = None;})
+                ("", "otherLab*0xF*&F*0b11", (WA 0u), testSymTab), 
+                    Ok (BranchI {BranchAddr = (94u*0xFu*0xFu*0b11u+8u); LinkAddr = None;})
 
                 // test invalid input
-                ("", "unknownLab", (WA 0u), Some(testSymTab)), Error "Invalid literal at end of expression."
-                ("K", "yetAnotherLabel", (WA 0u), Some testSymTab), Error "Invalid literal at end of expression."
-                ("L", "label with spaces", (WA 0u), Some testSymTab), Error "Invalid literal in expression."
-                ("", "", (WA 0u), Some testSymTab), Error "No input expression supplied."
-                ("L", "", (WA 0u), Some testSymTab), Error "No input expression supplied."
-                ("", " ", (WA 0u), Some testSymTab), Error "No input expression supplied."
+                ("", "unknownLab", (WA 0u), testSymTab), Error "Invalid literal at end of expression."
+                ("K", "yetAnotherLabel", (WA 0u), testSymTab), Error "Invalid literal at end of expression."
+                ("L", "label with spaces", (WA 0u), testSymTab), Error "Invalid literal in expression."
+                ("", "", (WA 0u), testSymTab), Error "No input expression supplied."
+                ("L", "", (WA 0u), testSymTab), Error "No input expression supplied."
+                ("", " ", (WA 0u), testSymTab), Error "No input expression supplied."
             ]
     // unit tests for parse function
     // with input corresponding to LDM/STM instructions
@@ -147,21 +137,21 @@ module MultMemTests
         let ls = { LoadAddr = WA 0u; Label = None; SymTab = Some testSymTab;
                 OpCode = ""; Operands = ""; }
         // default result
-        let res = {PInstr = BranchI {BranchAddr = None; LinkAddr = None;}; 
+        let res = {PInstr = BranchI {BranchAddr = 0u; LinkAddr = None;}; 
                     PLabel = None; PSize = 4u; PCond = Cal;}
         makeUnitTestList parse "parse Unit-Branch" 
             [
                 // test valid input
                 {ls with OpCode = "B"; Operands = "testLab";}, 
-                    Some(Ok {res with PInstr = BranchI {BranchAddr = Some 45u; LinkAddr = None;}})
+                    Some(Ok {res with PInstr = BranchI {BranchAddr = 45u; LinkAddr = None;}})
                 {ls with OpCode = "BL"; Operands = "testLab";}, 
-                    Some(Ok {res with PInstr = BranchI {BranchAddr = Some 45u; LinkAddr = Some (WA 4u);}})
+                    Some(Ok {res with PInstr = BranchI {BranchAddr = 45u; LinkAddr = Some (WA 4u);}})
                 {ls with OpCode = "BL"; Operands = "otherLab";}, 
-                    Some(Ok {res with PInstr = BranchI {BranchAddr = Some 102u; LinkAddr = Some (WA 4u);}})
+                    Some(Ok {res with PInstr = BranchI {BranchAddr = 102u; LinkAddr = Some (WA 4u);}})
                 {ls with OpCode = "BL"; Operands = "otherLab*2-1";}, 
-                    Some(Ok {res with PInstr = BranchI {BranchAddr = Some (94u*2u-1u+8u); LinkAddr = Some (WA 4u);}})
+                    Some(Ok {res with PInstr = BranchI {BranchAddr = (94u*2u-1u+8u); LinkAddr = Some (WA 4u);}})
                 {ls with OpCode = "B"; Operands = "otherLab*2-9*testLab";}, 
-                    Some(Ok {res with PInstr = BranchI {BranchAddr = Some (94u*2u-9u*37u+8u); LinkAddr = None;}})
+                    Some(Ok {res with PInstr = BranchI {BranchAddr = (94u*2u-9u*37u+8u); LinkAddr = None;}})
                 
                 // test invalid input
                 {ls with OpCode = "BL"; Operands = "   Testwhitespace    ";}, 
@@ -219,12 +209,11 @@ module MultMemTests
             // determine the correct result given randomised data
             let expected =
                 match branchAddr, linkAddr with
-                | Some b, None ->
+                | b, None ->
                     Ok {cpuData with Regs = cpuData.Regs.Add (R15, b)}
-                | Some b, Some (WA l) ->
+                | b, Some (WA l) ->
                     {cpuData with Regs = cpuData.Regs.Add (R15, b)}
                     |> fun cpu -> Ok {cpu with Regs = cpuData.Regs.Add (R14, l)}
-                | _ -> Error "Invalid branch instruction."
             Expect.equal result expected "cpuData"
 
     /// property-based testing of parse function
@@ -475,7 +464,7 @@ module MultMemTests
     [<Tests>]
     let testExecInstr =   
         let parsedBranchI = Some ( Ok {
-                PInstr = BranchI {BranchAddr = Some 111u; LinkAddr = None;}; 
+                PInstr = BranchI {BranchAddr = 111u; LinkAddr = None;}; 
                     PLabel = None; PSize = 4u; PCond = Cal;})
         let parsedMemI = 
             Some ( Ok {
