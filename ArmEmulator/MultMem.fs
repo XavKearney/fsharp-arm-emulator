@@ -222,7 +222,7 @@ module MultMem
                 | "B", Some (symtab) -> makeBranchInstr (suffix, ls.Operands, ls.LoadAddr, symtab)
                 | "B", None -> 
                     // this error gets translated to None later
-                    Error "Cannot parse branch instruction without symbol table."
+                    Error "Branch without symbol table."
                 | "END", _ -> Ok (EndI END)
                 | _ -> Error "Invalid instruction root."
             | _ -> Error "Instruction class not supported."
@@ -240,11 +240,10 @@ module MultMem
         |> List.choose (Map.tryFind ls.OpCode)
         |> function 
             // should only be a single result, if so, parse it
-            | [instr] ->
-                parse' instr
-                |> function
-                    | Error "Cannot parse branch instruction without symbol table." -> None
-                    | x -> Some x
+            | [instr] -> parse' instr
+                        |> function
+                        | Error "Branch without symbol table." -> None
+                        | x -> Some x
             | _ -> None
 
 
