@@ -1,6 +1,7 @@
 module TopLevel
     open CommonLex
     open CommonData
+    open VisualTest
 
     /// allows different modules to return different instruction types
     type Instr =
@@ -94,7 +95,7 @@ module TopLevel
 
     /// initialise DataPath object before executing instructions
     /// takes optional flags/regs/mem to initialise with
-    /// otherwise, all empty to begin with
+    /// otherwise, all empty to begin with (false flags, zero regs, no memory allocated)
     let initDataPath flags regs mem = 
         let initFlags = 
             match flags with
@@ -121,3 +122,26 @@ module TopLevel
                 MM = m;
             }
         | _, Error s, _ -> Error s
+
+    
+    // map a function which returns its own error type
+    // to one which returns a top-level error type
+    let mapErr fMap ins = 
+        match ins with
+        | Error s -> Error (fMap s)
+        | Ok x -> Ok x
+
+    // function to execute any parsed instruction from any module
+    let execParsedLine ins d symtab =
+        let exec' p f ins' err = 
+            { PInstr = ins'; PLabel = p.PLabel; PCond = p.PCond; PSize = p.PSize }
+            |> f
+            |> mapErr err
+
+        ins |> Result.bind (
+            function
+            | {PInstr=IMULTMEM ins'} as p -> 
+                exec' p (MultMem.execInstr d) ins' ERRIMULTMEM
+            // | {PInstr=IARITH ins'} as p -> 
+            //     exec' p (Arithmetic.doArithmetic d) ins' ERRIARITH
+        )

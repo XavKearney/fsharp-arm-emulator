@@ -4,7 +4,6 @@ module TopLevelTests
     open CommonData
     open CommonLex
     open Arithmetic
-    open BitArithmetic
     open MultMem
     open TopLevel
 
