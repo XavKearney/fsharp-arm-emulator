@@ -89,7 +89,6 @@ module Arithmetic
 
     // #### END - Active pattern code ####
 
-    
     /// FlexOp2 code that performs shifts on flexible operand 2 
     let flexOp2 op2 cpuData = 
         match op2 with
