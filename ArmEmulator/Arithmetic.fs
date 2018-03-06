@@ -526,7 +526,7 @@ module Arithmetic
 
     /// Execute an arithmetic instruction
     /// Performs arithmetic on given cpuData
-    let doArithmetic (input: Parse<ReturnInstr>) cpuData = 
+    let execArithmeticInstr (input: Parse<ReturnInstr>) cpuData = 
         // Register map
         let regMap = cpuData.Regs
 
@@ -673,8 +673,8 @@ module Arithmetic
             match logicOp with
             | Ok regVal -> 
                 let outVal, outFlags = regVal
-                {Regs = Map.add target (uint32 outVal) regMap; Fl = outFlags; MM = cpuData.MM}
-            | Error _ -> failwithf "The instruction is invalid"
+                Ok {Regs = Map.add target (uint32 outVal) regMap; Fl = outFlags; MM = cpuData.MM}
+            | Error err -> Error err
 
         // Computational code for CMP and CMN
         // Has the same basic stucture as for the above function with small
@@ -708,8 +708,8 @@ module Arithmetic
             match logicOp with
             | Ok regVal -> 
                 let _, outFlags = regVal
-                {Regs = regMap; Fl = outFlags; MM = cpuData.MM}
-            | Error _ -> failwithf "The instruction is invalid"
+                Ok {Regs = regMap; Fl = outFlags; MM = cpuData.MM}
+            | Error err -> Error err
 
         
 
