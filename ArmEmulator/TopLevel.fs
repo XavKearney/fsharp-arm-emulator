@@ -90,3 +90,34 @@ module TopLevel
         |> splitIntoWords
         |> Array.toList
         |> matchLine
+
+
+    /// initialise DataPath object before executing instructions
+    /// takes optional flags/regs/mem to initialise with
+    /// otherwise, all empty to begin with
+    let initDataPath flags regs mem = 
+        let initFlags = 
+            match flags with
+            | Some f -> f
+            | None -> {N=false;Z=false;C=false;V=false;} 
+        let initRegs = 
+            match regs with
+            | Some r when Map.count r = 16 -> Ok r
+            | None ->
+                [0..15]
+                |> List.map (fun i -> inverseRegNums.[i], 0u)
+                |> Map.ofList
+                |> Ok
+            | _ -> Error (ERRTOPLEVEL "Invalid initial registers.")
+        let initMem = 
+            match mem with
+            | Some m -> m
+            | None -> Map.empty
+        match initFlags, initRegs, initMem with
+        | f, Ok r, m ->
+            Ok {
+                Fl = f;
+                Regs = r;
+                MM = m;
+            }
+        | _, Error s, _ -> Error s
