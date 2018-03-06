@@ -337,14 +337,10 @@ module MultMem
     /// execution function to take result of parse
     /// and return the correct execution function        
     let execInstr cpuData parsed =
-        parsed |> Option.map (
-            fun r -> r |> Result.bind (fun x ->
-                match x.PInstr with
-                | BranchI _ -> execBranchInstr x cpuData
-                | MemI _ -> execMultMem x cpuData
-                | EndI _ -> Error "Cannot execute an END instruction."
-            )
-        )
+        match parsed.PInstr with
+        | BranchI _ -> execBranchInstr parsed cpuData
+        | MemI _ -> execMultMem parsed cpuData
+        | EndI _ -> Error "Cannot execute an END instruction."
 
     /// Parse Active Pattern used by top-level code
     let (|IMatch|_|)  = parse
