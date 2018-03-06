@@ -24,7 +24,11 @@ module Arithmetic
         |> Map.ofList
 
     // DU for flex op 2
-    type Op2Types = Literal of uint32 | Register of RName | RegisterShift of RName * Operations * int32 | RegisterRegisterShift of RName * Operations * RName
+    type Op2Types = 
+        | Literal of uint32 
+        | Register of RName 
+        | RegisterShift of RName * Operations * int32 
+        | RegisterRegisterShift of RName * Operations * RName
 
     // Main arithmetic instruction type
     type ArithInstr = 
@@ -73,6 +77,7 @@ module Arithmetic
     // #### START - Active pattern code ####
     
     // Flexible operand 2 string parsing -> Returns group matches
+    // XAV: This is just a generic AP, not specific to Op2
     let (|FlexParse|_|) pattern input = 
         let flexMatch = Regex.Match(input, pattern)
         match flexMatch.Success with
@@ -89,8 +94,8 @@ module Arithmetic
 
     // #### END - Active pattern code ####
 
-    
     /// FlexOp2 code that performs shifts on flexible operand 2 
+    // XAV: Don't need so many spaces here.
     let flexOp2 op2 cpuData = 
         match op2 with
         //Literal integer
@@ -193,6 +198,7 @@ module Arithmetic
             | Ok x, Ok y -> Ok (op x y)
             | _, _ -> Error ("Invalid 32 bit number")
 
+        // XAV: More unnecessary spacing (it's readable without!)
         match expression with
         | FlexParse "([+*-]{2})" _ ->
             Error ("Invalid expression")
@@ -205,6 +211,9 @@ module Arithmetic
             
         | _ ->   
             let rec recursiveSplit' expression = 
+            
+            // XAV: can you do this with a match?
+            // XAV: soo much repetition here
                 if String.exists (fun c -> c='+') expression then
                     expression.Split('+')
                     |> Array.map (fun s-> s.Trim()) 
@@ -231,6 +240,7 @@ module Arithmetic
                     // Binary string
                     | FlexParse "^(-?0b[0-1]+)$" [binStr] -> 
                         match binStr.Length with
+                        // XAV: when you include magic numbers like 38, please justify them in comments
                         | x when x > 38 -> Error ("Op2 is not a valid 32 bit number")
                         | _ -> 
                             match check32BitBound binStr with
@@ -240,6 +250,7 @@ module Arithmetic
                     // Hex string
                     | FlexParse "^(-?0x[0-9A-F]+|-?&[0-9A-F]+)$" [hexStr] -> 
                         match hexStr.Length with
+                        // XAV: same here
                         | x when x > 14 -> Error ("Op2 is not a valid 32 bit number")
                         | _ -> 
                             match hexStr with
@@ -256,6 +267,7 @@ module Arithmetic
                     // Decimal string
                     | FlexParse "^(-?[0-9]+)$" [numStr] ->
                         match numStr.Length with
+                        // XAV: and here
                         | x when x > 14 -> Error ("Op2 is not a valid 32 bit number")
                         | _ ->
                             match check32BitBound numStr with
@@ -283,7 +295,6 @@ module Arithmetic
         | 2 ->
             let op1Str = opList.[0]
             let op2Str = opList.[1]
-
             match regNames.TryFind op1Str with
             | Some op1 -> 
                 match op2Str with
@@ -304,12 +315,12 @@ module Arithmetic
             let op1Str = opList.[0]
             let op2Str = opList.[1]
             let flexStr = opList.[2]
-
             match regNames.TryFind op1Str with
             | Some op1 -> 
                 match regNames.TryFind op2Str with
                 | Some op2 -> 
                     match flexStr with
+                    // XAV: REGEX MUST HAVE @ BEFORE STRING
                     | FlexParse "^([A-Z]+)\s+(.*)?$" [shiftOpStr; regLitStr] ->
                         match operationNames.TryFind shiftOpStr with
                         | Some shiftOp ->
@@ -330,6 +341,7 @@ module Arithmetic
                                     | _ -> Error ("Flex is not a valid register or expression")
                         | _ -> Error ("Shift op is invalid")
                     // Special case for RRX -> There is no shift amount specified
+                    // XAV: REGEX MUST HAVE @ BEFORE STRING
                     | FlexParse "^(RRX)\s*$" [shiftOpStr] ->
                         match operationNames.TryFind shiftOpStr with
                         | Some shiftOp -> 
@@ -385,6 +397,7 @@ module Arithmetic
                     match regNames.TryFind op2Str with
                     | Some op2 ->
                         match flexStr with
+                        // XAV: REGEX MUST HAVE @ BEFORE STRING
                         | FlexParse "^([A-Z]+)\s+(R[0-9]+|#-?0b[0-1]+|#-?0x[0-9A-F]+|#-?&[0-9A-F]+|#-?[0-9]+)$" [shiftOpStr;regLitStr] ->
                             match operationNames.TryFind shiftOpStr with
                             | Some shiftOp ->
@@ -404,6 +417,7 @@ module Arithmetic
                                         | _ -> Error ("Op2 is not a valid register or expression")
 
                             | _ -> Error ("Invalid shift operation")
+                        // XAV: REGEX MUST HAVE @ BEFORE STRING
                         | FlexParse "^(RRX)\s*$" [shiftOpStr] ->
                             match operationNames.TryFind shiftOpStr with
                             | Some shiftOp -> 
@@ -411,6 +425,7 @@ module Arithmetic
                                 match flexVal with
                                 | Ok flexOut -> Ok (dest, op1, RegisterShift (op2, shiftOp, int32 flexOut))
                                 | Error err -> Error (err)
+                    // XAV: Not sure this is readable nesting, you can simultaneously match multiple things
                             | _ -> Error ("Shfit op invalid")
                         | _ -> Error ("Invalid flex op 2")
                     | _ -> Error ("Invalid op2 register")
@@ -526,6 +541,7 @@ module Arithmetic
 
     /// Execute an arithmetic instruction
     /// Performs arithmetic on given cpuData
+    // XAV: I think execution functions should begin with "exec" rather than "do", but it's opinion
     let doArithmetic (input: Parse<ReturnInstr>) cpuData = 
         // Register map
         let regMap = cpuData.Regs
@@ -710,8 +726,6 @@ module Arithmetic
                 let _, outFlags = regVal
                 {Regs = regMap; Fl = outFlags; MM = cpuData.MM}
             | Error _ -> failwithf "The instruction is invalid"
-
-        
 
         let instr = input.PInstr
 

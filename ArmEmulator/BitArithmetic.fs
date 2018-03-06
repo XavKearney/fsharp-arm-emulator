@@ -10,6 +10,7 @@ module BitArithmetic
 
 
 
+    // XAV: No need for so much whitespace everywhere
 
 
 // Types //
@@ -38,6 +39,8 @@ module BitArithmetic
 
     /// Infromation needed for instruction execution
     /// Part of the return from parse
+    // XAV: This could do with renaming to a similar style to the other modules
+    // XAV: e.g. BitArithInstr
     type InstDecomp = { instruction: InstRoots
                         suff: string
                         opA: RName Option
@@ -111,7 +114,7 @@ module BitArithmetic
             |> List.collect (fun n -> [n < 256u])
             |> List.contains true
         match num with
-        | x when ((x <= 2147483647) && (x >= -2147483648)) ->
+        | x when (x <= 2147483647) && (x >= -2147483648) ->
             match valid with 
             | true -> Some (uint32 num)
             | false -> None
@@ -122,6 +125,7 @@ module BitArithmetic
     let toLit (str : string) =  
         match str.Length=0 with 
         | false -> 
+        // XAV: could use an active pattern here
             match str.[0] with
             | '#' -> 
                 match str.[1..] with
@@ -155,6 +159,7 @@ module BitArithmetic
                 operands.Split(',') 
                 |> Array.map (fun str -> str.Trim())
             match Array.contains "" splitOps with 
+            // XAV: don't use arrays here, convert back to a list, and use error monads
             | true -> [|"Not valid input"|]
             | false -> splitOps            
 
@@ -195,6 +200,7 @@ module BitArithmetic
 
         /// converts array of strings to a flexible opperator (literal or register with optional shift)
         let toFlexOp (strArr : string array) = 
+            // XAV: use lists not arrays!
             match strArr with
             | [|reg ; shift|] -> 
                 match toReg reg, toShift shift with
@@ -215,6 +221,7 @@ module BitArithmetic
                         }
             
         match instrNames.[root] with 
+        // XAV: this could be made more readable
         | MOV | MVN | TST | TEQ when (ops.Length = 2) || (ops.Length = 3)
             -> Ok {baseInstr with opA = toReg ops.[0] ; opB = Some (Flex (toFlexOp ops.[1..]))}
 
@@ -300,6 +307,7 @@ module BitArithmetic
             | Some regCont -> 
                 match instroot with
                 | LSL -> 
+                    // XAV: Lots of repetition here
                     match litRegNum litOrReg,suffix with           
                     | Some num,"" -> Some (Lsl regCont num),carryNum
                     | Some num,"S" -> Some (Lsl regCont num),(shiftCarry regCont num Lsl selectMSB)
@@ -326,6 +334,9 @@ module BitArithmetic
     /// decides if instruction should be executed based on condidtion
     /// if instruction should be executed return is true, otherwise its false     
     let exeCond flags cond =
+    
+        // XAV: you can do this all on one line 
+        // XAV: like z,n,c,v = flags.Z, flags.N...
         let z = flags.Z
         let n = flags.N
         let v = flags.V
@@ -335,6 +346,7 @@ module BitArithmetic
             | true -> true
             | false -> false
         match cond with 
+        // XAV: I don't know why but this looks ugly, can't think of an improvement tho
         | Ceq -> exeDecide z true                // execute if Z=1
         | Cne -> exeDecide z false               // execute if Z=0      
         | Cmi -> exeDecide n true                // execute if N=1
@@ -369,6 +381,7 @@ module BitArithmetic
         let isNeg = int32 result < 0 
         let isZero = result = 0u
         let convCarry = 
+            // XAV: no incomplete pattern matches! everything must be matched!
             match carry with
             | 0u -> false
             | 1u -> true
@@ -379,6 +392,7 @@ module BitArithmetic
 
 
     /// executes the instruction
+    // XAV: could be renamed to execInstr to match others 
     let exeInstr cpuData parseOut =
 
         match parseOut with
@@ -411,6 +425,7 @@ module BitArithmetic
                 match exeCond cpuData.Fl exeInfo.PCond with
                 | true ->
                     match instrRoot with
+                    // XAV: Seems to be a lot of repetition in these match cases
                     | AND -> 
                         let impInstr =
                             match calcOp opb,calcOp opc with 
@@ -498,6 +513,7 @@ module BitArithmetic
                         | _ -> None               
                 | false -> None
 
+            // XAV: Justify what's going on with comments
             match instrRoot with 
             | TST | TEQ ->
                 match evalInstruction with 
