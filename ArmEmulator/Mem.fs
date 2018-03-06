@@ -1,5 +1,5 @@
-//MemInstructions
-module MemInstructions
+//Mem module
+module Mem
 
     open CommonData
     open CommonLex
