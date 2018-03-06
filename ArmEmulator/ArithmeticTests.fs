@@ -454,17 +454,19 @@ module ArithmeticTests
                 }
 
                 // Use my code with the same input values to obtain hopefully the same output
-                let results = doArithmetic parsed cpuData
+                let results = execArithmeticInstr parsed cpuData
 
-                let resCpu = results
-                let localRegs = 
-                    resCpu.Regs
-                    |> Map.toList
-                    |> List.map (fun (_, x) -> x)
+                match results with
+                | Ok resCpu ->
+                    let localRegs = 
+                        resCpu.Regs
+                        |> Map.toList
+                        |> List.map (fun (_, x) -> x)
 
-                // Expecto checks
-                Expect.equal regsActual.[..regsActual.Length - 2] localRegs.[..localRegs.Length - 2] "Registers"
-                Expect.equal flagsActual resCpu.Fl "Flags"
+                    // Expecto checks
+                    Expect.equal regsActual.[..regsActual.Length - 2] localRegs.[..localRegs.Length - 2] "Registers"
+                    Expect.equal flagsActual resCpu.Fl "Flags"
+                | Error _ -> ()
 
     [<Tests>]
     let testCompExec =
@@ -552,10 +554,11 @@ module ArithmeticTests
                     MM = Map.empty;
                 }
 
-                let results = doArithmetic parsed cpuData
+                let results = execArithmeticInstr parsed cpuData
 
-                let resCpu = results
-
-                Expect.equal flagsActual resCpu.Fl "Flags"
+                match results with
+                | Ok resCpu -> 
+                    Expect.equal flagsActual resCpu.Fl "Flags"
+                | Error _ -> ()
         
 
