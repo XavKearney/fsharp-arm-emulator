@@ -1,18 +1,16 @@
 module TopLevel
     open CommonLex
     open CommonData
-    open Arithmetic
-    open BitArithmetic
-    open MemInstructions
-    open MultMem
 
     /// allows different modules to return different instruction types
     type Instr =
         // arithmetic instrucitons
         | IARITH of Arithmetic.ReturnInstr
         // bit arithmetic instructions
+        // TODO: needs renaming
         | IBITARITH of BitArithmetic.InstDecomp
         // memory instructions
+        // TODO: Merge into one ReturnInstr
         | IMEM of MemInstructions.MemInstr
         | IADR of MemInstructions.ADRInstr
         | ILABEL of MemInstructions.labelInstr
@@ -29,6 +27,8 @@ module TopLevel
         | ERRIMULTMEM of MultMem.ErrInstr
         | ERRTOPLEVEL of string
 
+    type CondInstr = Condition * Instr
+
     /// Note that Instr in Mem and DP modules is NOT same as Instr in this module
     /// Instr here is all possible instruction values combined with a D.U.
     /// that tags the Instruction class
@@ -42,9 +42,6 @@ module TopLevel
         | MultMem.IMatch pa -> pConv IMULTMEM ERRIMULTMEM pa
         | _ -> None
     
-    
-
-    type CondInstr = Condition * Instr
 
     let parseLine (symtab: SymbolTable option) (loadAddr: WAddr) (asmLine:string) =
         /// put parameters into a LineData record
@@ -82,9 +79,12 @@ module TopLevel
                         with Label=Some label} 
                       |> IMatch with
                 | None -> 
-                    Error (ERRTOPLEVEL (sprintf "Unimplemented instruction %s" opc))
+                    Error (ERRTOPLEVEL 
+                        (sprintf"Instruction not implemented: %A" (String.concat " " words)))
                 | Some pa -> pa
-            | _ -> Error (ERRTOPLEVEL (sprintf "Unimplemented instruction %A" words))
+            | _ -> 
+                Error (ERRTOPLEVEL 
+                    (sprintf "Invalid instruction: %A" (String.concat " " words)))
         asmLine
         |> removeComment
         |> splitIntoWords
