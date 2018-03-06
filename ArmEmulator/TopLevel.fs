@@ -131,12 +131,12 @@ module TopLevel
         | Ok x -> Ok x
 
     // function to execute any parsed instruction from any module
-    let execParsedLine ins d symtab =
+    // returns the modified datapath (or an error)
+    let execParsedLine ins d (symtab: SymbolTable option) =
         let exec' p f ins' err = 
             { PInstr = ins'; PLabel = p.PLabel; PCond = p.PCond; PSize = p.PSize }
             |> f
             |> mapErr err
-
         ins |> Result.bind (
             function
             | {PInstr=IMULTMEM ins'} as p -> 
@@ -145,7 +145,11 @@ module TopLevel
                 exec' p (Arithmetic.execArithmeticInstr d) ins' ERRIARITH
         )
 
-    let parseLines (lines: string list) (symtab: SymbolTable option) = 
+    /// takes a list of lines as string
+    /// and optionally, a symbol table
+    /// parses each line using parseLine function
+    /// returns a list of Ok parsed instructions, or errors
+    let parseLines lines symtab = 
         let rec parseLines' lines loadaddr = 
             match lines with
             // no more lines to parse, return empty
@@ -158,3 +162,17 @@ module TopLevel
                     | Error s -> Error s :: parseLines' rest (loadaddr + 4u)
         parseLines' lines 0u
 
+
+    /// execute a list of parsed lines
+    /// returns modified DataPath and symbol table
+    /// binds any errors in the execution or parsed lines
+    let execParsedLines parsedLines cpuData symtab = 
+        let rec execLines lines cpu' symtab' = 
+            match lines with
+            // no more lines to return, so return cpu and symtab
+            | [] -> Ok (cpu', symtab')
+            | line :: rest ->
+                // TODO: modify symtab on each execution (requires other modules to be changed)
+                execParsedLine line cpu' symtab'
+                |> Result.bind (fun c -> execLines rest c symtab')
+        execLines parsedLines cpuData symtab
