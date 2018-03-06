@@ -42,7 +42,6 @@ module TopLevel
         | BitArithmetic.IMatch pa -> pConv IBITARITH ERRIBITARITH pa
         | MultMem.IMatch pa -> pConv IMULTMEM ERRIMULTMEM pa
         | _ -> None
-    
 
     let parseLine (symtab: SymbolTable option) (loadAddr: WAddr) (asmLine:string) =
         /// put parameters into a LineData record
@@ -142,6 +141,20 @@ module TopLevel
             function
             | {PInstr=IMULTMEM ins'} as p -> 
                 exec' p (MultMem.execInstr d) ins' ERRIMULTMEM
-            // | {PInstr=IARITH ins'} as p -> 
-            //     exec' p (Arithmetic.doArithmetic d) ins' ERRIARITH
+            | {PInstr=IARITH ins'} as p -> 
+                exec' p (Arithmetic.execArithmeticInstr d) ins' ERRIARITH
         )
+
+    let parseLines (lines: string list) (symtab: SymbolTable option) = 
+        let rec parseLines' lines loadaddr = 
+            match lines with
+            // no more lines to parse, return empty
+            | [] -> [] 
+            | line :: rest ->
+                parseLine symtab (WA loadaddr) line
+                |> function
+                    | Ok p -> Ok p :: parseLines' rest (loadaddr + p.PSize)
+                    // not sure how to increment size if error
+                    | Error s -> Error s :: parseLines' rest (loadaddr + 4u)
+        parseLines' lines 0u
+
