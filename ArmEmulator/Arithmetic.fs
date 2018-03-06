@@ -49,6 +49,9 @@ module Arithmetic
             Op2: Op2Types;
         }
 
+    // error instruction type
+    type ErrInstr = string
+
     // Defines the spec for all the Arithmetic instructions
     let CompSpec = {
         InstrC = COMP
