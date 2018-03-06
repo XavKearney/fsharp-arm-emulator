@@ -674,7 +674,7 @@ module Arithmetic
             | Ok regVal -> 
                 let outVal, outFlags = regVal
                 Ok {Regs = Map.add target (uint32 outVal) regMap; Fl = outFlags; MM = cpuData.MM}
-            | Error _ -> failwithf "The instruction is invalid"
+            | Error err -> Error err
 
         // Computational code for CMP and CMN
         // Has the same basic stucture as for the above function with small
@@ -709,7 +709,7 @@ module Arithmetic
             | Ok regVal -> 
                 let _, outFlags = regVal
                 Ok {Regs = regMap; Fl = outFlags; MM = cpuData.MM}
-            | Error _ -> failwithf "The instruction is invalid"
+            | Error err -> Error err
 
         
 
