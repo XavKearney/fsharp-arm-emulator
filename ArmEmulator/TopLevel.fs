@@ -1,7 +1,6 @@
 module TopLevel
     open CommonLex
     open CommonData
-    open VisualTest
 
     /// allows different modules to return different instruction types
     type Instr =
