@@ -529,7 +529,7 @@ module Arithmetic
 
     /// Execute an arithmetic instruction
     /// Performs arithmetic on given cpuData
-    let execArithmeticInstr (input: Parse<ReturnInstr>) cpuData = 
+    let execArithmeticInstr cpuData (input: Parse<ReturnInstr>) = 
         // Register map
         let regMap = cpuData.Regs
 
