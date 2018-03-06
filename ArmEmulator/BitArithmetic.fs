@@ -361,8 +361,8 @@ module BitArithmetic
             match z with
             | true -> exeDecide n (not v)
             | false -> false
-        | Cnv -> false                           // always execute 
-        | Cal -> true                            // never execute
+        | Cnv -> false                           // never execute
+        | Cal -> true                            // always execute
 
     /// updates N Z C flags
     let updateNZC flgs result carry =
