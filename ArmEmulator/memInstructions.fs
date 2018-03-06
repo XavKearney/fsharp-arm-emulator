@@ -45,11 +45,13 @@ module MemInstructions
 
 
     /// Parse Active Pattern used by top-level code
+    // XAV: why is this commented out?
     // let (|IMatch|_|) = parse
 
 
     ///Match the pattern using a cached compiled Regex
     let (|Match|_|) pattern input =
+        // XAV: Don't ignore these warnings
         if input = null then None
         else
             let m = Regex.Match(input, pattern, RegexOptions.Compiled)
@@ -57,6 +59,7 @@ module MemInstructions
             else None
     ///Match a Regex pattern multiple times
     let (|Matches|_|) pattern input =
+        // XAV: Don't ignore these warnings
         if input = null then None
         else
             let m = Regex.Matches(input, pattern, RegexOptions.Compiled)
@@ -64,6 +67,7 @@ module MemInstructions
             else None
 
 
+    // XAV: what is this for? comments! also don't be afraid to use more lines to break it up
     type FromOps = {Ra:Result<RName,String>; Rb: Result<RName,String>; IncrVal: int;
                         Post: bool; Rc: RName option;
                         Shift: int option}
@@ -85,8 +89,10 @@ module MemInstructions
 
     let selectFirst x _ = x
     
-
+    
+    // XAV: Do yu need ErrorGZ or could this just not match if not >=0?
     let (|GreaterThanZero|ErrorGZ|) x = if (x>=0) then GreaterThanZero else ErrorGZ
+    // XAV: such a long line! Don't try and do matches on one line, it's unreadable
     let isPos (x: Group) (y: Group) = match (x.Value|>int) with GreaterThanZero -> (Some (x.Value|>int),(Some regNames.[y.Value])) | ErrorGZ -> (None,None)
 
     ///Parse function for Memory instructions such as LDR and
@@ -107,6 +113,8 @@ module MemInstructions
         let errorMessage1 = resultDotBindTwoInp selectFirst instTypeTmp bytes 
         let parseOps ops =
             match ops with
+            // XAV: such long regex, maybe it's necessary but please double check it is?
+            // XAV: Lots of repetition in the return - use a default record and the "with" syntax
             | Match @"(R[0-9]|1[0-5]) *, *\[ *(R[0-9]|1[0-5]) *] *, *#([0-9]+)" [_; rA; rB; incV] -> //Post Increment
                 Ok ({Ra=regNamesTryFindMonad rA; Rb=regNamesTryFindMonad rB; IncrVal=(incV.Value|>int); Post= true; Rc= None; Shift= None;})
             | Match @"(R[0-9]|R1[0-5]) *, *\[ *(R[0-9]|R1[0-5]) *]" [_; rA; rB] -> //Base Case
@@ -128,12 +136,14 @@ module MemInstructions
                 PreIndexRb= pre; PostIndexRb= x.Post; 
                 ExtraAddressReg= x.Rc;
                 ShiftExtraRegBy= x.Shift;}
+        // XAV: Don't use long function names if it's difficult to tell what they mean anyway
         resultDotBindTwoInp makeOutFromParseOps (parseOps ((ls.Operands).Trim())) errorMessage1 
 
         
 
 
 
+    // XAV: Why such whitespace?
 
 
 
@@ -145,9 +155,11 @@ module MemInstructions
 
 //----------ADR INSTRUCTION DEFINITION AND PARSING-------------------------------------------------
 
+    // XAV: why the m?
     type ADRInstrType = ADRm 
 
 
+    // XAV: Comments!
     /// instruction (dummy: must change)
     type ADRInstr =
         {
@@ -160,6 +172,8 @@ module MemInstructions
 
     /// sample specification for set of instructions
     /// very incomplete!
+    // XAV: I think this should also be the MEM class
+    // XAV: it can be a different spec with the same class, no problem
     let ADRSpec = {
         InstrC = ADR
         Roots = ["ADR"]
@@ -170,10 +184,12 @@ module MemInstructions
     // let opCodesADR = opCodeExpand ADRSpec
 
 
+    // XAV: commented out again?
     /// Parse Active Pattern used by top-level code
     // let (|IMatch|_|) = parse
 
 
+    // XAV: don't leave commented out code in commits!
     // let (|BitRotatable|_|) num =
     //     match num with
     //     | None -> None
@@ -191,7 +207,9 @@ module MemInstructions
             |> Option.map (fun (_,n) -> { Base=(rotate l (32 - n)) |> fst; R=n/2})
         match literal with 
         | None -> Error (sprintf "Expression result (%A) cannot be made by a rotated 8 bit number" l)
+        // XAV: don't ignore green underlines!
         | Some x -> Ok l
+    // XAV: if these are tests, they shouldn't be here
     let test1 = checkLiteralMonad 2u
     let test2 = checkLiteralMonad 4u
     let test3 = checkLiteralMonad 255u
@@ -211,11 +229,13 @@ module MemInstructions
     /// - Add multiple bracket functionality 
     ///   Eg 2*(6+(3*4)-(6+3))*5
     /// - Add working CheckLiteral function which works for -ve's
+    // XAV: Consider using my ParseExpr module if you can't get brackets to work
     let evalExpression (exp0: string) (symTab: SymbolTable) =
         let rec evalExpression' (exp: string) = 
             if String.exists (fun c -> (c ='(')||(c =')')) exp then
                 let mapFunction (x: string) = 
                     if (String.exists (fun c -> (c ='(')||(c =')')) x) then 
+                    // XAV: don't ignore green underlines!
                     match ((evalExpression' x.[1..(x.Length-2)])) with
                     | (Ok y)  -> Ok (y|>string)
                     | Error m -> Error m
@@ -238,6 +258,7 @@ module MemInstructions
                 elif ((List.last list)="")
                 then list.[0..(List.length list)-2]
                 else list //Should return an error monad above here
+                // XAV: no need for a lambda here, just do List.map evalExpression'
                 |> List.map (fun x -> evalExpression' x)
                 |> List.reduce (resultDotBindTwoInp (+))
             elif String.exists (fun c -> (c ='-')) exp then
@@ -249,6 +270,7 @@ module MemInstructions
                 elif ((List.last list)="")
                 then list.[0..(List.length list)-2]
                 else list //Should return an error monad above here
+                // XAV: same here
                 |> List.map (fun x -> evalExpression' x)
                 |> List.reduce (resultDotBindTwoInp (-))
             elif String.exists (fun c -> (c ='*')) exp then
@@ -260,6 +282,7 @@ module MemInstructions
                 elif ((List.last list)="")
                 then list.[0..(List.length list)-2]
                 else list //Should return an error monad above here
+                // XAV: and here
                 |> List.map (fun x -> evalExpression' x)
                 |> List.reduce (resultDotBindTwoInp (*))
             else 
@@ -276,6 +299,7 @@ module MemInstructions
                 | Match @"(0x[0-9]+)" [_; ex] -> ex.Value |> uint32 |> Ok //Matching a hex number, Eg 0x5
                 | Match @"(&[0-9]+)" [_; ex]  -> ("0x"+(ex.Value).[1..(ex.Length-1)]) |> uint32 |> Ok //Matching a hex number, Eg &5
                 | Match @"(0b[0-1]+)" [_; ex] -> ex.Value |> uint32 |> Ok //Matching binary number, Eg 0b11
+                // XAV: listen to the green underlines
                 | Match @"(\w+)" [_; lab]     -> numberOrLabel (exp.Trim()) //Matching decimal numbers and labels
                 | _ -> Error "evalExpression: End case did not match any of the evalExpression end case options (0x4, 2, 0b11, label2 etc)"
         evalExpression' exp0
@@ -287,11 +311,13 @@ module MemInstructions
     /// a record which contains all the information needed
     /// to execute an ADR instruction.
     let parseAdrIns root ls =
+        // XAV: stick to camel case even if it's an instruction in the name
         let ADRInstrTypeTmp =
             match root with
             | "ADR" -> Ok ADRm
             | _     -> Error (sprintf "parseAdrIns: root passed to
                        function not 'ADR' (%A)" root)
+        // XAV: camelCaseeeeee
         let Rd =    
             match ((ls.Operands).Trim()) with
             | Match @"(R1[0-5]|R[0-9])" [_; rA] -> //Indentifying Destination Register
@@ -302,6 +328,7 @@ module MemInstructions
             match ls.SymTab with
             | None   -> Error "parseAdrIns: ls.SymTab = None"
             | Some x -> match ((ls.Operands).Trim()) with
+                        // XAV: always replace unusued values by _
                         | Match @"(R[0-9]|1[0-5]) *, *(.*)" [_; rA; expression] -> 
                             evalExpression expression.Value x
                         | _ -> Error (sprintf "parseAdrIns: Line Data in incorrect form\nls.Operands: %A" ls.Operands)
@@ -322,11 +349,11 @@ module MemInstructions
 //----------MEMORY INSTRUCTION DEFINITION AND PARSING-------------------------------------------------
 
     type LabelInstrType = EQU | FILL | DCD
-                                   //EquExpr is either:
-                                   //a register relative address
-                                   //a PC relative address
-                                   //an absolute address
-                                   //or a 32 bit integer
+   //EquExpr is either:
+   //a register relative address
+   //a PC relative address
+   //an absolute address
+   //or a 32 bit integer
     type EquExpr = uint32 
     type ValueList = string list
     type LabelL = Result<string option,string>
@@ -334,11 +361,13 @@ module MemInstructions
 
 
     /// instruction (dummy: must change)
+    // XAV: should be PascalCase, also comments!
     type labelInstr =
         {
             InstructionType: Result<LabelInstrType,String>;
             Name: LabelL;
             EQUExpr: Result<uint32,String> option;
+                                                                        // XAV: such indentation, much wow
             DCDValueList: Result<ValueList,string> option;            //What to fill the memory with
             FillN: Result<uint32,String> option;
         }
@@ -347,6 +376,7 @@ module MemInstructions
 
     /// sample specification for set of instructions
     /// very incomplete!
+    // XAV: comments! also I think maybe LABEL could be MISC
     let labelSpec = {
         InstrC = LABEL
         Roots = ["EQU";"FILL";"DCD"]
@@ -356,9 +386,11 @@ module MemInstructions
     /// map of all possible opcodes recognised
 
 
+    // XAV: commented out three times in the code?
     /// Parse Active Pattern used by top-level code
     // let (|IMatch|_|) = parse
 
+    // XAV: comments! PascalCase!
     type labelMemOrADR = LabelInstrType | ADRInstrType | MemInstrType
 
 
@@ -377,11 +409,13 @@ module MemInstructions
     /// FILL and DCD. Returns a record with all the information
     /// needed to execute an LDR or STR instruction.
     let parseLabelIns root ls =
+        // XAV: follow the green underlines
         let evalExprHandler ops symT labels =
             match symT with 
             | None -> Error (sprintf "parseLabelIns: ls.SymTab = None
                       \nroot: %A\nls: %A" root ls)
             | Some x -> (evalExpression ops x)
+        // XAV: why is this necessary? can't' you just match the root as string later?
         let instTypeTmp = 
             match root with
             | "EQU"  -> Ok EQU 
@@ -391,6 +425,7 @@ module MemInstructions
                         not EQU, FILL or DCD" root) 
         let (fillN, valList, equExp) =
             match instTypeTmp with
+                        // XAV: weird indentation here, be consistent with F# standards
             | Ok EQU  ->   let equExp1 = evalExprHandler ls.Operands (ls.SymTab) true
                            (None, None, (Some equExp1))  
             | Ok FILL ->   let fillN1 = evalExprHandler ls.Operands (ls.SymTab) false
@@ -399,6 +434,7 @@ module MemInstructions
             | Ok DCD  ->   let valList = (ls.Operands).Split(',') 
                                         |> Array.map (fun s-> s.Trim()) 
                                         |> Seq.toList
+                            // XAV: this indentation is ugly, it doesn't need to be like this
                            let valListRet =
                                 let symTab:SymbolTable = ["irrelevant",256u] |> Map.ofList
                                 let checkAllLiterals = 
@@ -407,15 +443,19 @@ module MemInstructions
                                         | Ok y -> 0
                                         | Error m -> 1
                                     List.map (checkLiteral) valList
+                                    // XAV: you don't need this lambda, just use List.reduce (+)
                                     |> List.reduce (fun a b -> a+b)
                                 match checkAllLiterals with 
                                 | 0 -> Ok valList
                                 | _ -> Error "parseLabelIns: Input to DCD function not valid (No input etc)"
+                                // XAV: don't leave commented out code
                                 // match valList with
                                 // | [""] -> Error "parseLabelIns: No input to DCD function" 
                                 // | _ -> Ok valList
                            (None, Some valListRet, None)
-            | _       ->   (None, None, None)                   
+            | _       ->   (None, None, None)
+         
+        // XAV: so many match statements in this function, is this necessary?                   
         let nameOut = 
             match ls.Label with
             | None -> if ((instTypeTmp = Ok EQU)||(instTypeTmp = Ok DCD))
@@ -432,30 +472,36 @@ module MemInstructions
             | (Some x, None, None) -> checkRes x
             | (None, Some x, None) -> checkRes x
             | (None, None, Some x) -> checkRes x
+            // XAV: this is an insanely long error message
             | _ -> Error (sprintf "parseLabelIns: should never happen, more or less than one of fillN(%A), valList(%A) and equExp(%A) are Some x" fillN valList equExp)
         let errorMessage2 = resultDotBindTwoInp selectFirst errorMessage1 instTypeTmp 
         let makeLabelOut (nO: string option) _ =
             {InstructionType = instTypeTmp; Name = Ok nO; 
                 EQUExpr = equExp; DCDValueList = valList; 
                 FillN = fillN}
+        // XAV: never used!
         let out = resultDotBindTwoInp makeLabelOut nameOut errorMessage2 
         let realOut =
             match (instTypeTmp, nameOut) with
             | (Error x, Error y) -> Error (x+"\n"+y)
             | (Error x, _) -> Error x
             | (_, Error y) -> Error y
+            // XAV: green lines!
             | (Ok x, Ok y) ->  Ok {InstructionType = instTypeTmp; Name = nameOut; 
                                 EQUExpr = equExp; DCDValueList = valList; 
                                 FillN = fillN}
+        // XAV: grrrrr
         // printfn "\n\n\nout = %A\nrealOut = %A" out realOut
         // if out <> realOut then printfn "out and realOut not equal: \nout = %A\nrealOut = %A\nroot = %A\nls = %A" out realOut root ls
         realOut
 
 
 
-    type LabelAndMemGeneralParse = LabelO of Result<labelInstr,string> 
-                                                | MemO of Result<MemInstr,string> 
-                                                | AdrO of Result<ADRInstr,string>
+    // XAV: comments!
+    type LabelAndMemGeneralParse = 
+        | LabelO of Result<labelInstr,string> 
+        | MemO of Result<MemInstr,string> 
+        | AdrO of Result<ADRInstr,string>
 
 
     
@@ -489,6 +535,7 @@ module MemInstructions
             // this does the real work of parsing
             // dummy return for now
             
+            // XAV: green lines everywhere
             let PInstrTmp =
                 match instrC with
                 | LABEL -> LabelO (parseLabelIns root ls)
@@ -501,6 +548,7 @@ module MemInstructions
                 | _     -> 4u
 
 
+            // XAV: are you joking
             if 1=1 then           
             Ok { 
                 // Normal (non-error) return from result monad
@@ -532,6 +580,7 @@ module MemInstructions
                 PCond = pCond 
                 }
             else Error "parse: Should never happen, just setting the type"
+        // XAV: say no to if statements
         if (Map.tryFind ls.OpCode opCodesLabel |> Option.map parse') <> None 
         then (Map.tryFind ls.OpCode opCodesLabel |> Option.map parse')
         elif (Map.tryFind ls.OpCode opCodesMem |> Option.map parse') <> None 
@@ -540,7 +589,7 @@ module MemInstructions
         (Map.tryFind ls.OpCode opCodesADR |> Option.map parse')
 
 
-
+    // XAV: 4th time?!
     /// Parse Active Pattern used by top-level code
     // let (|IMatch|_|) = parse
 
@@ -560,6 +609,7 @@ module MemInstructions
         match (dP.MM).TryFind wordAddress with
         | Some x -> match x with
                     | DataLoc y -> Ok y
+                            // XAV: unsure if these error messages are too long
                     | _ -> Error (sprintf "LDRexec-accessMemoryLocation: MemLoc value (%A) at %A was not of type DataLoc" x wordAddress)
         | _ -> Error (sprintf "LDRexec-accessMemoryLocation: %A was not present in memory" wordAddress)
 
@@ -582,7 +632,7 @@ module MemInstructions
             match bytes with
             | false -> (x,y)
             | true -> (x&&&0xFFu,y&&&0xFFu)
-
+        // XAV: say no to uppercase identifiers
         let incrementRbValue (inputRecord: MemInstr) (dP: DataPath<'INS>) (RbRes: Result<(uint32 * uint32),string>) =                
             let powerF (baseF: uint32) (expF: uint32) = 
                     ((baseF|>float)**(expF|>float))|>uint32
@@ -598,6 +648,7 @@ module MemInstructions
         let preOrPost pre post (inputRecord: MemInstr) (dP: DataPath<'INS>) x (rABTup: (uint32 * uint32)) =
             let Ra = fst rABTup
             let Rb = snd rABTup
+            // XAV: say no to incomplete pattern matches!
             match inputRecord.InstructionType with
             | Ok LDR -> match (pre,post) with
                         | (true,true) -> Error "LDRexec-interpretingRecord: pre and post can't both be true"
@@ -628,6 +679,7 @@ module MemInstructions
 
 
     ///Will just update the DataPath, SymbolTable is untouched
+    // XAV: maybe follow the group standard of execLDR
     let LDRexec (symbolTab: SymbolTable) (dP: DataPath<'INS>) (inputRecord: MemInstr) = 
         
         let fstRecTuple x =
@@ -643,7 +695,7 @@ module MemInstructions
             | Ok y -> (resultDotBindTwoInp (updateRegister y) reg x)
             | Error m -> Error m
         let interpretedRecord = interpretingRecord dP inputRecord
-
+        // XAV: horribly long lines
         let updatedDP1 = resultDotBindTwoInp updateDataPathRegs (Ok dP) (regsMapF (Ok dP) (inputRecord.DestSourceReg) (fstRecTuple interpretedRecord))
         let updatedDP2 = resultDotBindTwoInp updateDataPathRegs updatedDP1 (regsMapF updatedDP1 (inputRecord.AddressReg) (sndRecTuple interpretedRecord))
 
@@ -652,6 +704,7 @@ module MemInstructions
 
 
     ///Will just update the DataPath, SymbolTable is untouched
+    // XAV: again, maybe swap the function name with execSTR
     let STRexec (symbolTab: SymbolTable) (dP: DataPath<'INS>) (inputRecord: MemInstr) = 
 
         let interpretedRecord = interpretingRecord dP inputRecord
@@ -678,6 +731,7 @@ module MemInstructions
             | Error n -> Error (n+"\n"+(sprintf "updateSymbolTable: (%A).Name = Error" rec1))
         let getValue field inputRecord =
             match inputRecord.InstructionType with
+            // XAV: don't be afraid to start a new, indented line after "->", it makes lines shorter
             | Ok EQU -> match field with
                         | Some y -> y
                         | None -> Error (sprintf "updateSymbolTable-getValue: (Ok (%A).EQUExpr) = None" field)
@@ -708,6 +762,7 @@ module MemInstructions
                 | 0 -> []
                 | _ -> List.append (makeZeroList (length-1)) [0u]
             match inputRecord.InstructionType with
+                    // XAV: indentation could do with sorting out
             | Ok x ->   match x with
                         | DCD ->    match inputRecord.DCDValueList with
                                     | Some z -> match z with
@@ -740,7 +795,6 @@ module MemInstructions
             let waToUint32 (k,_) =
                 match k with
                 | WA y -> y
-
             dP.MM
             |> Map.toSeq
             |> Seq.map waToUint32
@@ -753,18 +807,19 @@ module MemInstructions
                 getAddrList [findMaxAddr dP] (Result.map (List.length) dataValList)
 
         let rec updateMachineMemory' (addrListRes: Result<uint32 list,string>) (dPMM: MachineMemory<'INS>) (dataValListRes') =
-            match (addrListRes, dataValListRes') with
+            match (addrListRes, dataValListRes') with        // XAV: use match not if
             | (Error x, Error y) -> if (x <> y) then Error (x+"\n"+y)
                                     else Error x
             | (Error x, _) -> Error x
             | (_, Error y) -> Error y
             | (Ok addrList, Ok (dataValList': uint32 list)) ->  match dataValList' with
                                                                 | [] -> Ok dPMM
-                                                                | _ ->  
+                                                                | _ ->          // XAV: such indentation, much wow
                                                                         let remainingAddrList = Ok addrList.[1..(List.length addrList)-1]
                                                                         let remainingValueList = Ok dataValList'.[1..(List.length dataValList')-1]
                                                                         let updatedMachineMem = dPMM.Add(WA (addrList.[0]+4u), DataLoc dataValList'.[0])
                                                                         updateMachineMemory' remainingAddrList updatedMachineMem remainingValueList
+           // XAV: ...
             // let doProcessing (dPMMf: MachineMemory<'INS>) (x: uint32 list) y = 
             //     match y with
             //     | [] -> Ok dPMMf
@@ -791,6 +846,7 @@ module MemInstructions
                 match Ok y with
                        | Ok y -> Ok y
                        | _ -> Error "should never happen"
+           // XAV: this match statement does nothing
             match x with
             | x -> Some temp 
             | _ -> None
@@ -814,6 +870,7 @@ module MemInstructions
                     match Ok y with
                            | Ok y -> Ok y
                            | _ -> Error "should never happen"
+               // XAV: this branch statement does nothing, and this code seems very familiar ^
                 match x with
                 | x -> Some temp 
                 | _ -> None
@@ -834,7 +891,9 @@ module MemInstructions
     /// state of the program by executing an EQU instruction
     ///Updates SymbolTable only
     let EQUexec (symbolTab: SymbolTable) (dP: DataPath<'INS>) (inputRecord: labelInstr) = 
-        (updateSymbolTable symbolTab inputRecord inputRecord.EQUExpr, Ok dP)                
+        (updateSymbolTable symbolTab inputRecord inputRecord.EQUExpr, Ok dP)     
+
+        // XAV: these functions, though short, seem very difficult to read (above and below)           
     
     ///Executes a Fill instruction, updates Symbol Table and DataPath
     let FILLexec (symbolTab: SymbolTable) (dP: DataPath<'INS>) (inputRecord: labelInstr) = 
@@ -866,7 +925,7 @@ module MemInstructions
                 | STR -> Ok (STRexec symbolTab dP inputRecord)
                 | _ -> Error (sprintf "memInstructionsHandler: InstructionType (%A) not recognised" x)
             Result.bind matchMemIns inputRecord.InstructionType
-
+        // XAV: say no to incomplete pattern matches!
         match inputRecord with
         | LabelO x -> Result.bind (labelInstructionsHandler symbolTab dP) x
         | AdrO x -> Result.map (ADRexec symbolTab dP) x
