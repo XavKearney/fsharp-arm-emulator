@@ -1,11 +1,9 @@
-//A series of tests for all the functions in memInstructions
-module memInstructionsTests
+//A series of tests for all the functions in Mem module
+module MemTests
     open CommonData
     open CommonLex
     open Expecto
-    open Expecto.ExpectoFsCheck
-    open MemInstructions
-    open System
+    open Mem
 
 
 
