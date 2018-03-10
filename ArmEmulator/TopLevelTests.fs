@@ -75,6 +75,7 @@ module TopLevelTests
             "blah", Error (ERRTOPLEVEL "Invalid instruction: \"blah\"")
         ]
 
+    /// tests the function execParsedLine with unit tests
     let testExecParsedLine = 
         let cpuData = 
             match initDataPath None None None with
@@ -87,13 +88,22 @@ module TopLevelTests
             | Some x -> x
             | None -> failwithf "Should never happen."
         makeUnitTestListWithTwoParams execParsedLine (cpuData, symtab) "Unit Test execParsedLine" [
+            // test valid lines
             (parseLine (someSymTab) (WA 0u) "STM R0, {R1}"), 
                 Ok ({cpuData with MM = cpuData.MM.Add (WA 0u, DataLoc 0u)}, symtab)
             (parseLine (someSymTab) (WA 0u) "ADD R0, R0, #1"), 
                 Ok ({cpuData with Regs = cpuData.Regs.Add (R0, 1u)}, symtab)
+            // test invalid lines
+            (parseLine (someSymTab) (WA 0u) "ADDM R0, R0, #1"), 
+                Error (ERRTOPLEVEL "Instruction not implemented: \"ADDM R0, R0, #1\"")
+            (parseLine (someSymTab) (WA 0u) "ADD R16, R0, #1"), 
+                Error (ERRIARITH "Destination is not a valid register")
+            (parseLine (someSymTab) (WA 0u) "LDM R0, R0, {}"), 
+                Error (ERRIMULTMEM "Incorrectly formatted operands.")
          ]
 
          
+    /// tests the function execParsedLines with unit tests
     let testExecParsedLines = 
         let cpuData = 
             match initDataPath None None None with
@@ -106,12 +116,25 @@ module TopLevelTests
             | Some x -> x
             | None -> failwithf "Should never happen."
         makeUnitTestListWithTwoParams execParsedLines (cpuData, symtab) "Unit Test execParsedLines" [
+            // test single valid lines
             [parseLine (someSymTab) (WA 0u) "STM R0, {R1}"], 
                 Ok ({cpuData with MM = cpuData.MM.Add (WA 0u, DataLoc 0u)}, symtab)
             [parseLine (someSymTab) (WA 0u) "ADD R0, R0, #1"], 
                 Ok ({cpuData with Regs = cpuData.Regs.Add (R0, 1u)}, symtab)
+            // test multiple valid lines
             [parseLine (someSymTab) (WA 0u) "STM R0, {R1}";
                 parseLine (someSymTab) (WA 0u) "ADD R0, R0, #1"], 
             Ok ({cpuData with 
                     Regs = cpuData.Regs.Add (R0, 1u);MM = cpuData.MM.Add (WA 0u, DataLoc 0u)}, symtab)
+            [parseLine (someSymTab) (WA 0u) "ADD R0, R0, #5";
+                parseLine (someSymTab) (WA 0u) "SUB R0, R0, #3"], 
+            Ok ({cpuData with 
+                    Regs = cpuData.Regs.Add (R0, 2u);}, symtab)
+            // test invalid single lines
+            [parseLine (someSymTab) (WA 0u) "LDM R0, R0, {}"], 
+                Error (ERRIMULTMEM "Incorrectly formatted operands.")
+            // test multiple invalid lines - only returns the first error (TODO: change)
+            [parseLine (someSymTab) (WA 0u) "LDM R0, R0, {}";
+                parseLine (someSymTab) (WA 0u) "ADD R16, R0, #1"], 
+                Error (ERRIMULTMEM "Incorrectly formatted operands.")
          ]
