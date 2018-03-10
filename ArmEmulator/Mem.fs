@@ -854,7 +854,7 @@ module Mem
     
         
 
-    let execInstr (parseInputRecord: Parse<ReturnInstr>) (symbolTab: SymbolTable) (dP: DataPath<'INS>) =
+    let execInstr (dP: DataPath<'INS>) (symbolTab: SymbolTable) (parseInputRecord: Parse<ReturnInstr>) =
         let inputRecord = parseInputRecord.PInstr
         let labelInstructionsHandler (symbolTab: SymbolTable) (dP: DataPath<'INS>) (inputRecord: labelInstr) =
             let matchLabIns x =
