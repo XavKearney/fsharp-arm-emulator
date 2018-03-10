@@ -91,7 +91,7 @@ module MultMem
         // get the target register as a string, e.g. "R10!"
         let targetStr = sLst.Head
         // check for writeback suffix '!'
-        let wb = targetStr.EndsWith('!')
+        let wb = targetStr.EndsWith("!")
         // get the target register's RName from string without '!' suffix
         let target = regNames.TryFind (targetStr.Trim('!'))
         // recombine the list of registers

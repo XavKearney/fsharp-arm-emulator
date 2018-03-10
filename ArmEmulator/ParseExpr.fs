@@ -20,8 +20,8 @@ module ParseExpr
 
     /// checks if a string contains a character
     /// if so, split at that character and return list
-    let (|SplitAt|_|) (c:string) (str:string) =
-        if str.Contains(c) 
+    let (|SplitAt|_|) (c:char) (str:string) =
+        if str.Contains(c.ToString()) 
         then Some(str.Split(c) |> Seq.toList)
         else None
 
