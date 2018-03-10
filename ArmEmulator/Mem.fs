@@ -2,8 +2,8 @@
 //Line 88, Let (|Greater...|ErrorGZ) - need to remove the
 // ErrorGZ bit but I haven't worked out how yet
 
-//MemInstructions
-module MemInstructions
+//Mem
+module Mem
 
     open CommonData
     open CommonLex
@@ -854,7 +854,7 @@ module MemInstructions
     
         
 
-    let generalExecHandler (parseInputRecord: Parse<ReturnInstr>) (symbolTab: SymbolTable) (dP: DataPath<'INS>) =
+    let execInstr (parseInputRecord: Parse<ReturnInstr>) (symbolTab: SymbolTable) (dP: DataPath<'INS>) =
         let inputRecord = parseInputRecord.PInstr
         let labelInstructionsHandler (symbolTab: SymbolTable) (dP: DataPath<'INS>) (inputRecord: labelInstr) =
             let matchLabIns x =
