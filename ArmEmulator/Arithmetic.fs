@@ -440,7 +440,7 @@ module Arithmetic
         match parseArithLine operands symTable with
         | Ok (dest, op1, op2) -> 
             // Converts suffix string into bool option
-            let suffType = suffix.EndsWith('S') 
+            let suffType = suffix.EndsWith("S") 
 
             // Creates basic ArithInstr type
             let baseArithInstr = {
