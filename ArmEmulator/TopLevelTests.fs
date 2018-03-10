@@ -19,6 +19,17 @@ module TopLevelTests
         List.map (fun (i, o) -> makeTest i o) inOutLst
         |> testList (sprintf "%s Test List" name) 
 
+    /// takes a function f, and a list of two parameters
+    /// it applies (f inp param1 param2) where twoParams = (param1, param2)
+    /// creates an expecto testlist with unit tests testing each case
+    let makeUnitTestListWithTwoParams f twoParams name inOutLst=
+        let makeTest inp outp =
+            let testName = (sprintf "%s: %A" name inp)
+            testCase testName <| fun () ->
+                Expect.equal (f inp <|| twoParams) outp testName
+        List.map (fun (i, o) -> makeTest i o) inOutLst
+        |> testList (sprintf "%s Test List" name) 
+
     [<Tests>]
     let testParseLine = 
         makeUnitTestList (parseLine None (WA 0u)) "Unit Test parseLine" [
@@ -63,3 +74,21 @@ module TopLevelTests
             "", Error (ERRTOPLEVEL "Invalid instruction: \"\"")
             "blah", Error (ERRTOPLEVEL "Invalid instruction: \"blah\"")
         ]
+
+    let testExecParsedLine = 
+        let cpuData = 
+            match initDataPath None None None with
+            | Ok x -> x
+            | Error _ -> failwithf "Should never happen."
+        let symtab = ["test", 0u] |> Map.ofList
+        let someSymTab = Some (symtab)
+        let getParsed f ld = 
+            match f ld with
+            | Some x -> x
+            | None -> failwithf "Should never happen."
+        makeUnitTestListWithTwoParams execParsedLine (cpuData, symtab) "Unit Test execParsedLine" [
+            (parseLine (someSymTab) (WA 0u) "STM R0, {R1}"), 
+                Ok ({cpuData with MM = cpuData.MM.Add (WA 0u, DataLoc 0u)}, symtab)
+            (parseLine (someSymTab) (WA 0u) "ADD R0, R0, #1"), 
+                Ok ({cpuData with Regs = cpuData.Regs.Add (R0, 1u)}, symtab)
+         ]
