@@ -1,3 +1,7 @@
+//Unresolved Comments from Xav
+//Line 88, Let (|Greater...|ErrorGZ) - need to remove the
+// ErrorGZ bit but I haven't worked out how yet
+
 //MemInstructions
 module MemInstructions
 
@@ -44,26 +48,22 @@ module MemInstructions
     }
 
 
-    /// Parse Active Pattern used by top-level code
-    // let (|IMatch|_|) = parse
-
-
     ///Match the pattern using a cached compiled Regex
     let (|Match|_|) pattern input =
-        if input = null then None
+        if isNull input then None
         else
             let m = Regex.Match(input, pattern, RegexOptions.Compiled)
             if m.Success then Some [for x in m.Groups -> x]
             else None
     ///Match a Regex pattern multiple times
     let (|Matches|_|) pattern input =
-        if input = null then None
+        if isNull input then None
         else
             let m = Regex.Matches(input, pattern, RegexOptions.Compiled)
             if m.Count > 0 then Some ([ for x in m -> x.Value])
             else None
 
-
+    ///A record to return all the data from the regexs
     type FromOps = {Ra:Result<RName,String>; Rb: Result<RName,String>; IncrVal: int;
                         Post: bool; Rc: RName option;
                         Shift: int option}
@@ -87,7 +87,9 @@ module MemInstructions
     
 
     let (|GreaterThanZero|ErrorGZ|) x = if (x>=0) then GreaterThanZero else ErrorGZ
-    let isPos (x: Group) (y: Group) = match (x.Value|>int) with GreaterThanZero -> (Some (x.Value|>int),(Some regNames.[y.Value])) | ErrorGZ -> (None,None)
+    let isPos (x: Group) (y: Group) = match (x.Value|>int) with 
+                                      | GreaterThanZero -> (Some (x.Value|>int),(Some regNames.[y.Value])) 
+                                      | _ -> (None,None)
 
     ///Parse function for Memory instructions such as LDR and
     /// STR. Returns a record with all the information needed
@@ -170,8 +172,6 @@ module MemInstructions
     // let opCodesADR = opCodeExpand ADRSpec
 
 
-    /// Parse Active Pattern used by top-level code
-    // let (|IMatch|_|) = parse
 
 
     // let (|BitRotatable|_|) num =
@@ -356,8 +356,6 @@ module MemInstructions
     /// map of all possible opcodes recognised
 
 
-    /// Parse Active Pattern used by top-level code
-    // let (|IMatch|_|) = parse
 
     type labelMemOrADR = LabelInstrType | ADRInstrType | MemInstrType
 
@@ -541,8 +539,6 @@ module MemInstructions
 
 
 
-    /// Parse Active Pattern used by top-level code
-    // let (|IMatch|_|) = parse
 
 
 
@@ -871,3 +867,9 @@ module MemInstructions
         | LabelO x -> Result.bind (labelInstructionsHandler symbolTab dP) x
         | AdrO x -> Result.map (ADRexec symbolTab dP) x
         // | MemO x -> 
+
+
+
+
+    /// Parse Active Pattern used by top-level code
+    let (|IMatch|_|) = parse
