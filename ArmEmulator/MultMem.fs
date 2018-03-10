@@ -334,8 +334,8 @@ module MultMem
             // and set LR to link address
             Ok {branchedCpu with Regs = cpuData.Regs.Add (R14, lAddr)}
 
-    /// execution function to take result of parse
-    /// and return the correct execution function        
+    /// generic execution for any parsed instruction
+    /// handled by this module        
     let execInstr cpuData parsed =
         match parsed.PInstr with
         | BranchI _ -> execBranchInstr parsed cpuData
@@ -344,5 +344,3 @@ module MultMem
 
     /// Parse Active Pattern used by top-level code
     let (|IMatch|_|)  = parse
-
-

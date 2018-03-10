@@ -174,7 +174,6 @@ module TopLevel
             // no more lines to return, so return cpu and symtab
             | [] -> Ok (cpu', symtab')
             | line :: rest ->
-                // TODO: modify symtab on each execution (requires other modules to be changed)
                 execParsedLine line cpu' symtab'
                 |> Result.bind (fun (newCpu, newSymTab) -> execLines rest newCpu newSymTab)
         execLines parsedLines cpuData symtab
