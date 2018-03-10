@@ -1,11 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
 <!--
       This is a dummy project that uses TargetFramework: netstandard2.0
       instead of the normal netcoreapp2.0
       This allows the whole repo to be used as a submodule, as in:
       https://github.com/djb15/arm-emulator-gui
 -->
-
-<?xml version="1.0" encoding="utf-8"?>
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
