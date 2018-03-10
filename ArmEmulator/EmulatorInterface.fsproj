@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <DebugType>portable</DebugType>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="VisualTesting/VisualTest/VTest.fs" />
+    <Compile Include="CommonData.fs" />
+    <Compile Include="CommonLex.fs" />
+    <Compile Include="ParseExpr.fs" />
+    <Compile Include="Arithmetic.fs" />
+    <Compile Include="ArithmeticTests.fs" />
+    <Compile Include="BitArithmetic.fs" />
+    <Compile Include="BitArithmeticTests.fs" />
+    <Compile Include="memInstructions.fs" />
+    <Compile Include="memInstructionsTests.fs" />
+    <Compile Include="MultMem.fs" />
+    <Compile Include="MultMemTests.fs" />
+    <Compile Include="ParseExprTests.fs" />
+    <Compile Include="Main.fs" />
+    <None Include="App.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Expecto" Version="5.1.1" />
+    <PackageReference Include="Expecto.FsCheck" Version="5.1.1" />
+  </ItemGroup>
+  <Import Project="..\.paket\Paket.Restore.targets" />
+ </Project>
