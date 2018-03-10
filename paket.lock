@@ -1,25 +1,22 @@
 RESTRICTION: >= net461
 NUGET
   remote: https://www.nuget.org/api/v2
-    Argu (5.0.1)
+    Argu (5.1)
       FSharp.Core (>= 4.0.0.1)
-    Expecto (5.1.2)
+    Expecto (6.0)
       Argu (>= 3.7)
       FSharp.Core (>= 4.1.18)
       Mono.Cecil (>= 0.10.0-beta7)
-      System.ValueTuple (>= 4.4)
-    Expecto.FsCheck (5.1.2)
-      Expecto (>= 5.1.2)
+    Expecto.FsCheck (6.0)
+      Expecto (>= 6.0)
       FsCheck (>= 2.10.4)
       FSharp.Core (>= 4.1.18)
-      System.ValueTuple (>= 4.4)
-    FsCheck (2.10.7)
+    FsCheck (2.10.8)
       FSharp.Core (>= 4.0.0.1)
     FSharp.Core (4.3.4)
     Mono.Cecil (0.10.0-beta7)
-    System.ValueTuple (4.4)
 
 GROUP Build
 NUGET
   remote: https://www.nuget.org/api/v2
-    FAKE (4.64.6)
+    FAKE (4.64.11)
