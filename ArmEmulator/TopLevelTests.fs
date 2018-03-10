@@ -92,3 +92,26 @@ module TopLevelTests
             (parseLine (someSymTab) (WA 0u) "ADD R0, R0, #1"), 
                 Ok ({cpuData with Regs = cpuData.Regs.Add (R0, 1u)}, symtab)
          ]
+
+         
+    let testExecParsedLines = 
+        let cpuData = 
+            match initDataPath None None None with
+            | Ok x -> x
+            | Error _ -> failwithf "Should never happen."
+        let symtab = ["test", 0u] |> Map.ofList
+        let someSymTab = Some (symtab)
+        let getParsed f ld = 
+            match f ld with
+            | Some x -> x
+            | None -> failwithf "Should never happen."
+        makeUnitTestListWithTwoParams execParsedLines (cpuData, symtab) "Unit Test execParsedLines" [
+            [parseLine (someSymTab) (WA 0u) "STM R0, {R1}"], 
+                Ok ({cpuData with MM = cpuData.MM.Add (WA 0u, DataLoc 0u)}, symtab)
+            [parseLine (someSymTab) (WA 0u) "ADD R0, R0, #1"], 
+                Ok ({cpuData with Regs = cpuData.Regs.Add (R0, 1u)}, symtab)
+            [parseLine (someSymTab) (WA 0u) "STM R0, {R1}";
+                parseLine (someSymTab) (WA 0u) "ADD R0, R0, #1"], 
+            Ok ({cpuData with 
+                    Regs = cpuData.Regs.Add (R0, 1u);MM = cpuData.MM.Add (WA 0u, DataLoc 0u)}, symtab)
+         ]
