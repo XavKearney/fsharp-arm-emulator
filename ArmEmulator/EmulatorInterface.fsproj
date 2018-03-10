@@ -20,8 +20,8 @@
     <Compile Include="ArithmeticTests.fs" />
     <Compile Include="BitArithmetic.fs" />
     <Compile Include="BitArithmeticTests.fs" />
-    <Compile Include="memInstructions.fs" />
-    <Compile Include="memInstructionsTests.fs" />
+    <Compile Include="Mem.fs" />
+    <Compile Include="MemTests.fs" />
     <Compile Include="MultMem.fs" />
     <Compile Include="MultMemTests.fs" />
     <Compile Include="ParseExprTests.fs" />
