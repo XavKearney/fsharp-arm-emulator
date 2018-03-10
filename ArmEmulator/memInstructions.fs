@@ -451,9 +451,9 @@ module MemInstructions
 
 
 
-    type LabelAndMemGeneralParse = LabelO of Result<labelInstr,string> 
-                                                | MemO of Result<MemInstr,string> 
-                                                | AdrO of Result<ADRInstr,string>
+    type ReturnInstr = LabelO of Result<labelInstr,string> 
+                        | MemO of Result<MemInstr,string> 
+                        | AdrO of Result<ADRInstr,string>
 
 
     
@@ -623,6 +623,14 @@ module MemInstructions
         changedToBytes inputRecord (changeType (resultDotBindTwoInp (preOrPost inputRecord.PreIndexRb inputRecord.PostIndexRb inputRecord dP) (incrementRbValue inputRecord dP (getOrigVal inputRecord dP)) (getOrigVal inputRecord dP)))
 
 
+    let makeTuple a b = (a,b)
+
+    let abstractResults (x: Result<(Result<Map<string,uint32>,string> * Result<DataPath<'INS>,string>),string>) =
+        match x with
+        | Error m -> Error m
+        | Ok (a, b) -> resultDotBindTwoInp makeTuple a b
+
+    
     ///Will just update the DataPath, SymbolTable is untouched
     let LDRexec (symbolTab: SymbolTable) (dP: DataPath<'INS>) (inputRecord: MemInstr) = 
         
@@ -643,7 +651,7 @@ module MemInstructions
         let updatedDP1 = resultDotBindTwoInp updateDataPathRegs (Ok dP) (regsMapF (Ok dP) (inputRecord.DestSourceReg) (fstRecTuple interpretedRecord))
         let updatedDP2 = resultDotBindTwoInp updateDataPathRegs updatedDP1 (regsMapF updatedDP1 (inputRecord.AddressReg) (sndRecTuple interpretedRecord))
 
-        (Ok symbolTab, updatedDP2)
+        abstractResults (Ok (Ok symbolTab, updatedDP2))
 
 
 
@@ -659,7 +667,7 @@ module MemInstructions
         // let test = updatedMachineMemory dP (wordAddress: WAddr) val0
 
         let makeDataPath x = {dP with MM = x}
-        (Ok symbolTab, Result.map makeDataPath (updatedSTRMachineMem interpretedRecord))
+        abstractResults (Ok (Ok symbolTab, Result.map makeDataPath (updatedSTRMachineMem interpretedRecord)))
 
 
 
@@ -822,7 +830,7 @@ module MemInstructions
             | Some y -> removeResult y
             | _ -> None
 
-        (updateSymbolTable symbolTab inputRecord (removeOptionD (inputRecord.DCDValueList)), (updateMemoryDataPath inputRecord dP))                
+        abstractResults (Ok (updateSymbolTable symbolTab inputRecord (removeOptionD (inputRecord.DCDValueList)), (updateMemoryDataPath inputRecord dP)))
 
     ///Takes in the current state of the program in the form
     /// of the SymbolTable and DataPath, as well as the 
@@ -830,11 +838,11 @@ module MemInstructions
     /// state of the program by executing an EQU instruction
     ///Updates SymbolTable only
     let EQUexec (symbolTab: SymbolTable) (dP: DataPath<'INS>) (inputRecord: labelInstr) = 
-        (updateSymbolTable symbolTab inputRecord inputRecord.EQUExpr, Ok dP)                
+        abstractResults (Ok (updateSymbolTable symbolTab inputRecord inputRecord.EQUExpr, Ok dP))
     
     ///Executes a Fill instruction, updates Symbol Table and DataPath
     let FILLexec (symbolTab: SymbolTable) (dP: DataPath<'INS>) (inputRecord: labelInstr) = 
-        (updateSymbolTable symbolTab inputRecord ((inputRecord.FillN)), (updateMemoryDataPath inputRecord dP))                
+        abstractResults (Ok (updateSymbolTable symbolTab inputRecord ((inputRecord.FillN)), (updateMemoryDataPath inputRecord dP)))
 
 
 
@@ -842,31 +850,32 @@ module MemInstructions
     let ADRexec (symbolTab: SymbolTable) (dP: DataPath<'INS>) (inputRecord: ADRInstr) = 
         let updateRegMap (dP: DataPath<'INS>) (inputRecord: ADRInstr) = 
             resultDotBindTwoInp (updateRegister dP) inputRecord.DestReg inputRecord.SecondOp 
-        (Ok symbolTab,Result.map (updateDataPathRegs dP) (updateRegMap dP inputRecord))
+        abstractResults (Ok (Ok symbolTab,Result.map (updateDataPathRegs dP) (updateRegMap dP inputRecord)))
     
+        
 
-
-    let generalExecHandler (inputRecord: LabelAndMemGeneralParse) (symbolTab: SymbolTable) (dP: DataPath<'INS>) =
+    let generalExecHandler (parseInputRecord: Parse<ReturnInstr>) (symbolTab: SymbolTable) (dP: DataPath<'INS>) =
+        let inputRecord = parseInputRecord.PInstr
         let labelInstructionsHandler (symbolTab: SymbolTable) (dP: DataPath<'INS>) (inputRecord: labelInstr) =
             let matchLabIns x =
                 match x with
-                | EQU -> Ok (EQUexec symbolTab dP inputRecord)
-                | DCD -> Ok (DCDexec symbolTab dP inputRecord)
-                | FILL -> Ok (FILLexec symbolTab dP inputRecord)
+                | EQU -> (EQUexec symbolTab dP inputRecord)
+                | DCD -> (DCDexec symbolTab dP inputRecord)
+                | FILL -> (FILLexec symbolTab dP inputRecord)
                 | _ -> Error (sprintf "labelInstructionsHandler: InstructionType (%A) not recognised" x)
             Result.bind matchLabIns inputRecord.InstructionType
         let memInstructionsHandler (symbolTab: SymbolTable) (dP: DataPath<'INS>) (inputRecord: MemInstr) =
             let matchMemIns x =
                 match x with
-                | LDR -> Ok (LDRexec symbolTab dP inputRecord)
-                | STR -> Ok (STRexec symbolTab dP inputRecord)
+                | LDR -> (LDRexec symbolTab dP inputRecord)
+                | STR -> (STRexec symbolTab dP inputRecord)
                 | _ -> Error (sprintf "memInstructionsHandler: InstructionType (%A) not recognised" x)
             Result.bind matchMemIns inputRecord.InstructionType
 
         match inputRecord with
         | LabelO x -> Result.bind (labelInstructionsHandler symbolTab dP) x
-        | AdrO x -> Result.map (ADRexec symbolTab dP) x
-        // | MemO x -> 
+        | AdrO x -> Result.bind (ADRexec symbolTab dP) x
+        | MemO x -> Result.bind (memInstructionsHandler symbolTab dP) x
 
 
 
