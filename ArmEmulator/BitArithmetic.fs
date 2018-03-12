@@ -7,9 +7,6 @@ module BitArithmetic
     open CommonLex
     open CommonData
     open ParseExpr
-    open System.Text.RegularExpressions
-    open FsCheck
-    open Expecto
 
 
 
@@ -192,27 +189,57 @@ module BitArithmetic
                         | _ -> Error "Invalid literal or register following shift instruction"
                     | _ -> Error "Invalid shift instruction"
                 | _ -> Error "Invalid target register for shift opperator"
-            | _ -> Error "Operands not in a form that can be converted to a flexible opperator"          
+            | _ -> Error "Operands not in a form that can be converted to a flexible opperator"
+
+        let checkReg reg =
+            match reg with
+            | Some R13 -> None 
+            | Some R15 -> None
+            | _ -> reg    
+
+        // check this can be done without a when
+        /// checks that destenation register or operand register is valid
+        let checkValid flexOp = 
+            match flexOp with
+            | Ok (Register R13) -> Error "Cannot use R13 with this instruction"            
+            | Ok (Register R15) -> Error "Cannot use R15 with this instruction"
+            | Ok (RegShiftLit (R13,_,_)) -> Error "Cannot use R13 with this instruction"
+            | Ok (RegShiftLit (R15,_,_)) -> Error "Cannot use R15 with this instruction" 
+            | Ok (RegShiftReg (R13,_,_)) -> Error "Cannot use R13 with this instruction"
+            | Ok (RegShiftReg (_,_,R13)) -> Error "Cannot use R13 with this instruction"            
+            | Ok (RegShiftReg (R15,_,_)) -> Error "Cannot use R15 with this instruction"
+            | Ok (RegShiftReg (_,_,R15)) -> Error "Cannot use R15 with this instruction"
+            | _ -> flexOp                      
 
         let baseInstr = { Instruction = instrNames.[root]
                           Suff = suffMap.[suffix]
-                          Dest =  toReg ops.[0]
+                          Dest = None
                           Op1 = Error ""
                           Op2 = Error ""
                         }
             
         match instrNames.[root] with 
-        | MOV | MVN | TST | TEQ when (ops.Length = 2) || (ops.Length = 3)
-            -> Ok {baseInstr with Op1 = toFlexOp ops.[1..]}
+        | MOV | MVN when (ops.Length = 2) || (ops.Length = 3) ->
+            Ok {baseInstr with Dest = toReg ops.[0]
+                                      Op1 = toFlexOp ops.[1..]}
 
-        | AND | ORR | EOR | BIC when (ops.Length = 3) || (ops.Length = 4) 
-            -> Ok {baseInstr with Op1 = toFlexOp [|ops.[1]|] ; Op2 = toFlexOp ops.[2..]}
+        | TST | TEQ when (ops.Length = 2) || (ops.Length = 3) ->
+            Ok {baseInstr with Dest = checkReg (toReg ops.[0]) 
+                                      Op1 = checkValid (toFlexOp ops.[1..])}                                  
 
-        | LSL | LSR | ASR | ROR when ops.Length = 3
-            -> Ok {baseInstr with Op1 = toFlexOp [|ops.[1]|] ; Op2 = toFlexOp ops.[2..]}
+        | AND | ORR | EOR | BIC when (ops.Length = 3) || (ops.Length = 4) ->
+            Ok {baseInstr with Dest = checkReg (toReg ops.[0])
+                                      Op1 = checkValid (toFlexOp [|ops.[1]|]) 
+                                      Op2 = checkValid (toFlexOp ops.[2..])}
 
-        | RRX when ops.Length = 2
-            -> Ok {baseInstr with Op1 = toFlexOp [|ops.[1]|]}
+        | LSL | LSR | ASR | ROR when ops.Length = 3 -> 
+            Ok {baseInstr with Dest = checkReg (toReg ops.[0])
+                                      Op1 = checkValid (toFlexOp [|ops.[1]|])
+                                      Op2 = checkValid (toFlexOp ops.[2..])}
+
+        | RRX when ops.Length = 2 -> 
+            Ok {baseInstr with Dest = checkReg (toReg ops.[0])
+                                      Op1 = toFlexOp [|ops.[1]|]}
 
         | _ -> Error "Not valid input operands; wrong number of opperands"
 
@@ -246,6 +273,29 @@ module BitArithmetic
 
 
 
+// // check parse is valid
+//     /// checks all elements of the return from parse are valid
+//     let checkValid (parseOut : Result<Parse<InstDecomp>,string> option) = 
+
+//         match parseOut with 
+//         | Some (Ok exeInfo) ->
+//             let dest = exeInfo.PInstr.Dest
+//             let instrc = exeInfo.PInstr.Instruction
+
+//             match exeInfo.PInstr.Instruction with 
+//             | MOV | MVN -> parseOut  
+//             | _ -> 
+//                 match exeInfo.PInstr.Dest, exeInfo.PInstr.Op1, exeInfo.PInstr.Op2 with
+//                 | Some dest, Ok op1, Ok op2 ->
+
+//                 | Some dest, Ok op1, Error "" ->
+
+
+//         | _ -> parseOut
+
+
+
+
 // executing instructions
 
 
@@ -262,28 +312,32 @@ module BitArithmetic
     // functions that do the bit manipulation
 
     let doLSL n shiftVal = 
+        let shifter = (int32 shiftVal) % 32
         let carry = 
-            ((n <<< (int32 shiftVal) - 1) >>> 31)
+            ((n <<< shifter - 1) >>> 31)
             |> intToBool
-        n <<< int32 shiftVal,carry
+        n <<< shifter,carry
 
     let doLSR n shiftVal = 
+        let shifter = (int32 shiftVal) % 32
         let carry = 
-            ((n >>> (int32 shiftVal) - 1) &&& 1u)
+            ((n >>> shifter - 1) &&& 1u)
             |> intToBool     
-        n >>> int32 shiftVal,carry
+        n >>> shifter,carry
 
     let doROR n rotateVal = 
+        let shifter = (int32 rotateVal) % 32
         let carry = 
             ((n >>> (int32 rotateVal) - 1) &&& 1u)
             |> intToBool            
-        (n>>> int32 rotateVal) ||| (n<<<(32- int32 rotateVal)),carry
+        (n >>> shifter) ||| (n <<<(32- shifter)),carry
 
     let doASR n shiftVal = 
+        let shifter = (int32 shiftVal) % 32
         let carry = 
-            ((n >>> (int32 shiftVal) - 1) &&& 1u)
+            ((n >>> shifter - 1) &&& 1u)
             |> intToBool        
-        uint32 (int32 n >>> int32 shiftVal),carry
+        uint32 (int32 n >>> shifter),carry
 
     let doRRX n carry = 
         let newCarry = 
