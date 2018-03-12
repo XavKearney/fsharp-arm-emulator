@@ -160,6 +160,18 @@ module BitArithmeticTests
                               PCond = Cal})
 
 
+                // LSL test
+                {ld with OpCode = "LSL" ; Operands = "R2, R11, #-4"},
+                    Some (Ok {PInstr = {instruction = LSL
+                                        suff = ""
+                                        opA = Some R2
+                                        opB = Some (Reg (Some R11))
+                                        opC = Some (Flex None)}
+                              PLabel = None
+                              PSize = 4u
+                              PCond = Cal})
+
+
                 // // tests invalid shift opperand
                 {ld with OpCode = "AND" ; Operands = "R0, R1, R3, ROR R17, #13 "},Some (Error "Parse error")                                                                                                                  
 

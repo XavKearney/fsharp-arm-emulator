@@ -6,7 +6,10 @@ module BitArithmetic
 
     open CommonLex
     open CommonData
+    open ParseExpr
     open System.Text.RegularExpressions
+    open FsCheck
+    open Expecto
 
 
 
@@ -19,30 +22,35 @@ module BitArithmetic
 
 
     /// instructions
-    type InstRoots =  MOV | MVN | AND | ORR | EOR | BIC | LSL | LSR | ASR
-                    | ROR | RRX | TST | TEQ 
+    type InstRoots =  MOV | MVN | AND | ORR | EOR | BIC 
+                    | LSL | LSR | ASR | ROR | RRX 
+                    | TST | TEQ 
+
+    type Shifter = Lsl | Lsr | Asr | Ror
+
+    type Suffix = S | NA
 
     /// parse error
     type ErrInstr = string
 
     type LitOrReg = Nm of uint32 | Rg of RName
 
-    /// Flexible opperator, can either be a number or a register with an optional shift
+    /// Flexible opperator
+    /// either a number or a register with an optional shift
     type FlexOp = 
-        | Num of uint32
-        | RegShiftOp of RName*(InstRoots*LitOrReg Option) Option
-
-    type RegOrFlexOp =
-        | Reg of RName option
-        | Flex of FlexOp option
+        | Literal of uint32
+        | Register of RName
+        | RegShiftReg of RName*Shifter*RName
+        | RegShiftLit of RName*Shifter*uint32
+        | RegRRX of RName
 
     /// Infromation needed for instruction execution
     /// Part of the return from parse
-    type InstDecomp = { instruction: InstRoots
-                        suff: string
-                        opA: RName Option
-                        opB: RegOrFlexOp Option
-                        opC: RegOrFlexOp Option
+    type InstDecomp = { Instruction: InstRoots
+                        Suff: Suffix
+                        Dest: RName Option
+                        Op1: Result<FlexOp,string>
+                        Op2: Result<FlexOp,string>
                         }
 
 
@@ -73,34 +81,23 @@ module BitArithmetic
             "MOV",MOV ; "MVN",MVN ; "AND",AND ; "ORR",ORR ; "EOR",EOR ; "BIC",BIC ;
             "LSL",LSL ; "LSR",LSR ; "ASR",ASR ; "ROR",ROR ; "RRX",RRX ; "TST",TST ; "TEQ",TEQ ]
 
+    /// map to convert string suffix into DU suffix
+    let suffMap = 
+        Map.ofList ["S",S ; "",NA]
+
     /// Map of allowed shifts
     let allowedShifts = 
-        Map.ofList ["LSL",LSL ; "ASR",ASR ; "LSR",LSR ; "ROR",ROR ; "RRX",RRX]
+        Map.ofList ["LSL",Lsl ; "ASR",Asr ; "LSR",Lsr ; "ROR",Ror ]
 
 
 
 
 
 // check litteral 
-// need to include expressions i.e * + - ()
 
 
 
 
-
-    let (|FirstMatch|_|) pattern input =
-        let m = Regex.Match(input,pattern)
-        match m.Success with
-        | true -> Some (m.Value)
-        | false -> None
-
-    let (|CheckLit|_|) input = 
-        match input with
-        | FirstMatch @"^(-?0[xX][a-fA-F0-9]+)$" x -> Some (int x)
-        | FirstMatch @"^(-?&[a-fA-F0-9]+)$" x -> Some (int ("0x"+x.[1..])) 
-        | FirstMatch @"^(-?0[bB][0-1]+)$" x -> Some (int x)
-        | FirstMatch @"^(-?[0-9]+)$" x -> Some (int x)
-        | _ -> None
 
     /// checks if an integer can be created by rotating an 8 bit number in a 32 bit word 
     let allowedLiterals num =
@@ -113,28 +110,26 @@ module BitArithmetic
         match num with
         | x when ((x <= 2147483647) && (x >= -2147483648)) ->
             match valid with 
-            | true -> Some (uint32 num)
-            | false -> None
-        | _ -> None
+            | true -> Ok (uint32 num)
+            | false -> Error "Litteral can't be created by rotating an 8 bit number in a 32 bit word "
+        | _ -> Error "Litteral is out of range"
 
     /// converts string to some litteral or none
     /// string number must start with #
-    let toLit (str : string) =  
+    let toLit (str : string) (symTab : SymbolTable) =  
         match str.Length=0 with 
         | false -> 
             match str.[0] with
             | '#' -> 
-                match str.[1..] with
-                | CheckLit n -> 
-                    match n >= 0 with
-                    | true -> allowedLiterals n
-                    | false ->
-                        match allowedLiterals (~~~ n) with
-                        | Some _ -> Some (uint32 n)
-                        | _ -> None
-                | _ -> None
-            | _ -> None
-        | true -> None
+                match evalExpr symTab str with
+                | Ok num when (int num) >= 0 -> allowedLiterals (int num)
+                | Ok num -> 
+                    match allowedLiterals (~~~ (int num)) with
+                    | Ok _ -> Ok num
+                    | _ -> Error "This litteral is not allowed"
+                | _ -> Error "Invalid litteral or expression"
+            | _ -> Error "No # preceeding expression/litteral"
+        | true -> Error "No string passed to toLit function"
 
 
 
@@ -148,87 +143,77 @@ module BitArithmetic
 
     /// returns the instruction line parsed into its seprate components given 
     /// the root, operands and suffix 
-    let parseInstr (root : string) (operands : string) (suffix : string) =
+    let parseInstr (root : string) (operands : string) (suffix : string) (symTab : SymbolTable) =
  
         let ops = 
             let splitOps = 
                 operands.Split(',') 
                 |> Array.map (fun str -> str.Trim())
             match Array.contains "" splitOps with 
-            | true -> [|"Not valid input"|]
+            | true -> [|"Input is not valid: There are two ',' back to back"|]
             | false -> splitOps            
 
         /// converts string to some valid register or none
         let toReg str = Map.tryFind str regNames
 
+        /// 
+        let toLitReg regOrLit =
+            match toLit regOrLit symTab,toReg regOrLit with
+            | Ok lit, None -> Ok (Literal lit)
+            | _, Some reg -> Ok (Register reg)
+            | _ -> Error "Opperand is not literal or register" 
+
         /// converts string to some shift with shift value or none
-        /// if RRX then shift value is none
         let toShift (opp : string) =
             let shiftSplit = opp.Split(' ')
                             |> Array.map (fun str -> str.Trim())
                             |> Array.filter (fun str -> str <> "")
             match shiftSplit.Length with
-            | 1 -> 
-                let cShift = Map.tryFind shiftSplit.[0] allowedShifts
-                match cShift with
-                | Some shift when shift=RRX -> Some (shift,None)
-                | _ -> None 
-            | 2 ->
-                let cShift = Map.tryFind shiftSplit.[0] allowedShifts
-                let cReg = Map.tryFind shiftSplit.[1] regNames
-                let cLit = toLit shiftSplit.[1]
-                match cShift,cReg,cLit with 
-                | Some shift,_,_ when shift = RRX -> None
-                | Some shift, Some r, None -> Some (shift,Some (Rg r))
-                | Some shift,None,Some lit -> Some (shift,Some (Nm lit))
-                | _ -> None
-            | _ -> None
+            | 2 -> 
+                match Map.tryFind shiftSplit.[0] allowedShifts,toLitReg shiftSplit.[1] with 
+                | Some shift,Ok regOrLit -> Ok (shift,regOrLit)
+                | _ -> Error "Invalid shift or register/litteral"
+            | _ -> Error "Invalid number of shift opperands"                 
 
-        /// converts string to a valid literal or register or is none
-        let toLitReg str =                                  
-            let checkLit = toLit str
-            let checkReg = toReg str
-            match checkLit,checkReg with
-            | Some lit, None -> Some (Nm lit)
-            | None, Some reg -> Some (Rg reg)
-            | _ -> None
-
-        /// converts array of strings to a flexible opperator (literal or register with optional shift)
+        /// converts a string array to a flexible opperator
         let toFlexOp (strArr : string array) = 
             match strArr with
+            | [|regOrLit|] -> toLitReg regOrLit            
             | [|reg ; shift|] -> 
-                match toReg reg, toShift shift with
-                | Some r, Some s -> Some (RegShiftOp (r,Some s))
-                | _ -> None
-            | [|regOrLit|] ->
-                match toLitReg regOrLit with
-                | Some (Nm lit) -> Some (Num lit)
-                | Some (Rg r) -> Some (RegShiftOp (r,None))
-                | _ -> None
-            | _ -> None
+                match toReg reg, Map.tryFind shift instrNames with
+                | Some targetReg, Some RRX -> Ok (RegRRX targetReg)
+                | Some targetReg, _ ->
+                    match toShift shift with 
+                    | Ok (shift,regOrLit) -> 
+                        match regOrLit with
+                        | Literal lit -> Ok (RegShiftLit (targetReg,shift,lit))
+                        | Register reg -> Ok (RegShiftReg (targetReg,shift,reg))
+                        | _ -> Error "Invalid literal or register following shift instruction"
+                    | _ -> Error "Invalid shift instruction"
+                | _ -> Error "Invalid target register"
+            | _ -> Error "Operands not in a form that can be converted to a flexible opperator"          
 
-        let baseInstr = { instruction = instrNames.[root]
-                          suff = suffix
-                          opA = None
-                          opB = None
-                          opC = None
+        let baseInstr = { Instruction = instrNames.[root]
+                          Suff = suffMap.[suffix]
+                          Dest = None
+                          Op1 = Error ""
+                          Op2 = Error ""
                         }
             
         match instrNames.[root] with 
         | MOV | MVN | TST | TEQ when (ops.Length = 2) || (ops.Length = 3)
-            -> Ok {baseInstr with opA = toReg ops.[0] ; opB = Some (Flex (toFlexOp ops.[1..]))}
+            -> Ok {baseInstr with Dest = toReg ops.[0] ; Op1 = toFlexOp ops.[1..]}
 
         | AND | ORR | EOR | BIC when (ops.Length = 3) || (ops.Length = 4) 
-            -> Ok {baseInstr with opA = toReg ops.[0] ; opB = Some (Reg (toReg ops.[1])) ; opC = Some (Flex (toFlexOp ops.[2..]))}
+            -> Ok {baseInstr with Dest = toReg ops.[0] ; Op1 = toFlexOp [|ops.[1]|] ; Op2 = toFlexOp ops.[2..]}
 
         | LSL | LSR | ASR | ROR when ops.Length = 3
-            -> Ok {baseInstr with opA = toReg ops.[0] ; opB = Some (Reg (toReg ops.[1])) ; opC = Some (Flex (toFlexOp ops.[2..]))}
+            -> Ok {baseInstr with Dest = toReg ops.[0] ; Op1 = toFlexOp [|ops.[1]|] ; Op2 = toFlexOp ops.[2..]}
 
         | RRX when ops.Length = 2
-            -> Ok {baseInstr with opA = toReg ops.[0] ; opB = Some(Reg (toReg ops.[1]))}
+            -> Ok {baseInstr with Dest = toReg ops.[0] ; Op1 = toFlexOp [|ops.[1]|]}
 
         | _ -> Error "Not valid input"
-
 
     /// main function to parse a line of assembler
     /// ls contains the line input
@@ -241,9 +226,12 @@ module BitArithmetic
                 match ls.Label,ls.LoadAddr with
                 | Some lab, WA addr -> Some (lab,addr)
                 | _ -> None 
-            match parseInstr root ls.Operands suffix with 
-            | Ok pInst -> Ok { PInstr=pInst; PLabel = pLab; PSize = 4u; PCond = pCond }
-            | _ -> Error "Parse error"
+            match ls.SymTab with    // check if symbol table is needed
+                Some symTable ->     
+                    match parseInstr root ls.Operands suffix symTable with 
+                    | Ok pInst -> Ok { PInstr=pInst; PLabel = pLab; PSize = 4u; PCond = pCond }
+                    | _ -> Error "Parse error"
+                | _ -> Error "No symbol table"
         Map.tryFind ls.OpCode opCodes
         |> Option.map parse'
 
@@ -380,144 +368,60 @@ module BitArithmetic
 
 
     /// executes the instruction
-    let exeInstr cpuData parseOut =
+    let exeInstr (cpuData : DataPath<'a>) parseOut symTable =
 
         match parseOut with
         | Some (Ok exeInfo) ->
-            let instrRoot = exeInfo.PInstr.instruction
-            let suffix = exeInfo.PInstr.suff
-            let opa = exeInfo.PInstr.opA            
-            let opb = exeInfo.PInstr.opB
-            let opc = exeInfo.PInstr.opC
-            let regContent r =  Map.tryFind r (cpuData.Regs)
-            let carryNum = System.Convert.ToUInt32(cpuData.Fl.C)
 
-            /// Returns a 2 tuple of (evaluated flexible opperator,carry) given an Opperand
-            let evalRegOrFlexOps op = 
-                match op with
-                | Some (Reg (Some rName)) -> Some ((regContent rName),carryNum)
-                | Some (Flex (Some flexOp)) -> Some (flexEval cpuData suffix flexOp)
-                | _ -> None
-            let evalCarry op =
-                match op with 
-                | Some (_,c) -> Some c
-                | _ -> None
-            let evalOp op = 
-                match op with
-                | Some (n, _) -> n
-                | _ -> None
-            let calcCarry = evalRegOrFlexOps >> evalCarry      
-            let calcOp = evalRegOrFlexOps >> evalOp
-            let evalInstruction =    
-                match exeCond cpuData.Fl exeInfo.PCond with
-                | true ->
-                    match instrRoot with
-                    | AND -> 
-                        let impInstr =
-                            match calcOp opb,calcOp opc with 
-                            | Some n1,Some n2 -> Some (AndTst n1 n2)
-                            | _ -> None
-                        match impInstr,calcCarry opc,suffix with    
-                        | Some n,_,"" -> Some (n,carryNum)
-                        | Some n,Some c,"S" -> Some (n,c)
-                        | _ -> None  
-                    | ORR -> 
-                        let impInstr =
-                            match calcOp opb,calcOp opc with 
-                            | Some n1,Some n2 -> Some (Orr n1 n2)
-                            | _ -> None
-                        match impInstr,calcCarry opc,suffix with
-                        | Some n,_,"" -> Some (n,carryNum)    
-                        | Some n,Some c,"S" -> Some (n,c)
-                        | _ -> None                          
-                    | EOR -> 
-                        let impInstr =
-                            match calcOp opb,calcOp opc with 
-                            | Some n1,Some n2 -> Some (EorTeq n1 n2)
-                            | _ -> None
-                        match impInstr,calcCarry opc,suffix with
-                        | Some n,_,"" -> Some (n,carryNum)    
-                        | Some n,Some c,"S" -> Some (n,c)
-                        | _ -> None                                    
-                    | BIC -> 
-                        let impInstr =
-                            match calcOp opb,calcOp opc with 
-                            | Some n1,Some n2 -> Some (Bic n1 n2)
-                            | _ -> None
-                        match impInstr,calcCarry opc,suffix with
-                        | Some n,_,"" -> Some (n,carryNum)    
-                        | Some n,Some c,"S" -> Some (n,c)
-                        | _ -> None                                                              
-                    | LSL -> 
-                        match calcOp opb,calcOp opc,suffix with
-                        | Some n1,Some n2,"" -> Some (Lsl n1 n2,carryNum) 
-                        | Some n1,Some n2,"S" -> Some (Lsl n1 n2,shiftCarry n1 n2 Lsl selectMSB)
-                        | _ -> None                                      
-                    | LSR -> 
-                        match calcOp opb,calcOp opc,suffix with 
-                        | Some n1,Some n2,"" -> Some (Lsr n1 n2,carryNum) 
-                        | Some n1,Some n2,"S" -> Some (Lsr n1 n2,shiftCarry n1 n2 Lsr selectLSB)
-                        | _ -> None                          
-                    | ROR -> 
-                        match calcOp opb,calcOp opc,suffix with
-                        | Some n1,Some n2,"" -> Some (Ror n1 n2,carryNum)  
-                        | Some n1,Some n2,"S" -> Some (Ror n1 n2,shiftCarry n1 n2 Ror selectLSB)
-                        | _ -> None                       
-                    | ASR -> 
-                        match calcOp opb,calcOp opc,suffix with
-                        | Some n1,Some n2,"" -> Some (Asr n1 n2,carryNum)  
-                        | Some n1,Some n2,"S" -> Some (Asr n1 n2,shiftCarry n1 n2 Asr selectLSB)
-                        | _ -> None                      
-                    | MOV -> 
-                        match calcOp opb,calcCarry opb,suffix with
-                        | Some n,_,"" -> Some (n,carryNum)
-                        | Some n,Some c,"S" -> Some (n,c)
-                        | _ -> None  
-                    | MVN ->
-                        match calcOp opb,calcCarry opb,suffix with
-                        | Some n,_,"" -> Some (~~~ n,carryNum)
-                        | Some n,Some c,"S" -> Some (~~~ n,c)
-                        | _ -> None                                    
-                    | TST -> 
-                        match opa,calcOp opb with
-                        | Some r,Some n -> 
-                            match regContent r,calcCarry opb with 
-                            | Some rCont,Some c -> Some (AndTst rCont n,c)
-                            | _ -> None
-                        | _ -> None
-                    | TEQ -> 
-                        match opa,calcOp opb with
-                        | Some r,Some n -> 
-                            match regContent r,calcCarry opb with 
-                            | Some rCont,Some c -> Some (EorTeq rCont n,c)
-                            | _ -> None
-                        | _ -> None                
-                    | RRX -> 
-                        match calcOp opb,suffix with
-                        | Some n,"" -> Some (Rrx n carryNum,carryNum)
-                        | Some n,"S" -> Some (Rrx n carryNum,selectLSB n)
-                        | _ -> None               
-                | false -> None
+            let suffix = exeInfo.PInstr.Suff
+            let regContent r =  Map.tryFind r cpuData.Regs
 
-            match instrRoot with 
-            | TST | TEQ ->
-                match evalInstruction with 
-                | Some (num,c) ->
-                    match updateNZC cpuData.Fl num c with 
-                    | Ok flgs -> Ok {cpuData with Fl = flgs}
-                    | _ -> Error "failed when updating flags in TST or TEQ"
-                | _ -> Error "Could not evaluate instruction"
-            | _ -> 
-                match evalInstruction,opa with
-                | Some (num,c),Some reg ->
-                    let regsUpdate = Map.add reg num cpuData.Regs
-                    match suffix with
-                    | "S" -> 
-                        match updateNZC cpuData.Fl num c with
-                        | Ok flgs -> Ok {cpuData with Regs = regsUpdate ; Fl = flgs}
-                        | _ -> Error "failed when updating flags in TST or TEQ" 
-                    | "" -> Ok {cpuData with Regs = regsUpdate}
-                    | _ -> Error ""
-                | _ -> Error "Could not evaluate instruction or opA is not a valid register"
+            match exeCond cpuData.Fl exeInfo.PCond with
+            | true -> 
+                match exeInfo.PInstr.Instruction, exeInfo.PInstr.Dest, exeInfo.PInstr.Op1, exeInfo.PInstr.Op2 with
+                | MOV, Some dest, Ok op1, Error ""  ->
+                    match flexEval cpuData suffix op1, suffix with 
+                    | Some (lit,_), NA  -> Ok {cpuData with Regs = Map.add dest lit cpuData.Regs}
+                    | Some (lit,carry), S -> Ok {cpuData with Regs = Map.add dest lit cpuData.Regs ; Fl = updateFlags flags carry}
+                    | _ -> Error "..."
+                | MVN, Some dest, Ok op1, Error "" ->
+                    match flexEval cpuData suffix op1, suffix with 
+                    | Some (lit,_), NA  -> Ok {cpuData with Regs = Map.add dest (~~~ lit) cpuData.Regs}
+                    | Some (lit,carry), S -> Ok {cpuData with Regs = Map.add dest (~~~ lit) cpuData.Regs ; Fl = updateFlags flags carry}
+                    | _ -> Error "..."                 
+                | AND, Some dest, Ok (Register reg), Ok op2 ->
+                    match flexEval cpuData suffix op2, suffix with
+                    | Some (lit,_), NA -> Ok {cpuData with Regs = Map.add dest (cpuData.Regs.[reg] &&& lit) cpuData.Regs}
+                    | Some (lit,carry), S -> Ok {cpuData with Regs = Map.add dest (cpuData.Regs.[reg] &&& lit) cpuData.Regs ; Fl = updateFlags flags carry}
+                    | _ -> Error "..."
+                | ORR, Some dest, Ok (Register reg), Ok op2 ->
+                    match flexEval cpuData suffix op2, suffix with
+                    | Some (lit,_), NA -> Ok {cpuData with Regs = Map.add dest (cpuData.Regs.[reg] ||| lit) cpuData.Regs}
+                    | Some (lit,carry), S -> Ok {cpuData with Regs = Map.add dest (cpuData.Regs.[reg] ||| lit) cpuData.Regs ; Fl = updateFlags flags carry}
+                    | _ -> Error "..."           
+                | EOR, Some dest, Ok (Register reg), Ok op2 ->
+                    match flexEval cpuData suffix op2, suffix with
+                    | Some (lit,_), NA -> Ok {cpuData with Regs = Map.add dest (cpuData.Regs.[reg] ^^^ lit) cpuData.Regs}
+                    | Some (lit,carry), S -> Ok {cpuData with Regs = Map.add dest (cpuData.Regs.[reg] ^^^ lit) cpuData.Regs ; Fl = updateFlags flags carry}
+                    | _ -> Error "..."                    
+                | BIC, Some dest, Ok (Register reg), Ok op2 ->
+                    match flexEval cpuData suffix op2, suffix with
+                    | Some (lit,_), NA -> Ok {cpuData with Regs = Map.add dest (cpuData.Regs.[reg] &&& (~~~  lit)) cpuData.Regs}
+                    | Some (lit,carry), S -> Ok {cpuData with Regs = Map.add dest (cpuData.Regs.[reg] &&& (~~~ lit)) cpuData.Regs ; Fl = updateFlags flags carry}
+                    | _ -> Error "..." 
+                | LSL, Some dest, Ok (Register reg), Ok op2 ->
+                    match flexEval cpuData suffix op2, suffix with
+                    | Some (lit,_), NA -> Ok {cpuData with Regs = Map.add dest (cpuData.Regs.[reg] <<<  lit) cpuData.Regs}
+                    | Some (lit,_), S -> Ok {cpuData with Regs = Map.add dest (cpuData.Regs.[reg] <<< lit) cpuData.Regs ; Fl = updateFlags flags (carry)}
+                    | _ -> Error "..."                 
+                | LSR ->
+                | ASR ->
+                | ROR ->
+                | RRX ->
+                | TST ->
+                | TEQ ->
 
-        | _ -> Error "Result from parse is an error"
+            | false -> Ok cpuData
+        | _ -> Error "Return from parse is None or error"
+
+        
