@@ -30,8 +30,6 @@ module BitArithmetic
     /// parse error
     type ErrInstr = string
 
-    type LitOrReg = Nm of uint32 | Rg of RName
-
     /// Flexible opperator
     /// either a number or a register with an optional shift
     type FlexOp = 
@@ -269,29 +267,6 @@ module BitArithmetic
     /// Parse Active Pattern used by top-level code
     let (|IMatch|_|) = parse
 
-
-
-
-
-// // check parse is valid
-//     /// checks all elements of the return from parse are valid
-//     let checkValid (parseOut : Result<Parse<InstDecomp>,string> option) = 
-
-//         match parseOut with 
-//         | Some (Ok exeInfo) ->
-//             let dest = exeInfo.PInstr.Dest
-//             let instrc = exeInfo.PInstr.Instruction
-
-//             match exeInfo.PInstr.Instruction with 
-//             | MOV | MVN -> parseOut  
-//             | _ -> 
-//                 match exeInfo.PInstr.Dest, exeInfo.PInstr.Op1, exeInfo.PInstr.Op2 with
-//                 | Some dest, Ok op1, Ok op2 ->
-
-//                 | Some dest, Ok op1, Error "" ->
-
-
-//         | _ -> parseOut
 
 
 

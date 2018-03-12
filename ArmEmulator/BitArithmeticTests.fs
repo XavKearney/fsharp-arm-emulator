@@ -30,14 +30,6 @@ module BitArithmeticTests
 
 // test parser
 
-    // /// Flexible opperator
-    // /// either a number or a register with an optional shift
-    // type FlexOp = 
-    //     | Literal of uint32
-    //     | Register of RName
-    //     | RegShiftReg of RName*Shifter*RName
-    //     | RegShiftLit of RName*Shifter*uint32
-    //     | RegRRX of RName
 
 
 
@@ -132,7 +124,7 @@ module BitArithmeticTests
                               PSize = 4u
                               PCond = Cal})
 
-                //tests invalid first opperand ******
+                //tests invalid first opperand
                 {ld with OpCode = "AND" ; Operands = "R0, #4, R7, RRX"},
                     Some (Ok {PInstr = {Instruction = AND
                                         Suff = NA
