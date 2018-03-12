@@ -93,6 +93,7 @@ module BitArithmetic
 
 
 
+
 // check litteral 
 
 
@@ -156,9 +157,9 @@ module BitArithmetic
         /// converts string to some valid register or none
         let toReg str = Map.tryFind str regNames
 
-        /// 
+        /// converts string that could be a literal or register to a valid literal or register
         let toLitReg regOrLit =
-            match toLit regOrLit symTab,toReg regOrLit with
+            match toLit regOrLit symTab, toReg regOrLit with
             | Ok lit, None -> Ok (Literal lit)
             | _, Some reg -> Ok (Register reg)
             | _ -> Error "Opperand is not literal or register" 
@@ -181,7 +182,7 @@ module BitArithmetic
             | [|regOrLit|] -> toLitReg regOrLit            
             | [|reg ; shift|] -> 
                 match toReg reg, Map.tryFind shift instrNames with
-                | Some targetReg, Some RRX -> Ok (RegRRX targetReg)
+                | Some targetReg, Some shift when shift = RRX -> Ok (RegRRX targetReg)
                 | Some targetReg, _ ->
                     match toShift shift with 
                     | Ok (shift,regOrLit) -> 
@@ -213,7 +214,7 @@ module BitArithmetic
         | RRX when ops.Length = 2
             -> Ok {baseInstr with Dest = toReg ops.[0] ; Op1 = toFlexOp [|ops.[1]|]}
 
-        | _ -> Error "Not valid input"
+        | _ -> Error "Not valid input operands; wrong number of opperands"
 
     /// main function to parse a line of assembler
     /// ls contains the line input
@@ -226,12 +227,15 @@ module BitArithmetic
                 match ls.Label,ls.LoadAddr with
                 | Some lab, WA addr -> Some (lab,addr)
                 | _ -> None 
-            match ls.SymTab with    // check if symbol table is needed
-                Some symTable ->     
-                    match parseInstr root ls.Operands suffix symTable with 
-                    | Ok pInst -> Ok { PInstr=pInst; PLabel = pLab; PSize = 4u; PCond = pCond }
-                    | _ -> Error "Parse error"
-                | _ -> Error "No symbol table"
+            match ls.SymTab with 
+            Some symTable ->     
+                match parseInstr root ls.Operands suffix symTable with 
+                | Ok pInst -> Ok { PInstr=pInst; PLabel = pLab; PSize = 4u; PCond = pCond }
+                | _ -> Error "Parse error"
+            | _ -> Error "No symbol tabel"
+
+        // checks Opcode is processed my this module
+        // Calls parse' if Opcode is recognised
         Map.tryFind ls.OpCode opCodes
         |> Option.map parse'
 
