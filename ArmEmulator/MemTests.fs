@@ -630,10 +630,10 @@ module MemTests
                         Operands= ops}
             ldFuncEQU label input
             |> parseLabelIns root
-        let BaseDataPath : DataPath<'INS> =
-            let memory : MachineMemory<'INS> = [WA 0x100u,DataLoc 5u] |> Map.ofList
-            let registers : Map<RName,uint32> = [(R0: RName), 2u] |> Map.ofList
-            let flags : Flags = { N= false; C=false; Z=false; V=false}
+        let baseDataPath =
+            let memory = [WA 0x100u,DataLoc 5u] |> Map.ofList
+            let registers = [(R0: RName), 2u] |> Map.ofList
+            let flags = { N= false; C=false; Z=false; V=false}
             {Fl= flags; Regs= registers; MM = memory}
 
         let makeTest name inputRec inpDataPath output =
@@ -645,24 +645,24 @@ module MemTests
         Expecto.Tests.testList "updateMemoryDataPathTest Tests"
                 [   
                     //DCD Working Tests
-                    makeTest "DCD Base Case" (makeLabelInstr "labelT" "DCD" "1") BaseDataPath (Ok {BaseDataPath with MM = ([WA 0x100u,DataLoc 5u; WA 0x104u, DataLoc 1u] |> Map.ofList)})
-                    makeTest "DCD List Base Case" (makeLabelInstr "labelT" "DCD" "1,3,5") BaseDataPath (Ok {BaseDataPath with MM = ([WA 0x100u,DataLoc 5u; WA 0x104u, DataLoc 1u; WA 0x108u, DataLoc 3u; WA 0x10Cu, DataLoc 5u] |> Map.ofList)})
+                    makeTest "DCD Base Case" (makeLabelInstr "labelT" "DCD" "1") baseDataPath (Ok {baseDataPath with MM = ([WA 0x100u,DataLoc 5u; WA 0x104u, DataLoc 1u] |> Map.ofList)})
+                    makeTest "DCD List Base Case" (makeLabelInstr "labelT" "DCD" "1,3,5") baseDataPath (Ok {baseDataPath with MM = ([WA 0x100u,DataLoc 5u; WA 0x104u, DataLoc 1u; WA 0x108u, DataLoc 3u; WA 0x10Cu, DataLoc 5u] |> Map.ofList)})
                     //DCD Error Message Tests
-                    makeTest "DCD No Input" (makeLabelInstr "labelT" "DCD" "") BaseDataPath (Error "parseLabelIns: Input to DCD function not valid (No input etc)")
-                    makeTest "DCD Invalid Input" (makeLabelInstr "labelT" "DCD" "a") BaseDataPath (Error "parseLabelIns: Input to DCD function not valid (No input etc)")
+                    makeTest "DCD No Input" (makeLabelInstr "labelT" "DCD" "") baseDataPath (Error "parseLabelIns: Input to DCD function not valid (No input etc)")
+                    makeTest "DCD Invalid Input" (makeLabelInstr "labelT" "DCD" "a") baseDataPath (Error "parseLabelIns: Input to DCD function not valid (No input etc)")
 
                     //Fill Working Tests
-                    makeTest "Fill Base Case" (makeLabelInstr "labelT" "FILL" "4") BaseDataPath (Ok {BaseDataPath with MM = ([WA 0x100u,DataLoc 5u; WA 0x104u, DataLoc 0u; WA 0x108u, DataLoc 0u; WA 0x10Cu, DataLoc 0u; WA 0x110u, DataLoc 0u] |> Map.ofList)})
-                    makeTest "Fill Changed given address" (makeLabelInstr "labelT" "FILL" "4") {BaseDataPath with MM =([WA 0x0u,DataLoc 4u] |> Map.ofList)} (Ok {BaseDataPath with MM = ([WA 0x0u,DataLoc 4u; WA 0x4u, DataLoc 0u; WA 0x8u, DataLoc 0u; WA 0xCu, DataLoc 0u; WA 0x10u, DataLoc 0u] |> Map.ofList)})
+                    makeTest "Fill Base Case" (makeLabelInstr "labelT" "FILL" "4") baseDataPath (Ok {baseDataPath with MM = ([WA 0x100u,DataLoc 5u; WA 0x104u, DataLoc 0u; WA 0x108u, DataLoc 0u; WA 0x10Cu, DataLoc 0u; WA 0x110u, DataLoc 0u] |> Map.ofList)})
+                    makeTest "Fill Changed given address" (makeLabelInstr "labelT" "FILL" "4") {baseDataPath with MM =([WA 0x0u,DataLoc 4u] |> Map.ofList)} (Ok {baseDataPath with MM = ([WA 0x0u,DataLoc 4u; WA 0x4u, DataLoc 0u; WA 0x8u, DataLoc 0u; WA 0xCu, DataLoc 0u; WA 0x10u, DataLoc 0u] |> Map.ofList)})
                     //Fill Error Message Tests
-                    makeTest "Fill input/4 != int" (makeLabelInstr "labelT" "FILL" "1") {BaseDataPath with MM =([WA 0x10u,DataLoc 3u] |> Map.ofList)} (Error "parseLabelIns: Fill expression (1u) <0 or not divisible by four")
-                    makeTest "Fill input/4 != int and negative" (makeLabelInstr "labelT" "FILL" "-3") {BaseDataPath with MM =([WA 0x100u,DataLoc 7u] |> Map.ofList)} (Error "parseLabelIns: Fill expression (4294967293u) <0 or not divisible by four")
-                    makeTest "Fill No Input" (makeLabelInstr "labelT" "FILL" "") BaseDataPath (Error "evalExpression: End case did not match any of the evalExpression end case options (0x4, 2, 0b11, label2 etc)")
+                    makeTest "Fill input/4 != int" (makeLabelInstr "labelT" "FILL" "1") {baseDataPath with MM =([WA 0x10u,DataLoc 3u] |> Map.ofList)} (Error "parseLabelIns: Fill expression (1u) <0 or not divisible by four")
+                    makeTest "Fill input/4 != int and negative" (makeLabelInstr "labelT" "FILL" "-3") {baseDataPath with MM =([WA 0x100u,DataLoc 7u] |> Map.ofList)} (Error "parseLabelIns: Fill expression (4294967293u) <0 or not divisible by four")
+                    makeTest "Fill No Input" (makeLabelInstr "labelT" "FILL" "") baseDataPath (Error "evalExpression: End case did not match any of the evalExpression end case options (0x4, 2, 0b11, label2 etc)")
 
                     //EQU Working Tests
-                    makeTest "EQU Base Case" (makeLabelInstr "labelT" "EQU" "2") BaseDataPath (Ok BaseDataPath)
+                    makeTest "EQU Base Case" (makeLabelInstr "labelT" "EQU" "2") baseDataPath (Ok baseDataPath)
                     //EQU Error Message Tests
-                    makeTest "EQU No Input" (makeLabelInstr "labelT" "EQU" "") BaseDataPath (Error "evalExpression: End case did not match any of the evalExpression end case options (0x4, 2, 0b11, label2 etc)")
+                    makeTest "EQU No Input" (makeLabelInstr "labelT" "EQU" "") baseDataPath (Error "evalExpression: End case did not match any of the evalExpression end case options (0x4, 2, 0b11, label2 etc)")
 
                 ]
 
@@ -680,10 +680,10 @@ module MemTests
                         Operands= ops}
             ldFuncEQU label input
             |> parseLabelIns root
-        let BaseDataPath : DataPath<'INS> =
-            let memory : MachineMemory<'INS> = [WA 0x100u,DataLoc 5u] |> Map.ofList
-            let registers : Map<RName,uint32> = [(R0: RName), 2u] |> Map.ofList
-            let flags : Flags = { N= false; C=false; Z=false; V=false}
+        let baseDataPath =
+            let memory = [WA 0x100u,DataLoc 5u] |> Map.ofList
+            let registers = [(R0: RName), 2u] |> Map.ofList
+            let flags = { N= false; C=false; Z=false; V=false}
             {Fl= flags; Regs= registers; MM = memory}
 
         let makeTest name inputSymTab inputRec inpDataPath output =
@@ -695,15 +695,15 @@ module MemTests
         Expecto.Tests.testList "DCDexecTest Tests"
                 [   
                     //DCD Working Tests
-                    makeTest "DCDexec: DCD Base Case" stOneItem (makeLabelInstr "labelT" "DCD" "1") BaseDataPath (Ok ({BaseDataPath with MM = ([WA 0x100u,DataLoc 5u; WA 0x104u, DataLoc 1u] |> Map.ofList)}, ["testL",256u; "labelT",1u] |> Map.ofList))
-                    makeTest "DCDexec: DCD List Base Case" stOneItem (makeLabelInstr "labelT" "DCD" "1, 3, 5") BaseDataPath (Ok ({BaseDataPath with MM = ([WA 0x100u,DataLoc 5u; WA 0x104u, DataLoc 1u; WA 0x108u, DataLoc 3u; WA 0x10Cu, DataLoc 5u] |> Map.ofList)}, ["testL",256u; "labelT",1u] |> Map.ofList))
-                    makeTest "DCDexec: DCD Negative List" stOneItem (makeLabelInstr "labelT" "DCD" "1, -3, 5") BaseDataPath (Ok ({BaseDataPath with MM = ([WA 0x100u,DataLoc 5u; WA 0x104u, DataLoc 1u; WA 0x108u, DataLoc 4294967293u; WA 0x10Cu, DataLoc 5u] |> Map.ofList)}, ["testL",256u; "labelT",1u] |> Map.ofList))
+                    makeTest "DCDexec: DCD Base Case" stOneItem (makeLabelInstr "labelT" "DCD" "1") baseDataPath (Ok ({baseDataPath with MM = ([WA 0x100u,DataLoc 5u; WA 0x104u, DataLoc 1u] |> Map.ofList)}, ["testL",256u; "labelT",1u] |> Map.ofList))
+                    makeTest "DCDexec: DCD List Base Case" stOneItem (makeLabelInstr "labelT" "DCD" "1, 3, 5") baseDataPath (Ok ({baseDataPath with MM = ([WA 0x100u,DataLoc 5u; WA 0x104u, DataLoc 1u; WA 0x108u, DataLoc 3u; WA 0x10Cu, DataLoc 5u] |> Map.ofList)}, ["testL",256u; "labelT",1u] |> Map.ofList))
+                    makeTest "DCDexec: DCD Negative List" stOneItem (makeLabelInstr "labelT" "DCD" "1, -3, 5") baseDataPath (Ok ({baseDataPath with MM = ([WA 0x100u,DataLoc 5u; WA 0x104u, DataLoc 1u; WA 0x108u, DataLoc 4294967293u; WA 0x10Cu, DataLoc 5u] |> Map.ofList)}, ["testL",256u; "labelT",1u] |> Map.ofList))
 
                     //DCD Error Message Tests
-                    makeTest "DCDexec: DCD No Input" stOneItem (makeLabelInstr "labelT" "DCD" "") BaseDataPath (Error "parseLabelIns: Input to DCD function not valid (No input etc)")
-                    makeTest "DCDexec: DCD Invalid Input" stOneItem (makeLabelInstr "labelT" "DCD" "a") BaseDataPath (Error "parseLabelIns: Input to DCD function not valid (No input etc)")
-                    makeTest "DCDexec: DCD No Input List" stOneItem (makeLabelInstr "labelT" "DCD" "1, ,5") BaseDataPath (Error "parseLabelIns: Input to DCD function not valid (No input etc)")
-                    makeTest "DCDexec: DCD Invalid List Input" stOneItem (makeLabelInstr "labelT" "DCD" "1,a,5") BaseDataPath (Error "parseLabelIns: Input to DCD function not valid (No input etc)")
+                    makeTest "DCDexec: DCD No Input" stOneItem (makeLabelInstr "labelT" "DCD" "") baseDataPath (Error "parseLabelIns: Input to DCD function not valid (No input etc)")
+                    makeTest "DCDexec: DCD Invalid Input" stOneItem (makeLabelInstr "labelT" "DCD" "a") baseDataPath (Error "parseLabelIns: Input to DCD function not valid (No input etc)")
+                    makeTest "DCDexec: DCD No Input List" stOneItem (makeLabelInstr "labelT" "DCD" "1, ,5") baseDataPath (Error "parseLabelIns: Input to DCD function not valid (No input etc)")
+                    makeTest "DCDexec: DCD Invalid List Input" stOneItem (makeLabelInstr "labelT" "DCD" "1,a,5") baseDataPath (Error "parseLabelIns: Input to DCD function not valid (No input etc)")
 
                 ]
 
@@ -719,10 +719,10 @@ module MemTests
                         Operands= ops}
             ldFuncEQU label input
             |> parseLabelIns root
-        let BaseDataPath : DataPath<'INS> =
-            let memory : MachineMemory<'INS> = [WA 0x100u,DataLoc 5u] |> Map.ofList
-            let registers : Map<RName,uint32> = [(R0: RName), 2u] |> Map.ofList
-            let flags : Flags = { N= false; C=false; Z=false; V=false}
+        let baseDataPath =
+            let memory = [WA 0x100u,DataLoc 5u] |> Map.ofList
+            let registers = [(R0: RName), 2u] |> Map.ofList
+            let flags = { N= false; C=false; Z=false; V=false}
             {Fl= flags; Regs= registers; MM = memory}
 
         let makeTest name inputSymTab inputRec inpDataPath output =
@@ -734,14 +734,14 @@ module MemTests
         Expecto.Tests.testList "EQUexecTest Tests"
                 [   
                     //EQU Working Tests
-                    makeTest "EQUexec: EQU Base Case" stOneItem (makeLabelInstr "labelT" "EQU" "2") BaseDataPath (Ok (BaseDataPath, ["testL",256u; "testL2",260u; "labelT",2u] |> Map.ofList))
-                    makeTest "EQUexec: EQU *+- Test" stOneItem (makeLabelInstr "labelT" "EQU" "5-4*3-1*1+2*2*2") BaseDataPath (Ok (BaseDataPath, ["testL",256u; "testL2",260u; "labelT",0u] |> Map.ofList))
-                    makeTest "EQUexec: EQU label test" stOneItem (makeLabelInstr "labelT" "EQU" "testL") BaseDataPath (Ok (BaseDataPath, ["testL",256u; "testL2",260u; "labelT",256u] |> Map.ofList))
-                    makeTest "EQUexec: EQU number label addition test" stOneItem (makeLabelInstr "labelT" "EQU" "testL + testL2") BaseDataPath (Ok (BaseDataPath, ["testL",256u; "testL2",260u; "labelT",516u] |> Map.ofList))
+                    makeTest "EQUexec: EQU Base Case" stOneItem (makeLabelInstr "labelT" "EQU" "2") baseDataPath (Ok (baseDataPath, ["testL",256u; "testL2",260u; "labelT",2u] |> Map.ofList))
+                    makeTest "EQUexec: EQU *+- Test" stOneItem (makeLabelInstr "labelT" "EQU" "5-4*3-1*1+2*2*2") baseDataPath (Ok (baseDataPath, ["testL",256u; "testL2",260u; "labelT",0u] |> Map.ofList))
+                    makeTest "EQUexec: EQU label test" stOneItem (makeLabelInstr "labelT" "EQU" "testL") baseDataPath (Ok (baseDataPath, ["testL",256u; "testL2",260u; "labelT",256u] |> Map.ofList))
+                    makeTest "EQUexec: EQU number label addition test" stOneItem (makeLabelInstr "labelT" "EQU" "testL + testL2") baseDataPath (Ok (baseDataPath, ["testL",256u; "testL2",260u; "labelT",516u] |> Map.ofList))
 
 
                     //EQU Error Message Tests
-                    makeTest "EQUexec: EQU No Input test" stOneItem (makeLabelInstr "labelT" "EQU" "") BaseDataPath (Error "evalExpression: End case did not match any of the evalExpression end case options (0x4, 2, 0b11, label2 etc)")
+                    makeTest "EQUexec: EQU No Input test" stOneItem (makeLabelInstr "labelT" "EQU" "") baseDataPath (Error "evalExpression: End case did not match any of the evalExpression end case options (0x4, 2, 0b11, label2 etc)")
 
                 ]
 
@@ -759,10 +759,10 @@ module MemTests
                         Operands= ops}
             ldFuncEQU label input
             |> parseLabelIns root
-        let BaseDataPath : DataPath<'INS> =
-            let memory : MachineMemory<'INS> = [WA 0x100u,DataLoc 5u] |> Map.ofList
-            let registers : Map<RName,uint32> = [(R0: RName), 2u] |> Map.ofList
-            let flags : Flags = { N= false; C=false; Z=false; V=false}
+        let baseDataPath =
+            let memory = [WA 0x100u,DataLoc 5u] |> Map.ofList
+            let registers = [(R0: RName), 2u] |> Map.ofList
+            let flags = { N= false; C=false; Z=false; V=false}
             {Fl= flags; Regs= registers; MM = memory}
 
         let makeTest name inputSymTab inputRec inpDataPath output =
@@ -774,13 +774,13 @@ module MemTests
         Expecto.Tests.testList "FILLexecTest Tests"
                 [   
                     //FILL Working Tests
-                    makeTest "FILLexec: FILL Base Case" stOneItem (makeLabelInstr "labelT" "FILL" "4") BaseDataPath (Ok ({BaseDataPath with MM = ([WA 0x100u,DataLoc 5u; WA 0x104u, DataLoc 0u; WA 0x108u, DataLoc 0u; WA 0x10Cu, DataLoc 0u; WA 0x110u, DataLoc 0u] |> Map.ofList)}, ["testL",256u; "testL2",260u; "labelT",0u] |> Map.ofList))
-                    makeTest "FILLexec: FILL Changed base address" stOneItem (makeLabelInstr "labelT" "FILL" "4") {BaseDataPath with MM =([WA 0x0u,DataLoc 5u] |> Map.ofList)} (Ok ({BaseDataPath with MM = ([WA 0x0u,DataLoc 5u; WA 0x4u, DataLoc 0u; WA 0x8u, DataLoc 0u; WA 0xCu, DataLoc 0u; WA 0x10u, DataLoc 0u] |> Map.ofList)}, ["testL",256u; "testL2",260u; "labelT",0u] |> Map.ofList))
+                    makeTest "FILLexec: FILL Base Case" stOneItem (makeLabelInstr "labelT" "FILL" "4") baseDataPath (Ok ({baseDataPath with MM = ([WA 0x100u,DataLoc 5u; WA 0x104u, DataLoc 0u; WA 0x108u, DataLoc 0u; WA 0x10Cu, DataLoc 0u; WA 0x110u, DataLoc 0u] |> Map.ofList)}, ["testL",256u; "testL2",260u; "labelT",0u] |> Map.ofList))
+                    makeTest "FILLexec: FILL Changed base address" stOneItem (makeLabelInstr "labelT" "FILL" "4") {baseDataPath with MM =([WA 0x0u,DataLoc 5u] |> Map.ofList)} (Ok ({baseDataPath with MM = ([WA 0x0u,DataLoc 5u; WA 0x4u, DataLoc 0u; WA 0x8u, DataLoc 0u; WA 0xCu, DataLoc 0u; WA 0x10u, DataLoc 0u] |> Map.ofList)}, ["testL",256u; "testL2",260u; "labelT",0u] |> Map.ofList))
 
                     //FILL Error Message Tests
-                    makeTest "FILLexec: Fill input/4 != int" stOneItem (makeLabelInstr "labelT" "FILL" "1") BaseDataPath (Error "parseLabelIns: Fill expression (1u) <0 or not divisible by four")
-                    makeTest "FILLexec: Fill input/4 != int and negative" stOneItem (makeLabelInstr "labelT" "FILL" "-3") BaseDataPath (Error "parseLabelIns: Fill expression (4294967293u) <0 or not divisible by four")
-                    makeTest "FILLexec: No Input" stOneItem (makeLabelInstr "labelT" "FILL" "") BaseDataPath (Error "evalExpression: End case did not match any of the evalExpression end case options (0x4, 2, 0b11, label2 etc)")
+                    makeTest "FILLexec: Fill input/4 != int" stOneItem (makeLabelInstr "labelT" "FILL" "1") baseDataPath (Error "parseLabelIns: Fill expression (1u) <0 or not divisible by four")
+                    makeTest "FILLexec: Fill input/4 != int and negative" stOneItem (makeLabelInstr "labelT" "FILL" "-3") baseDataPath (Error "parseLabelIns: Fill expression (4294967293u) <0 or not divisible by four")
+                    makeTest "FILLexec: No Input" stOneItem (makeLabelInstr "labelT" "FILL" "") baseDataPath (Error "evalExpression: End case did not match any of the evalExpression end case options (0x4, 2, 0b11, label2 etc)")
                 ]
 
 
@@ -799,10 +799,10 @@ module MemTests
                         Operands= ops}
             ldFuncEQU label input
             |> parseAdrIns root
-        let BaseDataPath : DataPath<'INS> =
-            let memory : MachineMemory<'INS> = [WA 0x100u,DataLoc 5u] |> Map.ofList
-            let registers : Map<RName,uint32> = [(R0: RName), 2u] |> Map.ofList
-            let flags : Flags = { N= false; C=false; Z=false; V=false}
+        let baseDataPath =
+            let memory = [WA 0x100u,DataLoc 5u] |> Map.ofList
+            let registers = [(R0: RName), 2u] |> Map.ofList
+            let flags = { N= false; C=false; Z=false; V=false}
             {Fl= flags; Regs= registers; MM = memory}
 
         let makeTest name symTab inputRec inpDataPath output =
@@ -815,12 +815,12 @@ module MemTests
                 [   
             //ADRexec (dP: DataPath<'INS>) (inputRecord: ADRInstr)
                     //ADR Working Tests
-                    makeTest "ADRexec: ADR Base Case" stOneItem (makeADRInstr "labelT" "ADR" "R1, 4") BaseDataPath (Ok ({BaseDataPath with Regs = ([(R0: RName), 2u; R1, 4u] |> Map.ofList)}, stOneItem))
-                    makeTest "ADRexec: ADR Label Base Case" stOneItem (makeADRInstr "labelT" "ADR" "R1, testL") BaseDataPath (Ok ({BaseDataPath with Regs = ([(R0: RName), 2u; R1, 256u] |> Map.ofList)}, stOneItem))
-                    makeTest "ADRexec: ADR Replacing Reg Value" stOneItem (makeADRInstr "labelT" "ADR" "R0, testL") BaseDataPath (Ok ({BaseDataPath with Regs = ([(R0: RName), 256u] |> Map.ofList)}, stOneItem))
+                    makeTest "ADRexec: ADR Base Case" stOneItem (makeADRInstr "labelT" "ADR" "R1, 4") baseDataPath (Ok ({baseDataPath with Regs = ([(R0: RName), 2u; R1, 4u] |> Map.ofList)}, stOneItem))
+                    makeTest "ADRexec: ADR Label Base Case" stOneItem (makeADRInstr "labelT" "ADR" "R1, testL") baseDataPath (Ok ({baseDataPath with Regs = ([(R0: RName), 2u; R1, 256u] |> Map.ofList)}, stOneItem))
+                    makeTest "ADRexec: ADR Replacing Reg Value" stOneItem (makeADRInstr "labelT" "ADR" "R0, testL") baseDataPath (Ok ({baseDataPath with Regs = ([(R0: RName), 256u] |> Map.ofList)}, stOneItem))
 
                     //ADR Error Message Tests
-                    // makeTest "ADRexec: ADR No Input" (makeADRInstr "labelT" "ADR" "R0, ") BaseDataPath (Ok {BaseDataPath with Regs = ([(R0: RName), 256u] |> Map.ofList)})
+                    // makeTest "ADRexec: ADR No Input" (makeADRInstr "labelT" "ADR" "R0, ") baseDataPath (Ok {baseDataPath with Regs = ([(R0: RName), 256u] |> Map.ofList)})
 
                 ]
 
@@ -842,30 +842,30 @@ module MemTests
                         Operands= ops}
             ldFuncEQU input
             |> parseMemIns root suffix
-        let BaseDataPath1 : DataPath<'INS> =
-            let memory : MachineMemory<'INS> = [WA 0x100u,DataLoc 5u; WA 0x104u, DataLoc 7u; WA 0x108u, DataLoc 9u] |> Map.ofList
-            let registers : Map<RName,uint32> = [R0, 2u; R1, 0x100u] |> Map.ofList
-            let flags : Flags = { N= false; C=false; Z=false; V=false}
+        let baseDataPath1 =
+            let memory = [WA 0x100u,DataLoc 5u; WA 0x104u, DataLoc 7u; WA 0x108u, DataLoc 9u] |> Map.ofList
+            let registers = [R0, 2u; R1, 0x100u] |> Map.ofList
+            let flags = { N= false; C=false; Z=false; V=false}
             {Fl= flags; Regs= registers; MM = memory}
-        let BaseDataPath2 : DataPath<'INS> =
-            let memory : MachineMemory<'INS> = [WA 0x100u,DataLoc 5u; WA 0x104u, DataLoc 7u; WA 0x108u, DataLoc 9u; WA 0x10Cu, DataLoc 11u] |> Map.ofList
-            let registers : Map<RName,uint32> = [R10, 2u; R11, 0xCu; R15, 0x100u] |> Map.ofList
-            let flags : Flags = { N= false; C=false; Z=false; V=false}
+        let baseDataPath2 =
+            let memory = [WA 0x100u,DataLoc 5u; WA 0x104u, DataLoc 7u; WA 0x108u, DataLoc 9u; WA 0x10Cu, DataLoc 11u] |> Map.ofList
+            let registers = [R10, 2u; R11, 0xCu; R15, 0x100u] |> Map.ofList
+            let flags = { N= false; C=false; Z=false; V=false}
             {Fl= flags; Regs= registers; MM = memory}
-        let BaseDataPath3 : DataPath<'INS> =
-            let memory : MachineMemory<'INS> = [WA 0x100u,DataLoc 5u; WA 0x104u, DataLoc 7u; WA 0x108u, DataLoc 9u; WA 0x10Cu, DataLoc 11u] |> Map.ofList
-            let registers : Map<RName,uint32> = [R10, 2u; R11, 0x100u; R15, 0x1u] |> Map.ofList
-            let flags : Flags = { N= false; C=false; Z=false; V=false}
+        let baseDataPath3 =
+            let memory = [WA 0x100u,DataLoc 5u; WA 0x104u, DataLoc 7u; WA 0x108u, DataLoc 9u; WA 0x10Cu, DataLoc 11u] |> Map.ofList
+            let registers = [R10, 2u; R11, 0x100u; R15, 0x1u] |> Map.ofList
+            let flags = { N= false; C=false; Z=false; V=false}
             {Fl= flags; Regs= registers; MM = memory}
-        let BaseDataPath4 : DataPath<'INS> =
-            let memory : MachineMemory<'INS> = [WA 0x100u,DataLoc 5u; WA 0x104u, DataLoc 7u; WA 0x108u, DataLoc 9u; WA 0x10Cu, DataLoc 11u] |> Map.ofList
-            let registers : Map<RName,uint32> = [R10, 2u; R11, 0x100u; R15, 0x4u] |> Map.ofList
-            let flags : Flags = { N= false; C=false; Z=false; V=false}
+        let baseDataPath4 =
+            let memory = [WA 0x100u,DataLoc 5u; WA 0x104u, DataLoc 7u; WA 0x108u, DataLoc 9u; WA 0x10Cu, DataLoc 11u] |> Map.ofList
+            let registers = [R10, 2u; R11, 0x100u; R15, 0x4u] |> Map.ofList
+            let flags = { N= false; C=false; Z=false; V=false}
             {Fl= flags; Regs= registers; MM = memory}
-        let BaseDataPath5 : DataPath<'INS> =
-            let memory : MachineMemory<'INS> = [WA 0x100u,DataLoc 5u; WA 0x104u, DataLoc 7u; WA 0x108u, DataLoc 9u; WA 0x10Cu, DataLoc 11u] |> Map.ofList
-            let registers : Map<RName,uint32> = [R10, 2u; R11, 0x100u; R15, 0x4u] |> Map.ofList
-            let flags : Flags = { N= false; C=false; Z=false; V=false}
+        let baseDataPath5 =
+            let memory = [WA 0x100u,DataLoc 5u; WA 0x104u, DataLoc 7u; WA 0x108u, DataLoc 9u; WA 0x10Cu, DataLoc 11u] |> Map.ofList
+            let registers = [R10, 2u; R11, 0x100u; R15, 0x4u] |> Map.ofList
+            let flags = { N= false; C=false; Z=false; V=false}
             {Fl= flags; Regs= registers; MM = memory}
 
 
@@ -878,19 +878,19 @@ module MemTests
         Expecto.Tests.testList "LDRexecTest Tests"
                 [   
                     //LDR Working Tests
-                    makeTest "LDRexec: LDR Base Case" stOneItem (makeMemInstr "LDR" "" "R0, [R1]") BaseDataPath1 (Ok ({BaseDataPath1 with Regs = ([(R0: RName), 5u; R1, 0x100u] |> Map.ofList)}, stOneItem))
-                    makeTest "LDRexec: LDR two digit Registers" stOneItem (makeMemInstr "LDR" "" "R10, [R15]") BaseDataPath2 (Ok ({BaseDataPath2 with Regs = ([R10, 5u; R11, 0xCu; R15, 0x100u] |> Map.ofList)}, stOneItem))
-                    makeTest "LDRexec: LDR Num Increment" stOneItem (makeMemInstr "LDR" "" "R0, [R1, #4]") BaseDataPath1 (Ok ({BaseDataPath1 with Regs = ([R0, 7u; R1, 0x100u] |> Map.ofList)}, stOneItem))
-                    makeTest "LDRexec: LDR Post Increment" stOneItem (makeMemInstr "LDR" "" "R0, [R1], #4") BaseDataPath1 (Ok ({BaseDataPath1 with Regs = ([R0, 5u; R1, 0x104u] |> Map.ofList)}, stOneItem))
-                    makeTest "LDRexec: LDR Pre Increment" stOneItem (makeMemInstr "LDR" "" "R0, [R1, #4]!") BaseDataPath1 (Ok ({BaseDataPath1 with Regs = ([R0, 7u; R1, 0x104u] |> Map.ofList)}, stOneItem))
-                    makeTest "LDRexec: LDR Adding Registers" stOneItem (makeMemInstr "LDR" "" "R10, [R11, R15]") BaseDataPath2 (Ok ({BaseDataPath2 with Regs = ([R10, 11u; R11, 0xCu; R15, 0x100u] |> Map.ofList)}, stOneItem))
-                    makeTest "LDRexec: LDR Adding Shifted Register" stOneItem (makeMemInstr "LDR" "" "R10, [R11, R15, LSL #2]") BaseDataPath3 (Ok ({BaseDataPath3 with Regs = ([R10, 7u; R11, 0x100u; R15, 0x1u] |> Map.ofList)}, stOneItem))
-                    makeTest "LDRexec: LDR Shifted and Pre" stOneItem (makeMemInstr "LDR" "" "R10, [R11, R15, LSL #2]!") BaseDataPath3 (Ok ({BaseDataPath3 with Regs = ([R10, 7u; R11, 0x104u; R15, 0x1u] |> Map.ofList)}, stOneItem))
-                    makeTest "LDRexec: LDR 0 Shift and Pre" stOneItem (makeMemInstr "LDR" "" "R10, [R11, R15, LSL #0]!") BaseDataPath4 (Ok ({BaseDataPath4 with Regs = ([R10, 7u; R11, 0x104u; R15, 0x4u] |> Map.ofList)}, stOneItem))
+                    makeTest "LDRexec: LDR Base Case" stOneItem (makeMemInstr "LDR" "" "R0, [R1]") baseDataPath1 (Ok ({baseDataPath1 with Regs = ([(R0: RName), 5u; R1, 0x100u] |> Map.ofList)}, stOneItem))
+                    makeTest "LDRexec: LDR two digit Registers" stOneItem (makeMemInstr "LDR" "" "R10, [R15]") baseDataPath2 (Ok ({baseDataPath2 with Regs = ([R10, 5u; R11, 0xCu; R15, 0x100u] |> Map.ofList)}, stOneItem))
+                    makeTest "LDRexec: LDR Num Increment" stOneItem (makeMemInstr "LDR" "" "R0, [R1, #4]") baseDataPath1 (Ok ({baseDataPath1 with Regs = ([R0, 7u; R1, 0x100u] |> Map.ofList)}, stOneItem))
+                    makeTest "LDRexec: LDR Post Increment" stOneItem (makeMemInstr "LDR" "" "R0, [R1], #4") baseDataPath1 (Ok ({baseDataPath1 with Regs = ([R0, 5u; R1, 0x104u] |> Map.ofList)}, stOneItem))
+                    makeTest "LDRexec: LDR Pre Increment" stOneItem (makeMemInstr "LDR" "" "R0, [R1, #4]!") baseDataPath1 (Ok ({baseDataPath1 with Regs = ([R0, 7u; R1, 0x104u] |> Map.ofList)}, stOneItem))
+                    makeTest "LDRexec: LDR Adding Registers" stOneItem (makeMemInstr "LDR" "" "R10, [R11, R15]") baseDataPath2 (Ok ({baseDataPath2 with Regs = ([R10, 11u; R11, 0xCu; R15, 0x100u] |> Map.ofList)}, stOneItem))
+                    makeTest "LDRexec: LDR Adding Shifted Register" stOneItem (makeMemInstr "LDR" "" "R10, [R11, R15, LSL #2]") baseDataPath3 (Ok ({baseDataPath3 with Regs = ([R10, 7u; R11, 0x100u; R15, 0x1u] |> Map.ofList)}, stOneItem))
+                    makeTest "LDRexec: LDR Shifted and Pre" stOneItem (makeMemInstr "LDR" "" "R10, [R11, R15, LSL #2]!") baseDataPath3 (Ok ({baseDataPath3 with Regs = ([R10, 7u; R11, 0x104u; R15, 0x1u] |> Map.ofList)}, stOneItem))
+                    makeTest "LDRexec: LDR 0 Shift and Pre" stOneItem (makeMemInstr "LDR" "" "R10, [R11, R15, LSL #0]!") baseDataPath4 (Ok ({baseDataPath4 with Regs = ([R10, 7u; R11, 0x104u; R15, 0x4u] |> Map.ofList)}, stOneItem))
 
 
                     // //LDR Error Message Tests
-                    makeTest "LDRexec: LDR -1 Shift and Pre" stOneItem (makeMemInstr "LDR" "" "R10, [R11, R15, LSL #-1]!") BaseDataPath5 (Ok ({BaseDataPath5 with Regs = ([R10, 5u; R11, 0x100u; R15, 0x4u] |> Map.ofList)}, stOneItem))
+                    makeTest "LDRexec: LDR -1 Shift and Pre" stOneItem (makeMemInstr "LDR" "" "R10, [R11, R15, LSL #-1]!") baseDataPath5 (Ok ({baseDataPath5 with Regs = ([R10, 5u; R11, 0x100u; R15, 0x4u] |> Map.ofList)}, stOneItem))
 
 
                 ]
@@ -912,10 +912,10 @@ module MemTests
                         Operands= ops}
             ldFuncEQU input
             |> parseMemIns root suffix
-        let BaseDataPath1 : DataPath<'INS> =
-            let memory : MachineMemory<'INS> = [WA 0x100u,DataLoc 5u; WA 0x104u, DataLoc 7u; WA 0x108u, DataLoc 9u; WA 0x10Cu, DataLoc 11u] |> Map.ofList
-            let registers : Map<RName,uint32> = [R0, 2u; R1, 0x100u] |> Map.ofList
-            let flags : Flags = { N= false; C=false; Z=false; V=false}
+        let baseDataPath1 =
+            let memory = [WA 0x100u,DataLoc 5u; WA 0x104u, DataLoc 7u; WA 0x108u, DataLoc 9u; WA 0x10Cu, DataLoc 11u] |> Map.ofList
+            let registers = [R0, 2u; R1, 0x100u] |> Map.ofList
+            let flags = { N= false; C=false; Z=false; V=false}
             {Fl= flags; Regs= registers; MM = memory}
 
 
@@ -928,8 +928,8 @@ module MemTests
         Expecto.Tests.testList "STRexecTest Tests"
                 [   
                     //STR Working Tests
-                    makeTest "STRexec: STR Base Case" stOneItem (makeMemInstr "STR" "" "R0, [R1]") BaseDataPath1 (Ok ({BaseDataPath1 with MM = ([WA 0x100u,DataLoc 2u; WA 0x104u, DataLoc 7u; WA 0x108u, DataLoc 9u; WA 0x10Cu, DataLoc 11u] |> Map.ofList)}, stOneItem))
-                    // makeTest "STRexec: STR Num Increment" stOneItem (makeMemInstr "STR" "" "R0, [R1, #4]") BaseDataPath1 (Ok stOneItem,(Ok {BaseDataPath1 with MM = ([WA 0x100u,DataLoc 5u; WA 0x104u, DataLoc 2u; WA 0x108u, DataLoc 9u; WA 0x10Cu, DataLoc 11u] |> Map.ofList)}))
+                    makeTest "STRexec: STR Base Case" stOneItem (makeMemInstr "STR" "" "R0, [R1]") baseDataPath1 (Ok ({baseDataPath1 with MM = ([WA 0x100u,DataLoc 2u; WA 0x104u, DataLoc 7u; WA 0x108u, DataLoc 9u; WA 0x10Cu, DataLoc 11u] |> Map.ofList)}, stOneItem))
+                    // makeTest "STRexec: STR Num Increment" stOneItem (makeMemInstr "STR" "" "R0, [R1, #4]") baseDataPath1 (Ok stOneItem,(Ok {baseDataPath1 with MM = ([WA 0x100u,DataLoc 5u; WA 0x104u, DataLoc 2u; WA 0x108u, DataLoc 9u; WA 0x10Cu, DataLoc 11u] |> Map.ofList)}))
                     //STR Error Message Tests
 
                 ]
