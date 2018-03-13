@@ -628,12 +628,8 @@ module MemTests
                         SymTab= Some stOneItem;
                         OpCode= "";
                         Operands= ops}
-            let removeRecord x =
-                match x with
-                | Ok y -> y 
             ldFuncEQU label input
             |> parseLabelIns root
-            |> removeRecord 
         let BaseDataPath : DataPath<'INS> =
             let memory : MachineMemory<'INS> = [WA 0x100u,DataLoc 5u] |> Map.ofList
             let registers : Map<RName,uint32> = [(R0: RName), 2u] |> Map.ofList
@@ -641,8 +637,11 @@ module MemTests
             {Fl= flags; Regs= registers; MM = memory}
 
         let makeTest name inputRec inpDataPath output =
-            testCase name <| fun () ->
-                Expect.equal (updateMemoryDataPath inputRec inpDataPath) output (sprintf "updateMemoryDataPathTest Test '%s'" name)
+            match inputRec with
+            | Ok v ->   testCase name <| fun () ->
+                            Expect.equal (updateMemoryDataPath v inpDataPath) output (sprintf "updateMemoryDataPathTest Test '%s'" name)
+            | Error m -> testCase name <| fun () ->
+                            Expect.equal 1 2 (sprintf "updateMemoryDataPathTest Test '%s'\nInstruction was parsed with an error: %A" name m)
         Expecto.Tests.testList "updateMemoryDataPathTest Tests"
                 [   
                     //DCD Working Tests
@@ -679,12 +678,8 @@ module MemTests
                         SymTab= Some stOneItem;
                         OpCode= "";
                         Operands= ops}
-            let removeRecord x =
-                match x with
-                | Ok y -> y 
             ldFuncEQU label input
             |> parseLabelIns root
-            |> removeRecord 
         let BaseDataPath : DataPath<'INS> =
             let memory : MachineMemory<'INS> = [WA 0x100u,DataLoc 5u] |> Map.ofList
             let registers : Map<RName,uint32> = [(R0: RName), 2u] |> Map.ofList
@@ -692,8 +687,11 @@ module MemTests
             {Fl= flags; Regs= registers; MM = memory}
 
         let makeTest name inputSymTab inputRec inpDataPath output =
-            testCase name <| fun () ->
-                Expect.equal (DCDexec inputSymTab inpDataPath inputRec) output (sprintf "DCDexecTest Test '%s'" name)
+            match inputRec with
+            | Ok v ->   testCase name <| fun () ->
+                            Expect.equal (DCDexec inputSymTab inpDataPath v) output (sprintf "DCDexecTest Test '%s'" name)
+            | Error m ->testCase name <| fun () ->
+                            Expect.equal 1 2 (sprintf "DCDexecTest Test '%s'\nInstruction was parsed with an error: %A" name m)
         Expecto.Tests.testList "DCDexecTest Tests"
                 [   
                     //DCD Working Tests
@@ -719,12 +717,8 @@ module MemTests
                         SymTab= Some stOneItem;
                         OpCode= "";
                         Operands= ops}
-            let removeRecord x =
-                match x with
-                | Ok y -> y 
             ldFuncEQU label input
             |> parseLabelIns root
-            |> removeRecord 
         let BaseDataPath : DataPath<'INS> =
             let memory : MachineMemory<'INS> = [WA 0x100u,DataLoc 5u] |> Map.ofList
             let registers : Map<RName,uint32> = [(R0: RName), 2u] |> Map.ofList
@@ -732,8 +726,11 @@ module MemTests
             {Fl= flags; Regs= registers; MM = memory}
 
         let makeTest name inputSymTab inputRec inpDataPath output =
-            testCase name <| fun () ->
-                Expect.equal (EQUexec inputSymTab inpDataPath inputRec) output (sprintf "EQUexecTest Test '%s'" name)
+            match inputRec with
+            | Ok v ->   testCase name <| fun () ->
+                            Expect.equal (EQUexec inputSymTab inpDataPath v) output (sprintf "EQUexecTest Test '%s'" name)
+            | Error m ->testCase name <| fun () ->
+                            Expect.equal 1 2 (sprintf "EQUexecTest Test '%s'\nInstruction was parsed with an error: %A" name m) 
         Expecto.Tests.testList "EQUexecTest Tests"
                 [   
                     //EQU Working Tests
@@ -760,12 +757,8 @@ module MemTests
                         SymTab= Some stOneItem;
                         OpCode= "";
                         Operands= ops}
-            let removeRecord x =
-                match x with
-                | Ok y -> y 
             ldFuncEQU label input
             |> parseLabelIns root
-            |> removeRecord 
         let BaseDataPath : DataPath<'INS> =
             let memory : MachineMemory<'INS> = [WA 0x100u,DataLoc 5u] |> Map.ofList
             let registers : Map<RName,uint32> = [(R0: RName), 2u] |> Map.ofList
@@ -773,8 +766,11 @@ module MemTests
             {Fl= flags; Regs= registers; MM = memory}
 
         let makeTest name inputSymTab inputRec inpDataPath output =
-            testCase name <| fun () ->
-                Expect.equal (FILLexec inputSymTab inpDataPath inputRec) output (sprintf "FILLexecTest Test '%s'" name)
+            match inputRec with
+            | Ok v ->   testCase name <| fun () ->
+                            Expect.equal (FILLexec inputSymTab inpDataPath v) output (sprintf "FILLexecTest Test '%s'" name)
+            | Error m ->testCase name <| fun () ->
+                            Expect.equal 1 2 (sprintf "FILLexecTest Test '%s'\nInstruction was parsed with an error: %A" name m)
         Expecto.Tests.testList "FILLexecTest Tests"
                 [   
                     //FILL Working Tests
@@ -801,21 +797,20 @@ module MemTests
                         SymTab= Some stOneItem;
                         OpCode= "";
                         Operands= ops}
-            let removeRecord x =
-                match x with
-                | Ok y -> y 
             ldFuncEQU label input
             |> parseAdrIns root
-            |> removeRecord 
         let BaseDataPath : DataPath<'INS> =
             let memory : MachineMemory<'INS> = [WA 0x100u,DataLoc 5u] |> Map.ofList
             let registers : Map<RName,uint32> = [(R0: RName), 2u] |> Map.ofList
             let flags : Flags = { N= false; C=false; Z=false; V=false}
             {Fl= flags; Regs= registers; MM = memory}
 
-        let makeTest name symTab inpDataPath inputRec output =
-            testCase name <| fun () ->
-                Expect.equal (ADRexec symTab inputRec inpDataPath) output (sprintf "ADRexecTest Test '%s'" name)
+        let makeTest name symTab inputRec inpDataPath output =
+            match inputRec with
+            | Ok v ->   testCase name <| fun () ->
+                            Expect.equal (ADRexec symTab inpDataPath v) output (sprintf "ADRexecTest Test '%s'" name)
+            | Error m ->testCase name <| fun () ->
+                            Expect.equal 1 2 (sprintf "ADRexecTest Test '%s'\nInstruction was parsed with an error: %A" name m)
         Expecto.Tests.testList "ADRexecTest Tests"
                 [   
             //ADRexec (dP: DataPath<'INS>) (inputRecord: ADRInstr)
@@ -845,12 +840,8 @@ module MemTests
                         SymTab= Some stOneItem;
                         OpCode= "";
                         Operands= ops}
-            let removeRecord x =
-                match x with
-                | Ok y -> y 
             ldFuncEQU input
             |> parseMemIns root suffix
-            |> removeRecord 
         let BaseDataPath1 : DataPath<'INS> =
             let memory : MachineMemory<'INS> = [WA 0x100u,DataLoc 5u; WA 0x104u, DataLoc 7u; WA 0x108u, DataLoc 9u] |> Map.ofList
             let registers : Map<RName,uint32> = [R0, 2u; R1, 0x100u] |> Map.ofList
@@ -878,9 +869,12 @@ module MemTests
             {Fl= flags; Regs= registers; MM = memory}
 
 
-        let makeTest name symTab inpDataPath inputRec output =
-            testCase name <| fun () ->
-                Expect.equal (LDRexec symTab inputRec inpDataPath) output (sprintf "LDRexecTest Test '%s'" name)
+        let makeTest name symTab inputRec inpDataPath output =
+            match inputRec with
+            | Ok v ->   testCase name <| fun () ->
+                            Expect.equal (LDRexec symTab inpDataPath v) output (sprintf "LDRexecTest Test '%s'" name)
+            | Error m ->testCase name <| fun () ->
+                            Expect.equal 1 2 (sprintf "LDRexecTest Test '%s'\nInstruction was parsed with an error: %A" name m)
         Expecto.Tests.testList "LDRexecTest Tests"
                 [   
                     //LDR Working Tests
@@ -916,12 +910,8 @@ module MemTests
                         SymTab= Some stOneItem;
                         OpCode= "";
                         Operands= ops}
-            let removeRecord x =
-                match x with
-                | Ok y -> y 
             ldFuncEQU input
             |> parseMemIns root suffix
-            |> removeRecord 
         let BaseDataPath1 : DataPath<'INS> =
             let memory : MachineMemory<'INS> = [WA 0x100u,DataLoc 5u; WA 0x104u, DataLoc 7u; WA 0x108u, DataLoc 9u; WA 0x10Cu, DataLoc 11u] |> Map.ofList
             let registers : Map<RName,uint32> = [R0, 2u; R1, 0x100u] |> Map.ofList
@@ -929,9 +919,12 @@ module MemTests
             {Fl= flags; Regs= registers; MM = memory}
 
 
-        let makeTest name symTab inpDataPath inputRec output =
-            testCase name <| fun () ->
-                Expect.equal (STRexec symTab inputRec inpDataPath) output (sprintf "STRexecTest Test '%s'" name)
+        let makeTest name symTab inputRec inpDataPath output =
+            match inputRec with
+            | Ok v ->   testCase name <| fun () ->
+                            Expect.equal (STRexec symTab inpDataPath v) output (sprintf "STRexecTest Test '%s'" name)
+            | Error m ->testCase name <| fun () ->
+                            Expect.equal 1 2 (sprintf "STRexecTest Test '%s'\nInstruction was parsed with an error: %A" name m)
         Expecto.Tests.testList "STRexecTest Tests"
                 [   
                     //STR Working Tests
