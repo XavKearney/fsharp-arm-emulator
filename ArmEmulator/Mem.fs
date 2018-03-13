@@ -631,35 +631,38 @@ module Mem
             match dPF with 
             | Ok y -> (resultDotBindTwoInp (updateRegister y) reg x)
             | Error m -> Error m
-        let interpretedRecord = interpretingRecord dP inputRecord
 
-        let updatedDP1 = 
-            interpretedRecord
-            |> fstRecTuple
-            |> regsMapF (Ok dP) (inputRecord.DestSourceReg)
-            |> resultDotBindTwoInp updateDataPathRegs (Ok dP) 
+
         let updatedDP2 = 
-            interpretedRecord
-            |> sndRecTuple 
-            |> regsMapF updatedDP1 (inputRecord.AddressReg)
-            |> resultDotBindTwoInp updateDataPathRegs updatedDP1
+            let updateDP f field dP0 = 
+                inputRecord
+                |> interpretingRecord dP 
+                |> f 
+                |> regsMapF dP0 field 
+                |> resultDotBindTwoInp updateDataPathRegs dP0
+            (Ok dP)
+            |> updateDP fstRecTuple (inputRecord.DestSourceReg) 
+            |> updateDP sndRecTuple (inputRecord.AddressReg)
 
-        abstractResults (Ok (updatedDP2, Ok symbolTab))
+        (updatedDP2, Ok symbolTab)
+        |> Ok
+        |> abstractResults
 
 
 
     ///Will just update the DataPath, SymbolTable is untouched
     let execSTR (symbolTab: SymbolTable) (dP: DataPath<'INS>) (inputRecord: MemInstr) = 
-
-        let interpretedRecord = interpretingRecord dP inputRecord
-
         let updatedSTRMachineMem (tuple: Result<(uint32 * uint32),string>) =
             match tuple with
             | Ok (a,b) -> (updatedMachineMemory dP (WA b) (a|>string))
             | Error m -> Error m
-
-        let makeDataPath x = {dP with MM = x}
-        abstractResults (Ok (Result.map makeDataPath (updatedSTRMachineMem interpretedRecord), Ok symbolTab))
+        inputRecord
+        |> interpretingRecord dP 
+        |> updatedSTRMachineMem 
+        |> Result.map (fun x -> {dP with MM = x}) 
+        |> fun a -> (a, Ok symbolTab)
+        |> Ok
+        |> abstractResults
 
 
 
