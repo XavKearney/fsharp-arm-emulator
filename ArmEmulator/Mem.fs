@@ -104,9 +104,8 @@ module Mem
 
     let selectFirst x _ = x
 
-    let (|GreaterThanZero|) x = if (x>=0) then GreaterThanZero
     let isPos (x: Group) (y: Group) = match (x.Value|>int) with 
-                                      | GreaterThanZero -> (Some (x.Value|>int),(Some regNames.[y.Value])) 
+                                      | v when v >= 0 -> (Some v,(Some regNames.[y.Value])) 
                                       | _ -> (None,None)
 
     ///Parse function for Memory instructions such as LDR and
@@ -149,8 +148,6 @@ module Mem
                 PreIndexRb= pre; PostIndexRb= x.Post; 
                 ExtraAddressReg= x.Rc;
                 ShiftExtraRegBy= x.Shift;}
-        // resultDotBindTwoInp 
-        //     makeOutFromParseOps (parseOps ((ls.Operands).Trim())) errorMessage1 
         parseOps ((ls.Operands).Trim())
         |> resultDotBindTwoInp makeOutFromParseOps errorMessage1
         
