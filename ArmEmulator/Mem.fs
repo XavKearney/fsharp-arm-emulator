@@ -1,6 +1,4 @@
 //Unresolved Comments from Xav
-//Line 88, let (|Greater...|ErrorGZ) - need to remove the
-// ErrorGZ bit but I haven't worked out how yet
 //Line 175 let ADRSpec = {...
 // Need to put ADR into the MEM class and work out how
 // to give it a different spec while being part of the 
@@ -105,9 +103,8 @@ module Mem
         | (Ok x, Ok y) -> Ok (operator x y)
 
     let selectFirst x _ = x
-    
 
-    let (|GreaterThanZero|ErrorGZ|) x = if (x>=0) then GreaterThanZero else ErrorGZ
+    let (|GreaterThanZero|) x = if (x>=0) then GreaterThanZero
     let isPos (x: Group) (y: Group) = match (x.Value|>int) with 
                                       | GreaterThanZero -> (Some (x.Value|>int),(Some regNames.[y.Value])) 
                                       | _ -> (None,None)
