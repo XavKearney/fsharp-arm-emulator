@@ -11,7 +11,6 @@ module BitArithmetic
 
 
 
-
 // Types //
 
 
@@ -286,38 +285,16 @@ module BitArithmetic
 
     // functions that do the bit manipulation
 
-    let doLSL n shiftVal = 
-        let shifter = (int32 shiftVal) % 32
-        let carry = 
-            ((n <<< shifter - 1) >>> 31)
-            |> intToBool
-        n <<< shifter,carry
-
-    let doLSR n shiftVal = 
-        let shifter = (int32 shiftVal) % 32
-        let carry = 
-            ((n >>> shifter - 1) &&& 1u)
-            |> intToBool     
-        n >>> shifter,carry
-
-    let doROR n rotateVal = 
-        let shifter = (int32 rotateVal) % 32
-        let carry = 
-            ((n >>> (int32 rotateVal) - 1) &&& 1u)
-            |> intToBool            
-        (n >>> shifter) ||| (n <<<(32- shifter)),carry
-
-    let doASR n shiftVal = 
-        let shifter = (int32 shiftVal) % 32
-        let carry = 
-            ((n >>> shifter - 1) &&& 1u)
-            |> intToBool        
-        uint32 (int32 n >>> shifter),carry
+    let doShift n shifter shiftVal =
+        let sVal = (int32 shiftVal) % 32  
+        match shifter with 
+        | Lsl -> (n <<< sVal) , (((n <<< sVal - 1) >>> 31) |> intToBool)
+        | Lsr -> (n >>> sVal) , (((n >>> (sVal - 1)) &&& 1u) |> intToBool)
+        | Asr -> (uint32 (int32 n >>> sVal)) , (((uint32 (int32 n >>> (sVal - 1))) &&& 1u) |> intToBool)
+        | Ror -> ((n >>> sVal) ||| (n <<<(32- sVal))) , ((((n >>> (sVal - 1)) ||| (n <<<(31 - sVal))) &&& 1u) |> intToBool)
 
     let doRRX n carry = 
-        let newCarry = 
-            (n &&& 1u)
-            |> intToBool        
+        let newCarry = (n &&& 1u) |> intToBool        
         (n >>> 1) + (carry <<< 31),newCarry 
 
 
@@ -368,7 +345,7 @@ module BitArithmetic
 
 
     /// evaluates flexible operator
-    /// returns (evaluatedOp,carry) 
+    /// returns (evaluatedOp as a uint32 , carry) 
     let flexEval cpuData op =
 
         let carry = cpuData.Fl.C 
@@ -376,24 +353,19 @@ module BitArithmetic
         match op with
         | Literal lit -> lit,carry
         | Register reg -> cpuData.Regs.[reg],carry
+        
         | RegShiftLit (regTarget,shift,lit) ->
-            match shift with
-            | Lsl -> doLSL cpuData.Regs.[regTarget] lit
-            | Lsr -> doLSR cpuData.Regs.[regTarget] lit
-            | Asr -> doASR cpuData.Regs.[regTarget] lit
-            | Ror -> doROR cpuData.Regs.[regTarget] lit
+            doShift cpuData.Regs.[regTarget] shift lit
+
         | RegShiftReg (regTarget,shift,reg) ->
-            match shift with
-            | Lsl -> doLSL cpuData.Regs.[regTarget] cpuData.Regs.[reg]
-            | Lsr -> doLSR cpuData.Regs.[regTarget] cpuData.Regs.[reg]
-            | Asr -> doASR cpuData.Regs.[regTarget] cpuData.Regs.[reg]
-            | Ror -> doROR cpuData.Regs.[regTarget] cpuData.Regs.[reg]       
+            doShift cpuData.Regs.[regTarget] shift cpuData.Regs.[reg]      
+
         | RegRRX reg -> 
             doRRX cpuData.Regs.[reg] (System.Convert.ToUInt32(carry))
 
 
     /// executes the instruction
-    let exeInstr cpuData parseOut symTable =
+    let exeInstr cpuData parseOut symTable  =
 
         match parseOut with
         | Some (Ok exeInfo) ->
@@ -447,40 +419,40 @@ module BitArithmetic
                 | LSL, Some dest, Ok (Register reg), Ok op2 ->
                     match flexEval cpuData op2, suffix with
                     | (lit,_), NA -> 
-                        let (result,_) = doLSL cpuData.Regs.[reg]  lit
+                        let (result,_) = doShift cpuData.Regs.[reg] Lsl lit
                         Ok {cpuData with Regs = updateRegs dest result}
                     | (lit,_), S ->
-                        let (result,carry) = doLSL cpuData.Regs.[reg]  lit                        
+                        let (result,carry) = doShift cpuData.Regs.[reg] Lsl lit                        
                         Ok {cpuData with Regs = updateRegs dest result
                                                 Fl = updateFlags result flags carry} 
 
                 | LSR, Some dest, Ok (Register reg), Ok op2 ->
                     match flexEval cpuData op2, suffix with
                     | (lit,_), NA -> 
-                        let (result,_) = doLSR cpuData.Regs.[reg]  lit
+                        let (result,_) = doShift cpuData.Regs.[reg] Lsr lit
                         Ok {cpuData with Regs = updateRegs dest result}
                     | (lit,_), S ->
-                        let (result,carry) = doLSR cpuData.Regs.[reg]  lit                        
+                        let (result,carry) = doShift cpuData.Regs.[reg] Lsr lit                        
                         Ok {cpuData with Regs = updateRegs dest result
                                                 Fl = updateFlags result flags carry}                                                 
                                                                       
                 | ASR, Some dest, Ok (Register reg), Ok op2 ->
                     match flexEval cpuData op2, suffix with
                     | (lit,_), NA -> 
-                        let (result,_) = doASR cpuData.Regs.[reg]  lit
+                        let (result,_) = doShift cpuData.Regs.[reg] Asr lit
                         Ok {cpuData with Regs = updateRegs dest result}
                     | (lit,_), S ->
-                        let (result,carry) = doASR cpuData.Regs.[reg]  lit                        
+                        let (result,carry) = doShift cpuData.Regs.[reg] Asr lit                        
                         Ok {cpuData with Regs = updateRegs dest result
                                                 Fl = updateFlags result flags carry}     
 
                 | ROR, Some dest, Ok (Register reg), Ok op2 ->
                     match flexEval cpuData op2, suffix with
                     | (lit,_), NA -> 
-                        let (result,_) = doROR cpuData.Regs.[reg]  lit
+                        let (result,_) = doShift cpuData.Regs.[reg] Ror lit
                         Ok {cpuData with Regs = updateRegs dest result}
                     | (lit,_), S ->
-                        let (result,carry) = doROR cpuData.Regs.[reg]  lit                        
+                        let (result,carry) = doShift cpuData.Regs.[reg] Ror lit                        
                         Ok {cpuData with Regs = updateRegs dest result
                                                 Fl = updateFlags result flags carry}  
 
@@ -490,7 +462,7 @@ module BitArithmetic
                         let (result,_) = doRRX lit (System.Convert.ToUInt32(flags.C))
                         Ok {cpuData with Regs = updateRegs dest result}                                   
                     | (lit,_), S ->
-                        let (result,carry) = doROR lit (System.Convert.ToUInt32(flags.C))                        
+                        let (result,carry) = doRRX lit (System.Convert.ToUInt32(flags.C))                        
                         Ok {cpuData with Regs = updateRegs dest result
                                                 Fl = updateFlags result flags carry} 
 
