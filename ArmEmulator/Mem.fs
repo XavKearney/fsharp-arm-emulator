@@ -3,8 +3,6 @@
 // Need to put ADR into the MEM class and work out how
 // to give it a different spec while being part of the 
 // same class
-//Line 342 let labelSpec = {
-// Need to put Label into MISC instruction class
 
 //COMMENTS FOR XAV
 //  - The bit in parseMemIns with the long regex (Line 134). Is
@@ -339,7 +337,7 @@ module Mem
 
     ///Specification for label instructions
     let labelSpec = {
-        InstrC = LABEL
+        InstrC = MISC
         Roots = ["EQU";"FILL";"DCD"]
         Suffixes = [""]
     }
@@ -461,7 +459,7 @@ module Mem
             
             let pInstrTmp =
                 match instrC with
-                | LABEL -> (Ok (LabelO (parseLabelIns root ls)))
+                | MISC -> (Ok (LabelO (parseLabelIns root ls)))
                 | MEM   -> (Ok (MemO (parseMemIns root suffix ls)))
                 | ADR   -> (Ok (AdrO (parseAdrIns root ls)))
                 | _ -> Error "Instruction class not supported."
