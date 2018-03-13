@@ -415,9 +415,6 @@ module Mem
                                 match checkAllLiterals with 
                                 | 0 -> Ok valList
                                 | _ -> Error "parseLabelIns: Input to DCD function not valid (No input etc)"
-                                // match valList with
-                                // | [""] -> Error "parseLabelIns: No input to DCD function" 
-                                // | _ -> Ok valList
                            (None, Some valListRet, None)
             | _       ->   (None, None, None)                   
         let nameOut = 
@@ -427,22 +424,10 @@ module Mem
                            instructions (%A) must have a label\nls: %A" root ls)
                       else Ok None
             | Some _ -> Ok ls.Label
-        // let errorMessage1 =
-        //     let checkRes x = 
-        //         match x with
-        //         | Ok _ -> Ok 1
-        //         | _ -> Error (sprintf "parseLabelIns: One of fillN, valList and equExp is an Error")
-        //     match (fillN, valList, equExp) with
-        //     | (Some x, None, None) -> checkRes x
-        //     | (None, Some x, None) -> checkRes x
-        //     | (None, None, Some x) -> checkRes x
-        //     | _ -> Error (sprintf "parseLabelIns: should never happen, more or less than one of fillN(%A), valList(%A) and equExp(%A) are Some x" fillN valList equExp)
-        // let errorMessage2 = resultDotBindTwoInp selectFirst errorMessage1 instTypeTmp 
         let makeLabelOut (nO: string option) _ =
             {InstructionType = instTypeTmp; Name = Ok nO; 
                 EQUExpr = equExp; DCDValueList = valList; 
                 FillN = fillN}
-        // let out = resultDotBindTwoInp makeLabelOut nameOut errorMessage2 
         let realOut =
             match (instTypeTmp, nameOut) with
             | (Error x, Error y) -> Error (x+"\n"+y)
@@ -451,8 +436,6 @@ module Mem
             | (Ok _, Ok _) ->  Ok {InstructionType = instTypeTmp; Name = nameOut; 
                                 EQUExpr = equExp; DCDValueList = valList; 
                                 FillN = fillN}
-        // printfn "\n\n\nout = %A\nrealOut = %A" out realOut
-        // if out <> realOut then printfn "out and realOut not equal: \nout = %A\nrealOut = %A\nroot = %A\nls = %A" out realOut root ls
         realOut
 
 
@@ -538,13 +521,6 @@ module Mem
                     PCond = pCond 
                     }
             | Error s -> Error s     
-        // if (Map.tryFind ls.OpCode opCodesLabel |> Option.map parse') <> None 
-        // then (Map.tryFind ls.OpCode opCodesLabel |> Option.map parse')
-        // elif (Map.tryFind ls.OpCode opCodesMem |> Option.map parse') <> None 
-        // then (Map.tryFind ls.OpCode opCodesMem |> Option.map parse')
-        // else 
-        // (Map.tryFind ls.OpCode opCodesADR |> Option.map parse')
-        // check each of the opcode maps to see if any match
         [opCodesLabel; opCodesMem; opCodesADR]
         |> List.choose (Map.tryFind ls.OpCode)
         |> function 
@@ -636,7 +612,12 @@ module Mem
             resultDotBindTwoInp makeBytes inputRecord.BytesNotWords a 
 
 
-        changedToBytes inputRecord (changeType (resultDotBindTwoInp (preOrPost inputRecord.PreIndexRb inputRecord.PostIndexRb inputRecord dP) (incrementRbValue inputRecord dP) (getOrigVal inputRecord dP)))
+        changedToBytes inputRecord 
+            (changeType 
+                (resultDotBindTwoInp 
+                    (preOrPost inputRecord.PreIndexRb inputRecord.PostIndexRb inputRecord dP) 
+                    (incrementRbValue inputRecord dP) 
+                    (getOrigVal inputRecord dP)))
 
 
     let makeTuple a b = (a,b)
@@ -680,7 +661,6 @@ module Mem
             match tuple with
             | Ok (a,b) -> (updatedMachineMemory dP (WA b) (a|>string))
             | Error m -> Error m
-        // let test = updatedMachineMemory dP (wordAddress: WAddr) val0
 
         let makeDataPath x = {dP with MM = x}
         abstractResults (Ok (Result.map makeDataPath (updatedSTRMachineMem interpretedRecord), Ok symbolTab))
@@ -723,10 +703,6 @@ module Mem
                             | Ok y -> y|>int
                             | _ -> 0
                 | _ -> 0
-            let rec makeZeroList length =
-                match length with
-                | 0 -> []
-                | _ -> List.append (makeZeroList (length-1)) [0u]
             match inputRecord.InstructionType with
             | Ok x ->   match x with
                         | DCD ->    match inputRecord.DCDValueList with
@@ -736,7 +712,7 @@ module Mem
                                     | None -> Error "updateMemoryDataPath-dataValList: DCDValueList = None"
                         | FILL -> match inputRecord.FillN with
                                   | Some y -> match y with 
-                                              | Ok _ -> Ok (makeZeroList fillNf)
+                                              | Ok _ -> Ok (List.replicate fillNf 0u)
                                               | Error m -> Error m
                                   | None -> Error "updateMemoryDataPath-dataValList: FillN = None" 
                         | EQU -> match inputRecord.EQUExpr with
@@ -785,15 +761,6 @@ module Mem
                                                                         let remainingValueList = Ok dataValList'.[1..(List.length dataValList')-1]
                                                                         let updatedMachineMem = dPMM.Add(WA (addrList.[0]+4u), DataLoc dataValList'.[0])
                                                                         updateMachineMemory' remainingAddrList updatedMachineMem remainingValueList
-            // let doProcessing (dPMMf: MachineMemory<'INS>) (x: uint32 list) y = 
-            //     match y with
-            //     | [] -> Ok dPMMf
-            //     | _ ->  
-            //             let remainingAddrList = Ok x.[1..(List.length x)-1]
-            //             let remainingValueList = Ok y.[1..(List.length y)-1]
-            //             let updatedMachineMem = dPMMf.Add(WA (x.[0]+4u), DataLoc y.[0])
-            //             updateMachineMemory' remainingAddrList updatedMachineMem remainingValueList
-            // resultDotBindTwoInp (doProcessing dPMM) addrListRes dataValListRes'
 
 
         match (updateMachineMemory' (findAddrs dP) dP.MM dataValList) with
@@ -825,24 +792,11 @@ module Mem
     /// DataPath and labelInstr record and outputing updated 
     /// Symbol tables and DataPaths
     let DCDexec (symbolTab: SymbolTable) (dP: DataPath<'INS>) (inputRecord: LabelInstr) = 
-        let removeOptionD (x:Result<ValueList,string> option) =   
-            let makeType (x:ValueList)  =
-                let y = (x.[0])|>uint32
-                let temp =
-                    match Ok y with
-                           | Ok y -> Ok y
-                           | _ -> Error "should never happen"
-                Some temp
-            let removeResult x =
-                match x with 
-                | Ok y -> makeType y
-                | Error m -> Some (Error m)
-
-            match x with
-            | Some y -> removeResult y
-            | _ -> None
-
-        abstractResults (Ok ((updateMemoryDataPath inputRecord dP), updateSymbolTable symbolTab inputRecord (removeOptionD (inputRecord.DCDValueList))))
+        removeOptionD (inputRecord.DCDValueList)
+        |> updateSymbolTable symbolTab inputRecord
+        |> fun b -> ((updateMemoryDataPath inputRecord dP), b)
+        |> Ok
+        |> abstractResults
 
     ///Takes in the current state of the program in the form
     /// of the SymbolTable and DataPath, as well as the 

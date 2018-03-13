@@ -578,15 +578,16 @@ module MemTests
             |> parseLabelIns root
         let makeTest symTab inpRec field name output =
             match inpRec with
-            | Ok v ->   match field with 
-                        | "EQU" ->  testCase name <| fun () ->
-                                        Expect.equal (updateSymbolTable symTab v v.EQUExpr) output (sprintf "checkUpdateSymbolTable Tests\nTest: %A" name)
-                        | "FILL" ->  testCase name <| fun () ->
-                                        Expect.equal (updateSymbolTable symTab v v.FillN) output (sprintf "checkUpdateSymbolTable Tests\nTest: %A" name)
-                        | "DCD" ->  testCase name <| fun () ->
-                                        Expect.equal (updateSymbolTable symTab v (removeOptionD v.DCDValueList)) output (sprintf "checkUpdateSymbolTable Tests\nTest: %A" name)
-                        | _ ->      testCase name <| fun () ->
-                                        Expect.equal 1 2 (sprintf "checkUpdateSymbolTable Tests\nTest: %A\nUnexpected field value: %A" name field)
+            | Ok v ->   
+                    match field with 
+                    | "EQU" ->  testCase name <| fun () ->
+                                    Expect.equal (updateSymbolTable symTab v v.EQUExpr) output (sprintf "checkUpdateSymbolTable Tests\nTest: %A" name)
+                    | "FILL" ->  testCase name <| fun () ->
+                                    Expect.equal (updateSymbolTable symTab v v.FillN) output (sprintf "checkUpdateSymbolTable Tests\nTest: %A" name)
+                    | "DCD" ->  testCase name <| fun () ->
+                                    Expect.equal (updateSymbolTable symTab v (removeOptionD v.DCDValueList)) output (sprintf "checkUpdateSymbolTable Tests\nTest: %A" name)
+                    | _ ->      testCase name <| fun () ->
+                                    Expect.equal 1 2 (sprintf "checkUpdateSymbolTable Tests\nTest: %A\nUnexpected field value: %A" name field)
             | Error m -> testCase name <| fun () ->
                             Expect.equal 1 2 (sprintf "checkUpdateSymbolTable Tests\nTest: %A\nInstruction was parsed with an error: %A" name m)
         Expecto.Tests.testList "checkUpdateSymbolTable Tests"
