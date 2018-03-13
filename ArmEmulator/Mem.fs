@@ -625,7 +625,7 @@ module Mem
 
     let makeTuple a b = (a,b)
 
-    let abstractResults (x: Result<(Result<Map<string,uint32>,string> * Result<DataPath<'INS>,string>),string>) =
+    let abstractResults (x: Result<(Result<DataPath<'INS>,string> * Result<Map<string,uint32>,string>),string>) =
         match x with
         | Error m -> Error m
         | Ok (a, b) -> resultDotBindTwoInp makeTuple a b
@@ -651,7 +651,7 @@ module Mem
         let updatedDP1 = resultDotBindTwoInp updateDataPathRegs (Ok dP) (regsMapF (Ok dP) (inputRecord.DestSourceReg) (fstRecTuple interpretedRecord))
         let updatedDP2 = resultDotBindTwoInp updateDataPathRegs updatedDP1 (regsMapF updatedDP1 (inputRecord.AddressReg) (sndRecTuple interpretedRecord))
 
-        abstractResults (Ok (Ok symbolTab, updatedDP2))
+        abstractResults (Ok (updatedDP2, Ok symbolTab))
 
 
 
@@ -667,7 +667,7 @@ module Mem
         // let test = updatedMachineMemory dP (wordAddress: WAddr) val0
 
         let makeDataPath x = {dP with MM = x}
-        abstractResults (Ok (Ok symbolTab, Result.map makeDataPath (updatedSTRMachineMem interpretedRecord)))
+        abstractResults (Ok (Result.map makeDataPath (updatedSTRMachineMem interpretedRecord), Ok symbolTab))
 
 
 
@@ -830,7 +830,7 @@ module Mem
             | Some y -> removeResult y
             | _ -> None
 
-        abstractResults (Ok (updateSymbolTable symbolTab inputRecord (removeOptionD (inputRecord.DCDValueList)), (updateMemoryDataPath inputRecord dP)))
+        abstractResults (Ok ((updateMemoryDataPath inputRecord dP), updateSymbolTable symbolTab inputRecord (removeOptionD (inputRecord.DCDValueList))))
 
     ///Takes in the current state of the program in the form
     /// of the SymbolTable and DataPath, as well as the 
@@ -838,11 +838,11 @@ module Mem
     /// state of the program by executing an EQU instruction
     ///Updates SymbolTable only
     let EQUexec (symbolTab: SymbolTable) (dP: DataPath<'INS>) (inputRecord: labelInstr) = 
-        abstractResults (Ok (updateSymbolTable symbolTab inputRecord inputRecord.EQUExpr, Ok dP))
+        abstractResults (Ok (Ok dP, updateSymbolTable symbolTab inputRecord inputRecord.EQUExpr))
     
     ///Executes a Fill instruction, updates Symbol Table and DataPath
     let FILLexec (symbolTab: SymbolTable) (dP: DataPath<'INS>) (inputRecord: labelInstr) = 
-        abstractResults (Ok (updateSymbolTable symbolTab inputRecord ((inputRecord.FillN)), (updateMemoryDataPath inputRecord dP)))
+        abstractResults (Ok ((updateMemoryDataPath inputRecord dP), updateSymbolTable symbolTab inputRecord ((inputRecord.FillN))))
 
 
 
@@ -850,7 +850,7 @@ module Mem
     let ADRexec (symbolTab: SymbolTable) (dP: DataPath<'INS>) (inputRecord: ADRInstr) = 
         let updateRegMap (dP: DataPath<'INS>) (inputRecord: ADRInstr) = 
             resultDotBindTwoInp (updateRegister dP) inputRecord.DestReg inputRecord.SecondOp 
-        abstractResults (Ok (Ok symbolTab,Result.map (updateDataPathRegs dP) (updateRegMap dP inputRecord)))
+        abstractResults (Ok (Result.map (updateDataPathRegs dP) (updateRegMap dP inputRecord), Ok symbolTab))
     
         
 
