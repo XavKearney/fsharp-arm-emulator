@@ -159,6 +159,7 @@ module BitArithmetic
             | _ -> Error "Opperand is not valid literal or register" 
 
         /// converts string to some shift with shift value or none
+        /// not used for RRX
         let toShift (opp : string) =
             let shiftSplit = opp.Split(' ')
                             |> Array.map (fun str -> str.Trim())
@@ -300,33 +301,29 @@ module BitArithmetic
         let newCarry = (n &&& 1u) |> intToBool        
         (n >>> 1) + (carry <<< 31),newCarry 
 
-
     /// updates N Z C flags
-    let updateFlags result flags carry = {flags with N = (int32 result) < 0 ; C = carry; Z = (result = 0u)}
-
+    let updateFlags result flags carry = {flags with N = (int32 result) < 0 ; C = carry; Z = (result = 0u)}      
 
     /// evaluates flexible operator
     /// returns (evaluatedOp as a uint32 , carry) 
     let flexEval cpuData op =
-
         let carry = cpuData.Fl.C 
-
         match op with
         | Literal lit -> lit,carry
-        | Register reg -> cpuData.Regs.[reg],carry
-        
+
+        | Register reg -> cpuData.Regs.[reg],carry  
+
         | RegShiftLit (regTarget,shift,lit) ->
             doShift cpuData.Regs.[regTarget] shift lit
 
         | RegShiftReg (regTarget,shift,reg) ->
-            doShift cpuData.Regs.[regTarget] shift cpuData.Regs.[reg]      
-
+            doShift cpuData.Regs.[regTarget] shift cpuData.Regs.[reg]
+                  
         | RegRRX reg -> 
-            doRRX cpuData.Regs.[reg] (System.Convert.ToUInt32(carry))
-
+            doRRX cpuData.Regs.[reg] (System.Convert.ToUInt32(carry)) 
 
     /// executes the instruction
-    let exeInstr cpuData parseOut symTable  =
+    let exeInstr cpuData parseOut symTable =
 
         match parseOut with
         | Some (Ok exeInfo) ->

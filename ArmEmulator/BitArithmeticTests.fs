@@ -260,8 +260,8 @@ module BitArithmeticTests
     //                 |> List.reduce (+)
     //         | _ -> failwithf "exeOut is an error"               
 
-    // let parseThenExe cpuData destReg = parse >> exeInstr cpuData >> convExe destReg
-    // let evalFlgs cpuData = parse >> exeInstr cpuData >> calcFlgs
+    // let parseThenExe cpuData destReg = parse >> exeInstr cpuData testSymTab >> convExe destReg
+    // let evalFlgs cpuData = parse >> exeInstr cpuData testSymTab >> calcFlgs
 
 
     //     /// ARM Status bits
