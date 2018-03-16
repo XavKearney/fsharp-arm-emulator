@@ -7,7 +7,10 @@ module BitArithmeticTests
     open Expecto
     open VisualTest.VCommon
 
-    // credit Xav kearney for this function
+
+    let testSymTab = [("testLab", 37u); ("otherLab", 94u)] |> Map.ofList
+
+
     /// takes a function f, test name
     /// and list of (input, output) tuples
     /// create an Expecto testList
@@ -20,9 +23,95 @@ module BitArithmeticTests
         List.map (fun (i, o) -> makeTest i o) inOutLst
         |> testList (sprintf "%s Test List" name)     
 
-    let testSymTab = [("testLab", 37u); ("otherLab", 94u)] |> Map.ofList
 
-    let ld = {Label = None ; LoadAddr = WA 0u ; OpCode = "" ; Operands = "" ; SymTab = Some testSymTab }
+
+
+
+
+
+
+    // testing input constants:
+
+    let makeUnitTestListLit f fTest name inLst=
+        let makeTest inp inpTest =
+            let testName = (sprintf "%s: %A" name inp)
+            testCase testName <| fun () ->
+                Expect.equal (f inp testSymTab) (fTest inpTest) testName
+        List.map (fun (i, inTest) -> makeTest i inTest) inLst
+        |> testList (sprintf "%s Test List" name) 
+
+
+
+    /// function from tick 3 feedback
+    /// used to test against toLit
+    let checkLiteral (lit:uint32) =
+        let valid0 =
+            let rotMask n = (0xFFu >>> n) ||| (0xFFu <<< 32 - n)
+            [0..2..30] 
+            |> List.map rotMask 
+            |> List.exists (fun mask -> (mask &&& lit) = lit)
+            |> function  
+                    | true -> Some lit 
+                    | false -> None
+        let valid1 =        
+            let rotMask n = (0xFFu >>> n) ||| (0xFFu <<< 32 - n)
+            [0..2..30] 
+            |> List.map rotMask 
+            |> List.exists (fun mask -> (mask &&& (~~~ lit)) = lit)
+            |> function  
+                    | true -> Some lit 
+                    | false -> None
+
+        match valid0, valid1 with
+        | Some x,_ -> Ok x
+        | _, Some x -> Ok x    
+        | _ -> Error "Litteral can't be created by rotating an 8 bit number in a 32 bit word "  
+    // let checkLiteral (lit:uint32) =
+    //     let rotMask n = (0xFFu >>> n) ||| (0xFFu <<< 32 - n)
+    //     [0..2..30] 
+    //     |> List.map rotMask 
+    //     |> List.exists (fun mask -> (mask &&& lit) = lit)
+    //     |> function  
+    //             | true -> Ok lit 
+    //             | false -> Error "Litteral can't be created by rotating an 8 bit number in a 32 bit word "
+
+
+
+    /// unit tests for literals
+    /// used to test corner cases
+    [<Tests>]
+    let testLit = 
+        makeUnitTestListLit toLit (fun x -> x) "Literal tests" 
+            [
+                // positives
+                "#0", Ok 0u
+                "#1", Ok 1u 
+                "#1+0", Ok 1u
+                "#2147483647", Ok 2147483647u
+                //"#9148140018481", Error " " // test very large numbers
+
+
+                // negatives
+                "#-1", Ok 4294967295u
+                "#-2147483648", Ok 2147483648u
+                "#-2147483649", Ok 2147483647u
+                
+            ]
+
+
+    /// Random tests for literals
+    /// tests 10000 random literals 
+    // [<Tests>]
+    // let testLitRan = 
+    //     let genRandTestPairs lstLength =
+    //         let rnd = System.Random()
+    //         List.init lstLength (fun _ -> rnd.Next(-2147483648, 2147483647))
+    //         |> List.map (fun num -> "#" + num.ToString(), uint32 num) 
+
+    //     makeUnitTestListLit toLit checkLiteral "Random literal tests" (genRandTestPairs 10000)
+
+
+
 
 
 
@@ -32,12 +121,25 @@ module BitArithmeticTests
 
 
 
+    let ld = {Label = None ; LoadAddr = WA 0u ; OpCode = "" ; Operands = "" ; SymTab = Some testSymTab }
 
+    /// unit tests for parser
     [<Tests>]
     let testParse = 
         makeUnitTestList parse "parse tests" 
             [
                 // test valid input
+
+                // tests MOV instruction
+                {ld with OpCode = "MOV" ; Operands = "R0, #-1"},
+                    Some (Ok {PInstr = {Instruction = MOV
+                                        Suff = NA
+                                        Dest = Some R0
+                                        Op1 =  Ok (Literal 4294967295u)
+                                        Op2 = Error ""}
+                              PLabel = None
+                              PSize = 4u
+                              PCond = Cal})
 
                 // tests large acceptable input
                 {ld with OpCode = "MOV" ; Operands = "R0, #4080"},
@@ -82,6 +184,17 @@ module BitArithmeticTests
                               PLabel = None
                               PSize = 4u
                               PCond = Cal})
+
+                // test BIC with flexible opperator
+                {ld with OpCode = "BICS" ; Operands = "R12, R3, R7, ROR #8 "},
+                    Some (Ok {PInstr = {Instruction = BIC
+                                        Suff = S
+                                        Dest = Some R12
+                                        Op1 = Ok (Register R3)
+                                        Op2 = Ok (RegShiftLit (R7,Ror,8u))}
+                              PLabel = None
+                              PSize = 4u
+                              PCond = Cal})                              
 
                 // test EOR with flexible opperator RRX
                 {ld with OpCode = "EORS" ; Operands = "R0, R1, R7, RRX"},
@@ -158,6 +271,19 @@ module BitArithmeticTests
                               PLabel = None
                               PSize = 4u
                               PCond = Cal})
+
+
+                // test BIC with flexible opperator
+                {ld with OpCode = "BICS" ; Operands = "R13, R3, R7, ROR #8 "},
+                    Some (Ok {PInstr = {Instruction = BIC
+                                        Suff = S
+                                        Dest = None
+                                        Op1 = Ok (Register R3)
+                                        Op2 = Ok (RegShiftLit (R7,Ror,8u))}
+                              PLabel = None
+                              PSize = 4u
+                              PCond = Cal})                              
+                              
 
 
                 // LSL test
