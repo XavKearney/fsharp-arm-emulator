@@ -70,14 +70,20 @@ module Mem
         if isNull input then None
         else
             let m = Regex.Match(input, pattern, RegexOptions.Compiled)
-            if m.Success then Some [for x in m.Groups -> x]
+            if m.Success then
+            [0..m.Groups.Count-1]
+            |> List.map (fun i -> m.Groups.[i])
+            |> Some
             else None
     ///Match a Regex pattern multiple times
     let (|Matches|_|) pattern input =
         if isNull input then None
         else
             let m = Regex.Matches(input, pattern, RegexOptions.Compiled)
-            if m.Count > 0 then Some ([ for x in m -> x.Value])
+            if m.Count > 0 then 
+            [0..m.Count-1]
+            |> List.map (fun i -> m.[i].Value)
+            |> Some
             else None
 
     ///A record to return all the data from the regexs
