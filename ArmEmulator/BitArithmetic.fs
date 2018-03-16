@@ -328,9 +328,9 @@ module BitArithmetic
             let flexEval op =
                 let carry = cpuData.Fl.C 
                 match op with
-                | Literal lit -> lit,carry
+                | Literal lit -> lit,false
 
-                | Register reg -> cpuData.Regs.[reg],carry  
+                | Register reg -> cpuData.Regs.[reg],false  
 
                 | RegShiftLit (regTarget,shift,lit) ->
                     doShift cpuData.Regs.[regTarget] shift lit
@@ -362,127 +362,27 @@ module BitArithmetic
 
             match exeInfo.PInstr.Instruction, exeInfo.PInstr.Dest, exeInfo.PInstr.Op1, exeInfo.PInstr.Op2 with    
             | (MOV | MVN | RRX), Some dest, Ok op1, Error ""  -> 
-                let lit,carry = flexEval op1 
-                let fVal,fCarry = doOpCode lit 0u carry
+                let flexVal,flexCarry = flexEval op1 
+                let totVal,totCarry = doOpCode flexVal 0u flexCarry
                 match suffix with
-                | S -> Ok {cpuData with Regs = updateRegs dest fVal ;  Fl = updateFlags fVal fCarry}
-                | NA -> Ok {cpuData with Regs = updateRegs dest fVal}
+                | S -> Ok {cpuData with Regs = updateRegs dest totVal ;  Fl = updateFlags totVal totCarry}
+                | NA -> Ok {cpuData with Regs = updateRegs dest totVal}
 
             | (TST | TEQ), Some dest, Ok op1, Error ""  -> 
-                let lit,carry = flexEval op1 
-                let fVal,fCarry = doOpCode cpuData.Regs.[dest] lit carry
-                Ok {cpuData with Fl = updateFlags fVal fCarry}
+                let flexVal,flexCarry = flexEval op1 
+                let totVal,totCarry = doOpCode cpuData.Regs.[dest] flexVal flexCarry
+                Ok {cpuData with Fl = updateFlags totVal totCarry}
    
 
             | (AND | ORR | EOR | BIC | LSL | LSR | ASR | ROR), Some dest, Ok (Register reg), Ok op2 ->
-                let lit,carry = flexEval op2 
-                let fVal,fCarry = doOpCode cpuData.Regs.[reg] lit carry
+                let flexVal,flexCarry = flexEval op2 
+                let totVal,totCarry = doOpCode cpuData.Regs.[reg] flexVal flexCarry
                 match suffix with
-                | S -> Ok {cpuData with Regs = updateRegs dest fVal ;  Fl = updateFlags fVal fCarry}
-                | NA -> Ok {cpuData with Regs = updateRegs dest fVal}
+                | S -> Ok {cpuData with Regs = updateRegs dest totVal ;  Fl = updateFlags totVal totCarry}
+                | NA -> Ok {cpuData with Regs = updateRegs dest totVal}
 
 
             | _ -> Error "Execution error"
 
         | Some _ -> Error "Return from parse is an error"
         | _ -> Error "Return from parse is none" 
-
-
-
-            // match exeInfo.PInstr.Instruction, exeInfo.PInstr.Dest, exeInfo.PInstr.Op1, exeInfo.PInstr.Op2 with
-
-            // | MOV, Some dest, Ok op1, Error ""  ->
-            //     match flexEval op1, suffix with 
-            //     | (lit,_), NA  -> Ok {cpuData with Regs = updateRegs dest lit}
-            //     | (lit,carry), S -> Ok {cpuData with Regs = updateRegs dest lit 
-            //                                                 Fl = updateFlags lit flags carry}
-
-            // | MVN, Some dest, Ok op1, Error "" ->
-            //     match flexEval op1, suffix with 
-            //     | (lit,_), NA  -> Ok {cpuData with Regs =updateRegs dest (~~~ lit)}
-            //     | (lit,carry), S -> Ok {cpuData with Regs = updateRegs dest (~~~ lit)
-            //                                                 Fl = updateFlags (~~~ lit) flags carry}       
-                                                            
-            // | AND, Some dest, Ok (Register reg), Ok op2 ->
-            //     match flexEval op2, suffix with
-            //     | (lit,_), NA -> Ok {cpuData with Regs = updateRegs dest (cpuData.Regs.[reg] &&& lit)}
-            //     | (lit,carry), S -> Ok {cpuData with Regs = updateRegs dest (cpuData.Regs.[reg] &&& lit)
-            //                                                 Fl = updateFlags (cpuData.Regs.[reg] &&& lit) flags carry}
-
-            // | ORR, Some dest, Ok (Register reg), Ok op2 ->
-            //     match flexEval op2, suffix with
-            //     | (lit,_), NA -> Ok {cpuData with Regs = updateRegs dest (cpuData.Regs.[reg] ||| lit)}
-            //     | (lit,carry), S -> Ok {cpuData with Regs = updateRegs dest (cpuData.Regs.[reg] ||| lit)
-            //                                                 Fl = updateFlags (cpuData.Regs.[reg] ||| lit) flags carry}            
-
-            // | EOR, Some dest, Ok (Register reg), Ok op2 ->
-            //     match flexEval op2, suffix with
-            //     | (lit,_), NA -> Ok {cpuData with Regs = updateRegs dest (cpuData.Regs.[reg] ^^^ lit)}
-            //     | (lit,carry), S -> Ok {cpuData with Regs = updateRegs dest (cpuData.Regs.[reg] ^^^ lit)
-            //                                                 Fl = updateFlags (cpuData.Regs.[reg] ^^^ lit) flags carry} 
-
-            // | BIC, Some dest, Ok (Register reg), Ok op2 ->
-            //     match flexEval op2, suffix with
-            //     | (lit,_), NA -> Ok {cpuData with Regs = updateRegs dest (cpuData.Regs.[reg] &&& (~~~  lit))}
-            //     | (lit,carry), S -> Ok {cpuData with Regs = updateRegs dest (cpuData.Regs.[reg] &&& (~~~  lit))
-            //                                                 Fl = updateFlags (cpuData.Regs.[reg] &&& (~~~  lit)) flags carry} 
-
-            // | LSL, Some dest, Ok (Register reg), Ok op2 ->
-            //     match flexEval op2, suffix with
-            //     | (lit,_), NA -> 
-            //         let (result,_) = doShift cpuData.Regs.[reg] Lsl lit
-            //         Ok {cpuData with Regs = updateRegs dest result}
-            //     | (lit,_), S ->
-            //         let (result,carry) = doShift cpuData.Regs.[reg] Lsl lit                        
-            //         Ok {cpuData with Regs = updateRegs dest result
-            //                                 Fl = updateFlags result flags carry} 
-
-            // | LSR, Some dest, Ok (Register reg), Ok op2 ->
-            //     match flexEval op2, suffix with
-            //     | (lit,_), NA -> 
-            //         let (result,_) = doShift cpuData.Regs.[reg] Lsr lit
-            //         Ok {cpuData with Regs = updateRegs dest result}
-            //     | (lit,_), S ->
-            //         let (result,carry) = doShift cpuData.Regs.[reg] Lsr lit                        
-            //         Ok {cpuData with Regs = updateRegs dest result
-            //                                 Fl = updateFlags result flags carry}                                                 
-                                                                  
-            // | ASR, Some dest, Ok (Register reg), Ok op2 ->
-            //     match flexEval op2, suffix with
-            //     | (lit,_), NA -> 
-            //         let (result,_) = doShift cpuData.Regs.[reg] Asr lit
-            //         Ok {cpuData with Regs = updateRegs dest result}
-            //     | (lit,_), S ->
-            //         let (result,carry) = doShift cpuData.Regs.[reg] Asr lit                        
-            //         Ok {cpuData with Regs = updateRegs dest result
-            //                                 Fl = updateFlags result flags carry}     
-
-            // | ROR, Some dest, Ok (Register reg), Ok op2 ->
-            //     match flexEval op2, suffix with
-            //     | (lit,_), NA -> 
-            //         let (result,_) = doShift cpuData.Regs.[reg] Ror lit
-            //         Ok {cpuData with Regs = updateRegs dest result}
-            //     | (lit,_), S ->
-            //         let (result,carry) = doShift cpuData.Regs.[reg] Ror lit                        
-            //         Ok {cpuData with Regs = updateRegs dest result
-            //                                 Fl = updateFlags result flags carry}  
-
-            // | RRX, Some dest, Ok op1, Error "" -> 
-            //     match flexEval op1, suffix with
-            //     | (lit,_), NA -> 
-            //         let (result,_) = doRRX lit (System.Convert.ToUInt32(flags.C))
-            //         Ok {cpuData with Regs = updateRegs dest result}                                   
-            //     | (lit,_), S ->
-            //         let (result,carry) = doRRX lit (System.Convert.ToUInt32(flags.C))                        
-            //         Ok {cpuData with Regs = updateRegs dest result
-            //                                 Fl = updateFlags result flags carry} 
-
-            // | TST, Some dest, Ok op1, Error ""  ->
-            //     match flexEval op1 with 
-            //     | lit,carry -> Ok {cpuData with Fl = updateFlags (cpuData.Regs.[dest] &&& lit) flags carry}
-
-            // | TEQ, Some dest, Ok op1, Error "" ->
-            //     match flexEval op1 with 
-            //     | lit,carry -> Ok {cpuData with Fl = updateFlags (cpuData.Regs.[dest] ^^^ lit) flags carry}  
-
-            // | _ -> Error "Execution error"        
