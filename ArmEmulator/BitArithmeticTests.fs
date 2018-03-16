@@ -8,8 +8,14 @@ module BitArithmeticTests
     open VisualTest.VCommon
 
 
-    let testSymTab = [("testLab", 37u); ("otherLab", 94u)] |> Map.ofList
+    let config = { FsCheckConfig.defaultConfig with maxTest = 10000 }
 
+    let genRandomUint32List (min,max) count =
+        let rnd = System.Random()
+        List.init count (fun _ -> rnd.Next (min, max))
+        |> List.map uint32
+
+    let testSymTab = [("testLab", 37u); ("otherLab", 94u)] |> Map.ofList
 
     /// takes a function f, test name
     /// and list of (input, output) tuples
@@ -303,39 +309,60 @@ module BitArithmeticTests
 
             ]
 
-
-
-
-// test VisualTest works
-
-
-
+    // [<Tests>]
+    // // tests property that ROR by 32 is equal to its selft
+    // let RORtest = 
+    //     testProperty "Property Test for ROR instruction" <| 
+    //     fun flags memMap ->
+    //        // generate random values for registers R0-R15
+    //         let regVals = genRandomUint32List (-0x7FFFFFFF, 0xFFFFFFFF) 16
+    //        // create randomised cpuData
+    //         let cpuDATA = {
+    //             Fl = flags;
+    //             Regs = List.mapi (fun i x -> (inverseRegNums.[i], x)) regVals |> Map.ofList;
+    //             MM = memMap }
+    //         let randReg = "R" + (System.Random().Next(12)).ToString()
+    //         let operands = randReg + ", " + randReg + ", #32"
+    //         let exeOutROR = exeInstr cpuDATA (parse {ld with OpCode = "ROR" ; Operands = operands}) testSymTab
+    //         let expected = Ok cpuDATA
+    //         Expect.equal exeOutROR expected "ROR by 32 is equal to its selft"
 
 
     [<Tests>]
-    let tests = 
-        testList "Minimal Visual Unit Tests"
-            [
-            // MOV tests with decimals
-            vTest "MOV test 1" "MOV R0, #1" "0000" [R 0, 1]
-            vTest "MOV test 2" "MOVS R1, #0" "0100" [R 1, 0]
-            vTest "MOV test 3" "MOV R2, #137" "0000" [R 2, 137]
-            vTest "MOV test 4" "MOV R3, #4080" "0000" [R 3, 4080]
-            // MOV tests with hex numbers
-            vTest "MOV test 5" "MOV R4, #0x0" "0000" [R 4, 0]
-            vTest "MOV tes 6" "MOV R5, #0xA" "0000" [R 5, 10]
-            vTest "MOV test 7" "MOV R6, #0x2300" "0000" [R 6, 8960]
-            // MOV tests with hex binary
-            vTest "MOV test 8" "MOV R4, #0b0" "0000" [R 4, 0]
-            vTest "MOV test 9" "MOV R0, #0b1010" "0000" [R 0, 10]
-            vTest "MOV test 10" "MOV R0, #0b10001100000000" "0000" [R 0, 8960]
+    // tests property that ROR by integer multiple of 32 is equal to its selft
+    let RORtest = 
+        testPropertyWithConfig config  "Property Test for ROR instruction" <| 
+        fun n ->
+            let rndMultof32 = 32 * System.Random().Next(10)
+            let rorBy32 = doShift n Ror (uint32 rndMultof32)
+            Expect.equal (fst rorBy32) n "ROR by 32 is equal to its selft"
 
-            // AND tests with decimals
-            vTest "AND test 1" "AND R2, R1, R0" "0000" [R 0, -2]
-            vTest "AND test 2" "AND R3, R2, R0" "0000" [R 0, -2]
-            vTest "AND test 3" "AND R2, R2, R0" "0000" [R 2, -138]
-            vTest "AND test 4" "AND R3, R3, R3" "0000" [R 3, -4081]  
-            ]
+
+
+    // [<Tests>]
+    // let tests = 
+    //     testList "Minimal Visual Unit Tests"
+    //         [
+    //         // MOV tests with decimals
+    //         vTest "MOV test 1" "MOV R0, #1" "0000" [R 0, 1]
+    //         vTest "MOV test 2" "MOVS R1, #0" "0100" [R 1, 0]
+    //         vTest "MOV test 3" "MOV R2, #137" "0000" [R 2, 137]
+    //         vTest "MOV test 4" "MOV R3, #4080" "0000" [R 3, 4080]
+    //         // MOV tests with hex numbers
+    //         vTest "MOV test 5" "MOV R4, #0x0" "0000" [R 4, 0]
+    //         vTest "MOV tes 6" "MOV R5, #0xA" "0000" [R 5, 10]
+    //         vTest "MOV test 7" "MOV R6, #0x2300" "0000" [R 6, 8960]
+    //         // MOV tests with hex binary
+    //         vTest "MOV test 8" "MOV R4, #0b0" "0000" [R 4, 0]
+    //         vTest "MOV test 9" "MOV R0, #0b1010" "0000" [R 0, 10]
+    //         vTest "MOV test 10" "MOV R0, #0b10001100000000" "0000" [R 0, 8960]
+
+    //         // AND tests with decimals
+    //         vTest "AND test 1" "AND R2, R1, R0" "0000" [R 0, -2]
+    //         vTest "AND test 2" "AND R3, R2, R0" "0000" [R 0, -2]
+    //         vTest "AND test 3" "AND R2, R2, R0" "0000" [R 2, -138]
+    //         vTest "AND test 4" "AND R3, R3, R3" "0000" [R 3, -4081]  
+    //         ]
     
 
 
