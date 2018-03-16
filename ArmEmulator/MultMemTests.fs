@@ -463,22 +463,22 @@ module MultMemTests
     /// instruction-specific functions
     [<Tests>]
     let testExecInstr =   
-        let parsedBranchI = Some ( Ok {
+        let parsedBranchI = {
                 PInstr = BranchI {BranchAddr = 111u; LinkAddr = None;}; 
-                    PLabel = None; PSize = 4u; PCond = Cal;})
+                    PLabel = None; PSize = 4u; PCond = Cal;}
         let parsedMemI = 
-            Some ( Ok {
-                        PInstr = MemI { 
-                                    InsType = Some(LDM); 
-                                    Direction = Some(FA);
-                                    Target = R4; 
-                                    WriteBack = false; 
-                                    RegList = [R0;]
-                                };
-                        PLabel = None; PSize = 4u; PCond = Cal;
-                    })
-        let parsedEndI = Some ( Ok {PInstr = EndI END; 
-                            PLabel = None; PSize = 4u; PCond = Cal;})
+            {
+                PInstr = MemI { 
+                            InsType = Some(LDM); 
+                            Direction = Some(FA);
+                            Target = R4; 
+                            WriteBack = false; 
+                            RegList = [R0;]
+                        };
+                PLabel = None; PSize = 4u; PCond = Cal;
+            }
+        let parsedEndI = {PInstr = EndI END; 
+                            PLabel = None; PSize = 4u; PCond = Cal;}
         let cpuData = {
                 Fl = {N=false;C=true;V=false;Z=false;};
                 Regs = [(R0,0u);(R1,0u);(R2,0u);(R3,0u);(R4,0u);(R5,0u);
@@ -488,7 +488,7 @@ module MultMemTests
             }
         makeUnitTestList (execInstr cpuData) "execInstr Unit" 
             [
-                parsedBranchI, Some (Ok {cpuData with Regs=cpuData.Regs.Add (R15, 111u)})
-                parsedMemI, Some (Ok {cpuData with Regs=cpuData.Regs.Add (R0, 1u)})
-                parsedEndI, Some (Error "Cannot execute an END instruction.")
+                parsedBranchI, Ok {cpuData with Regs=cpuData.Regs.Add (R15, 111u)}
+                parsedMemI, Ok {cpuData with Regs=cpuData.Regs.Add (R0, 1u)}
+                parsedEndI, Error "Cannot execute an END instruction."
             ]

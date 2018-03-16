@@ -49,6 +49,9 @@ module Arithmetic
             Op2: Op2Types;
         }
 
+    // error instruction type
+    type ErrInstr = string
+
     // Defines the spec for all the Arithmetic instructions
     let CompSpec = {
         InstrC = COMP
@@ -526,7 +529,7 @@ module Arithmetic
 
     /// Execute an arithmetic instruction
     /// Performs arithmetic on given cpuData
-    let execArithmeticInstr (input: Parse<ReturnInstr>) cpuData = 
+    let execArithmeticInstr cpuData (input: Parse<ReturnInstr>) = 
         // Register map
         let regMap = cpuData.Regs
 

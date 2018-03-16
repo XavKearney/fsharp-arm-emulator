@@ -74,7 +74,8 @@ module CommonData
     /// or does it contain the word number (real address dvided by 4)
     /// either way multiply/divide by 4 will cause problems!
     /// document this well and be consistent.
-    type WAddr = | WA of uint32
+    type WAddr = | WA of uint32 with
+        member wa.Val = wa |> fun (WA x) -> x
 
     /// type to represent memory
     type MachineMemory<'INS> = Map<WAddr,MemLoc<'INS>>
