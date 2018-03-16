@@ -533,11 +533,6 @@ module Mem
                             at %A was not of type DataLoc" x wordAddress)
         | _ -> Error (sprintf "execLDR-accessMemoryLocation: %A was not present in memory" wordAddress)
 
-    ///Adds a value to memory. Called by execSTR
-    let updatedMachineMemory (dP: DataPath<'INS>) (wordAddress: WAddr) val0 =
-        match System.UInt32.TryParse val0 with
-        | (true, x) -> (Ok ((dP.MM).Add(wordAddress, DataLoc x)))
-        | (false,_) -> Error (sprintf "execSTR-updateMemoryLocation: val0 (%A) could not be converted to a uint32" val0)
 
     ///Returns end value of Ra, Rb. Called by execSTR and 
     /// LRD exec
@@ -548,10 +543,10 @@ module Mem
                 (Map.find Ra dP.Regs, Map.find Rb dP.Regs)
             resultDotBindTwoInp getOriginalRegisterVals inputRecord.DestSourceReg inputRecord.AddressReg
 
-        let makeBytes (bytes: bool) (x,y) =
+        let makeBytes (bytes: bool) (x,y,z) =
             match bytes with
-            | false -> (x,y)
-            | true -> (x&&&0xFFu,y&&&0xFFu)
+            | false -> (x,y,z)
+            | true -> (x&&&0xFFu,y,z)
 
         let incrementRbValue (inputRecord: MemInstr) (dP: DataPath<'INS>) =                
             let powerF (baseF: uint32) (expF: uint32) = 
@@ -565,6 +560,7 @@ module Mem
                        | Some y -> if y >= 0 then Ok (rC*(powerF 2u (y|>uint32)))
                                     else Ok 0u
 
+
         ///Returns the Ra and Rb values
         let preOrPost pre post (inputRecord: MemInstr) (dP: DataPath<'INS>) x (rABTup: (uint32 * uint32)) =
             let rA = fst rABTup
@@ -573,40 +569,36 @@ module Mem
             | Ok LDR -> 
                        match (pre,post) with
                        | (true,true) -> Error "execLDR-interpretingRecord: pre and post can't both be true"
-                       | (true, _) -> Ok (accessMemoryLocation dP (WA (rB+x)), rB+x)
-                       | (_, true) -> Ok (accessMemoryLocation dP (WA (rB)), rB+x)
-                       | (false,false) -> Ok (accessMemoryLocation dP (WA (rB+x)), rB)
+                       | (true, _) -> Ok (accessMemoryLocation dP (WA (rB+x)), rB+x, 0u)
+                       | (_, true) -> Ok (accessMemoryLocation dP (WA (rB)), rB+x, 0u)
+                       | (false,false) -> Ok (accessMemoryLocation dP (WA (rB+x)), rB, x)
             | Ok STR -> 
                        match (pre,post) with
                        | (true,true) -> Error "execLDR-interpretingRecord: pre and post can't both be true"
-                       | (true, _) -> Ok (Ok rA, rB+x)
-                       | (_, true) -> Ok (Ok rA, rB+x)
-                       | (false,false) -> Ok (Ok rA, rB) 
+                       | (true, _) -> Ok (Ok rA, rB+x, 0u)
+                       | (_, true) -> Ok (Ok rA, rB+x, (-1|>uint32)*x)
+                       | (false,false) -> Ok (Ok rA, rB, x) 
             | Error m -> Error (sprintf "interpretingRecord-preOrPost: Given instruction type not STR of LDR\n%A" m)                    
 
         ///Removes unnecessary levels of Result
-        let changeType (v: Result<Result<(Result<uint32,string> * uint32),string>,string>) = 
+        let changeType (v: Result<Result<(Result<uint32,string> * uint32 * uint32),string>,string>) = 
             match v with
             | Ok x ->   
                      match x with
                      | Ok y -> 
                               match y with
-                              | (Ok z, u) -> Ok (z,u)
-                              | (_, _) -> Error "execLDR-interpretingRecord: Error accesing memory location"
+                              | (Ok z, u, v) -> Ok (z,u,v)
+                              | (_, _, _) -> Error "execLDR-interpretingRecord: Error accesing memory location"
                      | Error m -> Error m
             | Error m -> Error m
-
-        let changedToBytes (inputRecord: MemInstr) (a: Result<(uint32 * uint32),string>) =
+        let changedToBytes (inputRecord: MemInstr) (a: Result<(uint32 * uint32 * uint32),string>) =
             resultDotBindTwoInp makeBytes inputRecord.BytesNotWords a 
-
-
-        changedToBytes inputRecord 
-            (changeType 
-                (resultDotBindTwoInp 
-                    (preOrPost inputRecord.PreIndexRb inputRecord.PostIndexRb inputRecord dP) 
-                    (incrementRbValue inputRecord dP) 
-                    (getOrigVal inputRecord dP)))
-
+        (getOrigVal inputRecord dP)
+        |> resultDotBindTwoInp 
+            (preOrPost inputRecord.PreIndexRb inputRecord.PostIndexRb inputRecord dP) 
+            (incrementRbValue inputRecord dP)
+        |> changeType
+        |> changedToBytes inputRecord                    
 
     let makeTuple a b = (a,b)
 
@@ -618,20 +610,18 @@ module Mem
     
     ///Will just update the DataPath, SymbolTable is untouched
     let execLDR (symbolTab: SymbolTable) (dP: DataPath<'INS>) (inputRecord: MemInstr) = 
-        
         let fstRecTuple x =
             match x with 
-            | Ok (a,_) -> Ok a
+            | Ok (a,_,_) -> Ok a
             | Error m -> Error m 
         let sndRecTuple x =
             match x with 
-            | Ok (_,b) -> Ok b
+            | Ok (_,b,_) -> Ok b
             | Error m -> Error m 
         let regsMapF (dPF: Result<DataPath<'INS>,string>) reg x = 
             match dPF with 
             | Ok y -> (resultDotBindTwoInp (updateRegister y) reg x)
             | Error m -> Error m
-
 
         let updatedDP2 = 
             let updateDP f field dP0 = 
@@ -652,14 +642,27 @@ module Mem
 
     ///Will just update the DataPath, SymbolTable is untouched
     let execSTR (symbolTab: SymbolTable) (dP: DataPath<'INS>) (inputRecord: MemInstr) = 
-        let updatedSTRMachineMem (tuple: Result<(uint32 * uint32),string>) =
+        let updatedSTRMachineMem (tuple: Result<(uint32 * uint32 * uint32),string>) =
             match tuple with
-            | Ok (a,b) -> (updatedMachineMemory dP (WA b) (a|>string))
+            | Ok (a,b,c) -> Ok ((dP.MM).Add(WA (b+c), DataLoc a))
             | Error m -> Error m
+        let updatedRegMap = 
+            let test = interpretingRecord dP inputRecord
+            let sndTup tup = 
+                match tup with
+                | (_,y,_) -> y
+            let thrdTup tup = 
+                match tup with
+                | (_,_,z) -> z
+            match (inputRecord.AddressReg, test) with
+            | (Error _, Error _) -> Map.empty
+            | (Error _, _) -> Map.empty
+            | (_, Error _) -> Map.empty                       
+            | (Ok x, Ok y) -> updateRegister dP x (sndTup y)
         inputRecord
         |> interpretingRecord dP 
         |> updatedSTRMachineMem 
-        |> Result.map (fun x -> {dP with MM = x}) 
+        |> Result.map (fun x -> {dP with MM = x; Regs = updatedRegMap}) 
         |> fun a -> (a, Ok symbolTab)
         |> Ok
         |> abstractResults
@@ -755,7 +758,7 @@ module Mem
 
         let findAddrs (dP: DataPath<'INS>) :Result<uint32 list, string>=
             if ((dP.MM).IsEmpty) then
-                getAddrList [0x100u] (Result.map (List.length) dataValList)
+                getAddrList [0xFCu] (Result.map (List.length) dataValList)
             else 
                 getAddrList [findMaxAddr dP] (Result.map (List.length) dataValList)
 
