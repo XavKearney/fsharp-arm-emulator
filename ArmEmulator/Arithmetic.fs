@@ -79,7 +79,7 @@ module Arithmetic
     let (|FlexParse|_|) pattern input = 
         let flexMatch = Regex.Match(input, pattern)
         match flexMatch.Success with
-        | true -> Some (List.tail [for strMatch in flexMatch.Groups -> strMatch.Value ])
+        | true -> Some (List.tail [for strMatch in flexMatch.Captures -> strMatch.Value ])
         | false -> None
 
     // Matches the first character of a string and returns the rest
