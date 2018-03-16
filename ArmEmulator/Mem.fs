@@ -533,12 +533,6 @@ module Mem
                             at %A was not of type DataLoc" x wordAddress)
         | _ -> Error (sprintf "execLDR-accessMemoryLocation: %A was not present in memory" wordAddress)
 
-    ///Adds a value to memory. Called by execSTR
-    let updatedMachineMemory (dP: DataPath<'INS>) (wordAddress: WAddr) val0 =
-        match System.UInt32.TryParse val0 with
-        | (true, x) -> (Ok ((dP.MM).Add(wordAddress, DataLoc x)))
-        | (false,_) -> Error (sprintf "execSTR-updateMemoryLocation: val0 (%A) could not be converted to a uint32" val0)
-
     ///Returns end value of Ra, Rb. Called by execSTR and 
     /// LRD exec
     let interpretingRecord (dP: DataPath<'INS>) (inputRecord: MemInstr) =
@@ -654,7 +648,7 @@ module Mem
     let execSTR (symbolTab: SymbolTable) (dP: DataPath<'INS>) (inputRecord: MemInstr) = 
         let updatedSTRMachineMem (tuple: Result<(uint32 * uint32),string>) =
             match tuple with
-            | Ok (a,b) -> (updatedMachineMemory dP (WA b) (a|>string))
+            | Ok (a,b) -> Ok ((dP.MM).Add(WA b, DataLoc a))
             | Error m -> Error m
         inputRecord
         |> interpretingRecord dP 
