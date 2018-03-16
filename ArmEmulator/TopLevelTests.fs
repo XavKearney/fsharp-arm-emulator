@@ -4,6 +4,7 @@ module TopLevelTests
     open CommonData
     open CommonLex
     open Arithmetic
+    open Mem
     open MultMem
     open TopLevel
 
@@ -38,8 +39,11 @@ module TopLevelTests
             Ok {PInstr = IARITH (ArithI {InstrType = Some ADD; SuffixSet = false;
                              Target = R0; Op1 = R0; Op2 = Literal 5u;});
                 PLabel = None; PSize = 4u; PCond = Cal;}
+            "ADR R0, 4", 
+            Ok {PInstr = IMEM (AdrO (Error "parseAdrIns: ls.SymTab = None"));
+                PLabel = None; PSize = 4u; PCond = Cal;}
                 
-            // TODO: add memory + bitarith instructions here
+            // TODO: add all instructions here
 
             "LDM R0, {R1,R2,R3}", 
             Ok {PInstr = IMULTMEM (MemI {InsType = Some(LDM); Direction = Some(FD);
@@ -95,6 +99,10 @@ module TopLevelTests
                 Ok ({cpuData with Regs = cpuData.Regs.Add (R0, 1u)}, symtab)
             (parseLine (someSymTab) (WA 0u) "test ADD R0, R0, #1"), 
                 Ok ({cpuData with Regs = cpuData.Regs.Add (R0, 1u)}, symtab.Add ("test", 0u))
+            (parseLine (someSymTab) (WA 0u) "ADR R0, 4"), 
+                Ok ({cpuData with Regs = cpuData.Regs.Add (R0, 4u)}, symtab)
+            (parseLine (someSymTab) (WA 0u) "test DCD 1"), 
+                Ok ({cpuData with MM = cpuData.MM.Add (WA 0x104u, DataLoc 1u)}, symtab.Add ("test", 1u))
             // test invalid lines
             (parseLine (someSymTab) (WA 0u) "ADDM R0, R0, #1"), 
                 Error (ERRTOPLEVEL "Instruction not implemented: ADDM R0, R0, #1")

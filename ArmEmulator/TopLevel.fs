@@ -36,6 +36,7 @@ module TopLevel
         match ld with
         | Arithmetic.IMatch pa -> pConv IARITH ERRIARITH pa
         | BitArithmetic.IMatch pa -> pConv IBITARITH ERRIBITARITH pa
+        | Mem.IMatch pa -> pConv IMEM ERRIMEM pa
         | MultMem.IMatch pa -> pConv IMULTMEM ERRIMULTMEM pa
         | _ -> None
 
@@ -134,6 +135,8 @@ module TopLevel
 
         ins |> Result.bind (
             function
+            | {PInstr=IMEM ins';} as p -> 
+                exec' p (Mem.execInstr d symtab) ins' ERRIMULTMEM
             | {PInstr=IMULTMEM ins';} as p -> 
                 exec' p (MultMem.execInstr d) ins' ERRIMULTMEM
                 |> Result.map (fun cpu -> cpu, symtab)
