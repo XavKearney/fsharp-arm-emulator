@@ -119,6 +119,7 @@ module ParseExpr
 
 
     let evalTokenized tokInput =
+        // printfn "%A" tokInput
         let doOp op right left = 
             match op with
             | Op Add -> left + right
@@ -129,6 +130,7 @@ module ParseExpr
         let first2 (lst: 'a list) = lst.Head, lst.Tail.Head, lst.Tail.Tail
         
         let rec eval' toks nums ops =
+            // (printfn "%A %A %A" toks nums ops)
             match toks with
             // if a number, put in the number stack
             | Num n :: rest -> eval' rest (n::nums) ops
@@ -140,7 +142,7 @@ module ParseExpr
                 | true when nums.Length >= 2 ->
                     let first, second, remaining = first2 nums
                     doOp ops.Head first second
-                    |> fun res -> eval' rest (res::remaining) (Op op::ops.Tail)
+                    |> fun res -> eval' toks (res::remaining) (ops.Tail)
                 | false -> 
                     match nums, ops with
                     // if it starts with an operator, put in a 0 at the beginning

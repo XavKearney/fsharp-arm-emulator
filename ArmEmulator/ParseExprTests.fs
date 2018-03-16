@@ -23,6 +23,8 @@ module ParseExprTests
                 "10*0", Ok(10u*0u)
                 "1-0", Ok(1u-0u)
                 "2*6+3", Ok(2u*6u+3u)
+                "2*2*2*2", Ok(2u*2u*2u*2u)
+                "2*2*2*2+3", Ok(2u*2u*2u*2u+3u)
                 // test brackets
                 "2*(6+3)", Ok(2u*(6u+3u))
                 "(8-2)*(6+3)", Ok((8u-2u)*(6u+3u))
