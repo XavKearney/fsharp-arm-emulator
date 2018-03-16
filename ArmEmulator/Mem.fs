@@ -422,15 +422,13 @@ module Mem
                 | MISC -> (Ok (LabelO (parseLabelIns root ls)))
                 | MEM   -> (Ok (MemO (parseMemIns root suffix ls)))
                 | ADR   -> (Ok (AdrO (parseAdrIns root ls)))
-                | _ -> Error "Instruction class not supported."
+                | _ -> Error "parse: Instruction class not supported."
 
-
-            match pInstrTmp with
-            | Ok x -> 
+            let outputRec pIn = 
                 let pSizeTmp =
                     match root with
                     | "EQU" -> 0u
-                    | "DCD" -> findDcdPSize x
+                    | "DCD" -> findDcdPSize pIn
                     | _     -> 4u
                 Ok { 
                     // Normal (non-error) return from result monad
@@ -438,7 +436,7 @@ module Mem
                     // the operands. Not done in the sample.
                     // Note the record type returned must be written by the module author.
                     // PInstr={InstructionType= (); DestSourceReg= (); SecondOp= ();}; 
-                    PInstr = x
+                    PInstr = pIn
 
 
                     // This is normally the line label as contained in
@@ -461,7 +459,24 @@ module Mem
                     // this part never changes
                     PCond = pCond 
                     }
-            | Error s -> Error s     
+
+
+            match pInstrTmp with
+            | Ok x -> 
+                match x with
+                | LabelO y -> 
+                    match y with
+                    | Ok _ -> outputRec x
+                    | Error m -> Error m
+                | MemO y -> 
+                    match y with
+                    | Ok _ -> outputRec x
+                    | Error m -> Error m
+                | AdrO y -> 
+                    match y with
+                    | Ok _ -> outputRec x
+                    | Error m -> Error m
+            | Error m -> Error m     
         [opCodesLabel; opCodesMem; opCodesADR]
         |> List.choose (Map.tryFind ls.OpCode)
         |> function 
