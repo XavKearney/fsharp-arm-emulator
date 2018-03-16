@@ -10,10 +10,7 @@ module TopLevel
         // TODO: needs renaming
         | IBITARITH of BitArithmetic.InstDecomp
         // memory instructions
-        // TODO: Merge into one ReturnInstr
-        | IMEM of MemInstructions.MemInstr
-        | IADR of MemInstructions.ADRInstr
-        | ILABEL of MemInstructions.labelInstr
+        | IMEM of Mem.ReturnInstr
         // multiple memory instructions (and branch & end)
         | IMULTMEM of MultMem.ReturnInstr
 
@@ -23,7 +20,7 @@ module TopLevel
     type ErrInstr =
         | ERRIARITH of Arithmetic.ErrInstr
         | ERRIBITARITH of BitArithmetic.ErrInstr
-        | ERRIMEM of MemInstructions.ErrInstr
+        | ERRIMEM of Mem.ErrInstr
         | ERRIMULTMEM of MultMem.ErrInstr
         | ERRTOPLEVEL of string
 
@@ -41,7 +38,6 @@ module TopLevel
         | BitArithmetic.IMatch pa -> pConv IBITARITH ERRIBITARITH pa
         | MultMem.IMatch pa -> pConv IMULTMEM ERRIMULTMEM pa
         | _ -> None
-    
 
     let parseLine (symtab: SymbolTable option) (loadAddr: WAddr) (asmLine:string) =
         /// put parameters into a LineData record
@@ -75,16 +71,11 @@ module TopLevel
             match pNoLabel, words with
             | Some pa, _ -> pa
             | None, label :: opc :: operands -> 
-                match { makeLineData opc operands 
-                        with Label=Some label} 
-                      |> IMatch with
+                match { makeLineData opc operands with Label=Some label} |> IMatch with
                 | None -> 
-                    Error (ERRTOPLEVEL 
-                        (sprintf"Instruction not implemented: %A" (String.concat " " words)))
+                    Error (ERRTOPLEVEL (sprintf "Unimplemented instruction %s" opc))
                 | Some pa -> pa
-            | _ -> 
-                Error (ERRTOPLEVEL 
-                    (sprintf "Invalid instruction: %A" (String.concat " " words)))
+            | _ -> Error (ERRTOPLEVEL (sprintf "Unimplemented instruction %A" words))
         asmLine
         |> removeComment
         |> splitIntoWords
@@ -94,7 +85,7 @@ module TopLevel
 
     /// initialise DataPath object before executing instructions
     /// takes optional flags/regs/mem to initialise with
-    /// otherwise, all empty to begin with
+    /// otherwise, all empty to begin with (false flags, zero regs, no memory allocated)
     let initDataPath flags regs mem = 
         let initFlags = 
             match flags with
@@ -121,3 +112,92 @@ module TopLevel
                 MM = m;
             }
         | _, Error s, _ -> Error s
+    
+    // map a function which returns its own error type
+    // to one which returns a top-level error type
+    let mapErr fMap ins = 
+        match ins with
+        | Error s -> Error (fMap s)
+        | Ok x -> Ok x
+
+    // function to execute any parsed instruction from any module
+    // returns the modified datapath (or an error)
+    let execParsedLine ins d (symtab: SymbolTable) =
+        /// executes a given instruction with the correct execution function f
+        let exec' p f ins' err = 
+            { PInstr = ins'; PLabel = p.PLabel; PCond = p.PCond; PSize = p.PSize }
+            |> f
+            |> mapErr err
+
+        ins |> Result.bind (
+            function
+            | {PInstr=IMULTMEM ins';} as p -> 
+                exec' p (MultMem.execInstr d) ins' ERRIMULTMEM
+                |> Result.map (fun cpu -> cpu, symtab)
+            | {PInstr=IARITH ins';} as p -> 
+                exec' p (Arithmetic.execArithmeticInstr d) ins' ERRIARITH
+                |> Result.map (fun cpu -> cpu, symtab)
+        )
+
+    /// takes a list of lines as string
+    /// and optionally, a symbol table
+    /// parses each line using parseLine function
+    /// returns a list of Ok parsed instructions, or errors
+    /// plus the completed symbol table, if given
+    let parseLines lines symtab = 
+        // adds all labels in the parsed lines to the symbol table
+        let rec createSymTab (symtab': SymbolTable option) parsedLines =
+            match parsedLines, symtab' with
+            | [], _ -> symtab'
+            | (Ok line) :: rest, Some syms -> 
+                match line.PLabel with
+                | Some lab -> createSymTab (Some (syms.Add lab)) rest
+                | None -> createSymTab symtab' rest
+            | _ :: rest, _ ->  createSymTab symtab' rest
+        // parses each line one by one, updating the symbol table as it goes
+        // tail recursive so it can't return the final symbol table (maybe refactor?)
+        let rec parseLines' lines loadaddr (symtab': SymbolTable option) = 
+            let addLabel p =
+                match p.PLabel, symtab' with
+                | Some lab, Some syms -> p, Some (syms.Add lab)
+                | _ -> p, symtab'
+            match lines with
+            // no more lines to parse, return empty
+            | [] -> [] 
+            | line :: rest ->
+                parseLine symtab' (WA loadaddr) line
+                |> Result.map addLabel
+                |> function
+                    | Ok (p, syms) -> Ok p :: parseLines' rest (loadaddr + p.PSize) syms
+                    // not sure how to increment size if error
+                    | Error s -> Error s :: parseLines' rest (loadaddr + 4u) symtab'
+        parseLines' lines 0u symtab
+        |> fun p -> p, createSymTab symtab p
+
+
+    /// execute a list of parsed lines
+    /// returns modified DataPath and symbol table
+    /// binds any errors in the execution or parsed lines
+    let execParsedLines parsedLines cpuData symtab = 
+        let rec execLines lines cpu' symtab' = 
+            match lines with
+            // no more lines to return, so return cpu and symtab
+            | [] -> Ok (cpu', symtab')
+            | line :: rest ->
+                execParsedLine line cpu' symtab'
+                |> Result.bind (fun (newCpu, newSymTab) -> execLines rest newCpu newSymTab)
+        execLines parsedLines cpuData symtab
+
+
+    /// takes a list of lines as string, a datapath and an optional symbol table
+    /// does 2 passes of parsing to get symbol table contents correct
+    /// then executes the instructions with the symbol table (if given)
+    let parseThenExecLines lines cpuData symtab = 
+        // first pass of parsing
+        parseLines lines symtab
+        // second pass of parsing
+        |> snd |> parseLines lines
+        // execute
+        |> function
+            | parsedLines, Some syms -> execParsedLines parsedLines cpuData syms
+            | parsedLines, None -> execParsedLines parsedLines cpuData Map.empty

@@ -4,7 +4,6 @@ module TopLevelTests
     open CommonData
     open CommonLex
     open Arithmetic
-    open BitArithmetic
     open MultMem
     open TopLevel
 
@@ -94,6 +93,8 @@ module TopLevelTests
                 Ok ({cpuData with MM = cpuData.MM.Add (WA 0u, DataLoc 0u)}, symtab)
             (parseLine (someSymTab) (WA 0u) "ADD R0, R0, #1"), 
                 Ok ({cpuData with Regs = cpuData.Regs.Add (R0, 1u)}, symtab)
+            (parseLine (someSymTab) (WA 0u) "test ADD R0, R0, #1"), 
+                Ok ({cpuData with Regs = cpuData.Regs.Add (R0, 1u)}, symtab.Add ("test", 0u))
             // test invalid lines
             (parseLine (someSymTab) (WA 0u) "ADDM R0, R0, #1"), 
                 Error (ERRTOPLEVEL "Instruction not implemented: \"ADDM R0, R0, #1\"")
@@ -104,8 +105,8 @@ module TopLevelTests
          ]
 
          
-    /// tests the function execParsedLines with unit tests
-    let testExecParsedLines = 
+    /// tests the function parseThenExecLines with unit tests
+    let testParseThenExecLines = 
         let cpuData = 
             match initDataPath None None None with
             | Ok x -> x
@@ -116,26 +117,29 @@ module TopLevelTests
             match f ld with
             | Some x -> x
             | None -> failwithf "Should never happen."
-        makeUnitTestListWithTwoParams execParsedLines (cpuData, symtab) "Unit Test execParsedLines" [
+        makeUnitTestListWithTwoParams parseThenExecLines (cpuData, someSymTab) "Unit Test execParsedLines" [
             // test single valid lines
-            [parseLine (someSymTab) (WA 0u) "STM R0, {R1}"], 
+            ["STM R0, {R1}"], 
                 Ok ({cpuData with MM = cpuData.MM.Add (WA 0u, DataLoc 0u)}, symtab)
-            [parseLine (someSymTab) (WA 0u) "ADD R0, R0, #1"], 
+            ["ADD R0, R0, #1"], 
                 Ok ({cpuData with Regs = cpuData.Regs.Add (R0, 1u)}, symtab)
             // test multiple valid lines
-            [parseLine (someSymTab) (WA 0u) "STM R0, {R1}";
-                parseLine (someSymTab) (WA 0u) "ADD R0, R0, #1"], 
+            ["STM R0, {R1}"; "ADD R0, R0, #1"], 
             Ok ({cpuData with 
                     Regs = cpuData.Regs.Add (R0, 1u);MM = cpuData.MM.Add (WA 0u, DataLoc 0u)}, symtab)
-            [parseLine (someSymTab) (WA 0u) "ADD R0, R0, #5";
-                parseLine (someSymTab) (WA 0u) "SUB R0, R0, #3"], 
+            ["ADD R0, R0, #5"; "SUB R0, R0, #3"], 
             Ok ({cpuData with 
                     Regs = cpuData.Regs.Add (R0, 2u);}, symtab)
+            ["ADD R0, R0, #5"; "test2 SUB R0, R0, #3"], 
+            Ok ({cpuData with 
+                    Regs = cpuData.Regs.Add (R0, 2u);}, symtab.Add ("test2", 4u))
+            ["ADD R0, R0, #test3"; "test3 SUB R0, R0, #3"], 
+            Ok ({cpuData with 
+                    Regs = cpuData.Regs.Add (R0, 1u);}, symtab.Add ("test3", 4u))
             // test invalid single lines
-            [parseLine (someSymTab) (WA 0u) "LDM R0, R0, {}"], 
+            ["LDM R0, R0, {}"], 
                 Error (ERRIMULTMEM "Incorrectly formatted operands.")
             // test multiple invalid lines - only returns the first error (TODO: change)
-            [parseLine (someSymTab) (WA 0u) "LDM R0, R0, {}";
-                parseLine (someSymTab) (WA 0u) "ADD R16, R0, #1"], 
+            ["LDM R0, R0, {}"; "ADD R16, R0, #1"], 
                 Error (ERRIMULTMEM "Incorrectly formatted operands.")
          ]
