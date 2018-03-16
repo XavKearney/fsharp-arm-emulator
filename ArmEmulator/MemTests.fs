@@ -44,7 +44,10 @@ module MemTests
                                                                                     EQUExpr = (Some (Ok 0u)); DCDValueList = None;
                                                                                     FillN = None})
                     //EQU Error Message Tests
-                    
+                    makeTest "EQU" (ldFunc "labelT" "") "EQU No Literal" (Ok {InstructionType = Ok EQU; Name = (Ok (Some "labelT"));
+                                                                                    EQUExpr = (Some (Ok 0u)); DCDValueList = None;
+                                                                                    FillN = None})
+
                     //Fill Working Tests
                     makeTest "FILL" (ldFunc "labelT" "4") "FILL 4" (Ok {InstructionType = Ok FILL; Name = (Ok (Some "labelT"));
                                                                                     EQUExpr = None; DCDValueList = None;
@@ -496,7 +499,7 @@ module MemTests
                 [   
                     //parse Working Tests
                     //ADR
-                    makeTest (ldFunc st "ADR" "R0, 4") "Base Test" (Some (Ok {PInstr = AdrO (Ok {InstructionType= Ok ADRm;
+                    makeTest (ldFunc st "ADR" "R0, 4") "parse ADR Base Test" (Some (Ok {PInstr = AdrO (Ok {InstructionType= Ok ADRm;
                                                                                 DestReg= Ok R0;
                                                                                 SecondOp= Ok 4u;});
                                                                     PLabel = Some ("labelTest", 100u);
@@ -544,9 +547,51 @@ module MemTests
                                                                                     FillN = Some (Ok 4u)});
                                                                     PLabel = Some ("labelTest", 100u);
                                                                     PSize = 4u; PCond = Cal}))
-                    makeTest (ldFuncAll 100u "labelTest" st "FILL" "-1") "Fill Error Case" (Some (Ok {PInstr = LabelO (Ok {InstructionType = Ok FILL; Name = (Ok (Some "labelTest"));
+                    makeTest (ldFuncAll 100u "labelTest" st "FILL" "-1") "parse: Fill Error Case" (Some (Ok {PInstr = LabelO (Ok {InstructionType = Ok FILL; Name = (Ok (Some "labelTest"));
                                                                                     EQUExpr = None; DCDValueList = None;
                                                                                     FillN = Some (Error "parseLabelIns: Fill expression (4294967295u) <0 or not divisible by four")});
+                                                                    PLabel = Some ("labelTest", 100u);
+                                                                    PSize = 4u; PCond = Cal}))
+                    //LDR
+                    makeTest (ldFuncAll 100u "labelTest" st "LDR" "R0, [R1]") "parse: LDR Base Case" (Some (Ok {PInstr = MemO (Ok {InstructionType= Ok LDR;
+                                                                                    DestSourceReg= Ok R0; AddressReg= Ok R1;
+                                                                                    BytesNotWords= Ok false; IncrementValue= 0;
+                                                                                    PreIndexRb= false; PostIndexRb= false; 
+                                                                                    ExtraAddressReg= None;
+                                                                                    ShiftExtraRegBy= None;});
+                                                                    PLabel = Some ("labelTest", 100u);
+                                                                    PSize = 4u; PCond = Cal}))
+                    makeTest (ldFuncAll 100u "labelTest" st "LDR" "R0, [R11, R1, LSL #-1]!") "parse: LDR -1 Shift and Pre" (Some (Ok {PInstr = MemO (Ok {InstructionType= Ok LDR;
+                                                                                    DestSourceReg= Ok R0; AddressReg= Ok R11;
+                                                                                    BytesNotWords= Ok false; IncrementValue= 0;
+                                                                                    PreIndexRb= true; PostIndexRb= false; 
+                                                                                    ExtraAddressReg= None;
+                                                                                    ShiftExtraRegBy= None;});
+                                                                    PLabel = Some ("labelTest", 100u);
+                                                                    PSize = 4u; PCond = Cal}))
+                    //STR
+                    makeTest (ldFuncAll 100u "labelTest" st "STR" "R0, [R11, R1, LSL #1]") "parse: STR Shifted Register" (Some (Ok {PInstr = MemO (Ok {InstructionType= Ok STR;
+                                                                                    DestSourceReg= Ok R0; AddressReg= Ok R11;
+                                                                                    BytesNotWords= Ok false; IncrementValue= 0;
+                                                                                    PreIndexRb= false; PostIndexRb= false; 
+                                                                                    ExtraAddressReg= Some R1;
+                                                                                    ShiftExtraRegBy= Some 1;});
+                                                                    PLabel = Some ("labelTest", 100u);
+                                                                    PSize = 4u; PCond = Cal}))
+                    makeTest (ldFuncAll 100u "labelTest" st "STR" "R8, [R7], #40") "parse: STR Post Increment" (Some (Ok {PInstr = MemO (Ok {InstructionType= Ok STR;
+                                                                                    DestSourceReg= Ok R8; AddressReg= Ok R7;
+                                                                                    BytesNotWords= Ok false; IncrementValue= 40;
+                                                                                    PreIndexRb= false; PostIndexRb= true; 
+                                                                                    ExtraAddressReg= None;
+                                                                                    ShiftExtraRegBy= None;});
+                                                                    PLabel = Some ("labelTest", 100u);
+                                                                    PSize = 4u; PCond = Cal}))
+                    makeTest (ldFuncAll 100u "labelTest" st "STR" "R6, [R5, #4]") "parse: STR Num Increment" (Some (Ok {PInstr = MemO (Ok {InstructionType= Ok STR;
+                                                                                    DestSourceReg= Ok R6; AddressReg= Ok R5;
+                                                                                    BytesNotWords= Ok false; IncrementValue= 4;
+                                                                                    PreIndexRb= false; PostIndexRb= false; 
+                                                                                    ExtraAddressReg= None;
+                                                                                    ShiftExtraRegBy= None;});
                                                                     PLabel = Some ("labelTest", 100u);
                                                                     PSize = 4u; PCond = Cal}))
 
@@ -903,8 +948,7 @@ module MemTests
 
 
                     // //LDR Error Message Tests
-                    // makeTest "execLDR: LDR -1 Shift and Pre" stOneItem (makeMemInstr "LDR" "" "R10, [R11, R15, LSL #-1]!") baseDataPath5 (Ok ({baseDataPath5 with Regs = ([R10, 5u; R11, 0x100u; R15, 0x4u] |> Map.ofList)}, stOneItem))
-
+                    makeTest "execLDR: LDR -1 Shift and Pre" stOneItem (makeMemInstr "LDR" "" "R10, [R11, R15, LSL #-1]!") baseDataPath5 (Ok ({baseDataPath5 with Regs = ([R10, 5u; R11, 0x100u; R15, 0x4u] |> Map.ofList)}, stOneItem))
 
                 ]
 
@@ -945,6 +989,11 @@ module MemTests
             let registers = [R10, 2u; R11, 0x100u; R15, 0x4u] |> Map.ofList
             let flags = { N= false; C=false; Z=false; V=false}
             {Fl= flags; Regs= registers; MM = memory}
+        let baseDataPath5 =
+            let memory = [WA 0x100u,DataLoc 5u; WA 0x104u, DataLoc 7u; WA 0x108u, DataLoc 9u; WA 0x10Cu, DataLoc 11u] |> Map.ofList
+            let registers = [R10, 2u; R11, 0x100u; R15, 0x4u] |> Map.ofList
+            let flags = { N= false; C=false; Z=false; V=false}
+            {Fl= flags; Regs= registers; MM = memory}
 
 
         let makeTest name symTab inputRec inpDataPath output =
@@ -967,7 +1016,7 @@ module MemTests
                     makeTest "execSTR: STR 0 Shift and Pre" stOneItem (makeMemInstr "STR" "" "R10, [R11, R15, LSL #0]!") baseDataPath4 (Ok ({baseDataPath4 with Regs = ([R10, 2u; R11, 0x104u; R15, 0x4u] |> Map.ofList); MM = [WA 0x100u,DataLoc 5u; WA 0x104u, DataLoc 2u; WA 0x108u, DataLoc 9u; WA 0x10Cu, DataLoc 11u] |> Map.ofList}, stOneItem))
 
                     //STR Error Message Tests
-                    // makeTest "execSTR: LDR -1 Shift and Pre" stOneItem (makeMemInstr "STR" "" "R10, [R11, R15, LSL #-1]!") baseDataPath5 (Ok ({baseDataPath5 with Regs = ([R10, 5u; R11, 0x100u; R15, 0x4u] |> Map.ofList)}, stOneItem))
+                    makeTest "execSTR: STR -1 Shift and Pre" stOneItem (makeMemInstr "STR" "" "R10, [R11, R15, LSL #-1]!") baseDataPath5 (Ok ({baseDataPath5 with Regs = ([R10, 2u; R11, 0x100u; R15, 0x4u] |> Map.ofList); MM = [WA 0x100u,DataLoc 2u; WA 0x104u, DataLoc 7u; WA 0x108u, DataLoc 9u; WA 0x10Cu, DataLoc 11u] |> Map.ofList}, stOneItem))
 
                 ]
 
