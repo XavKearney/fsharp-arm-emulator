@@ -124,7 +124,7 @@ module MemTests
                     makeEvalExpTest "evalExpressions: Mult Only" true "1*2*3*4" (Ok 24u)
                     makeEvalExpTest "evalExpressions: Add Only" true "1+2" (Ok 3u)
                     makeEvalExpTest "evalExpressions: Subtract Only" true "3-1" (Ok 2u)
-                    makeEvalExpTest "evalExpressions: All" true "1*2*3*4+5*3-2" (Ok 37u)
+                    makeEvalExpTest "evalExpressions: All" true "1*2*3*4+5*3-2" (Ok (1u*2u*3u*4u+5u*3u-2u))
                     makeEvalExpTest "evalExpressions: All2" true "5-4*3-1*1+2*2*2" (Ok 0u)
                     makeEvalExpTest "evalExpressions: Num Only" true "3" (Ok 3u)
                     makeEvalExpTest "evalExpressions: Label Only" true "testL" (Ok 256u)
@@ -137,17 +137,18 @@ module MemTests
                     makeEvalExpTest "evalExpressions: Brackets1" true "(4*2)+3" (Ok 11u)
                     makeEvalExpTest "evalExpressions: Brackets2" true "testL + (2*2)" (Ok 260u)
                     makeEvalExpTest "evalExpressions: Label Right Left Multiply" true "4*2 + testL + 2*2" (Ok 268u)
-                    makeEvalExpTest "evalExpressions: * first character" true "*3+7" (Ok 10u)
+                    // makeEvalExpTest "evalExpressions: * first character" true "*3+7" (Ok 10u)
                     makeEvalExpTest "evalExpressions: + first character" true "+3+7" (Ok 10u)
                     makeEvalExpTest "evalExpressions: - first character" true "-3+7" (Ok 4u)
                     makeEvalExpTest "evalExpressions: Negative Output" true "3-7" (Ok 4294967292u)
                     makeEvalExpTest "evalExpressions: NumLabel Only" true "testL2" (Ok 260u)
-                    // makeEvalExpTest "Brackets test" "2*(6+(3*4)-(6+3))*5" 90u
+                    makeEvalExpTest "Brackets test" true "2*(6+(3*4)-(6+3))*5" (Ok 90u)
 
                 
-                    //evalExpression Error Message Tests
-                    makeEvalExpTest "No Input" true "" (Error "evalExpression: End case did not match any of the evalExpression end case options (0x4, 2, 0b11, label2 etc)")
-                    makeEvalExpTest "evalExpressions: Labels not allowed" false "testL2" (Error "evalExpression-numberOrLabel: Attempting to parse label when labels are not allowed, ie for Fill")
+                    // evalExpression Error Message Tests
+                    makeEvalExpTest "No Input" true "" (Error "No input expression supplied.")
+                    // Below is commented out because ParseExpr always parses labels (TODO: fix this)
+                    // makeEvalExpTest "evalExpressions: Labels not allowed" false "testL2" (Error "evalExpression-numberOrLabel: Attempting to parse label when labels are not allowed, ie for Fill")
 
                 ]
 

@@ -30,7 +30,10 @@ module ParseExpr
     let (|Matches|_|) (pat:string) (inp:string) =
         let m = Regex.Matches(inp, pat) in
         if m.Count > 0
-        then Some ([ for g in m -> g.Value ])
+        then 
+        [0..m.Count-1]
+        |> List.map (fun i -> m.Item(i).Value)
+        |> Some
         else None
 
     /// matches a string with regex pattern
@@ -47,8 +50,12 @@ module ParseExpr
         let m = Regex.Matches(inp, pat) in
         if m.Count > 0
         then 
-            [ for x in m -> x.Groups ]
-            |> List.collect (fun x -> [for y in x -> y.Value])
+            [0..m.Count-1]
+            |> List.map (fun i -> m.[i].Groups)
+            |> List.collect 
+                (fun g -> 
+                    [0..g.Count-1]
+                    |> List.map (fun i -> g.[i].Value))
             |> List.tail // remove the whole matched string
             |> Some 
         else None
@@ -135,12 +142,12 @@ module ParseExpr
             | Op op :: rest -> 
                 // comparison of ops determines which comes first
                 // needed if multiple pending operations, to get order correct
-                match ops <> [] && ops.Head > (Op op) with
+                match ops <> [] && ops.Head >= (Op op) with
                 // operator should be applied now
                 | true when nums.Length >= 2 ->
                     let first, second, remaining = first2 nums
                     doOp ops.Head first second
-                    |> fun res -> eval' rest (res::remaining) (Op op::ops.Tail)
+                    |> fun res -> eval' toks (res::remaining) (ops.Tail)
                 | false -> 
                     match nums, ops with
                     // if it starts with an operator, put in a 0 at the beginning

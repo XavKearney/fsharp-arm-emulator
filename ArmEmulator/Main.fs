@@ -3,7 +3,7 @@ module ArmEmulator
 open Expecto
 open VisualTest
 open System.IO
-open TopLevel
+open Emulator.TopLevel
 open CommonData
 
 /// reads the lines of a file into a string
