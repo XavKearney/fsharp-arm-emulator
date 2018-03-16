@@ -77,10 +77,18 @@ module Arithmetic
     
     // Flexible operand 2 string parsing -> Returns group matches
     let (|FlexParse|_|) pattern input = 
-        let flexMatch = Regex.Match(input, pattern)
-        match flexMatch.Success with
-        | true -> Some (List.tail [for strMatch in flexMatch.Captures -> strMatch.Value ])
-        | false -> None
+        let m = Regex.Matches(input, pattern) in
+        if m.Count > 0
+        then 
+            [0..m.Count-1]
+            |> List.map (fun i -> m.[i].Groups)
+            |> List.collect 
+                (fun g -> 
+                    [0..g.Count-1]
+                    |> List.map (fun i -> g.[i].Value))
+            |> List.tail // remove the whole matched string
+            |> Some 
+        else None
 
     // Matches the first character of a string and returns the rest
     let (|Prefix|_|) (p:string) (s:string) =
