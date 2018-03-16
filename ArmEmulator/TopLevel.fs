@@ -73,9 +73,12 @@ module TopLevel
             | None, label :: opc :: operands -> 
                 match { makeLineData opc operands with Label=Some label} |> IMatch with
                 | None -> 
-                    Error (ERRTOPLEVEL (sprintf "Unimplemented instruction %s" opc))
+                    Error (ERRTOPLEVEL 
+                        (sprintf "Instruction not implemented: %s" (String.concat " " words)))
                 | Some pa -> pa
-            | _ -> Error (ERRTOPLEVEL (sprintf "Unimplemented instruction %A" words))
+            | _ -> 
+                Error (ERRTOPLEVEL
+                    (sprintf "Invalid instruction: %s" (String.concat " " words)))
         asmLine
         |> removeComment
         |> splitIntoWords
