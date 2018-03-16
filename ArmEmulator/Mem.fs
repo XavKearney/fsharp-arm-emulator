@@ -518,23 +518,11 @@ module Mem
                     // this part never changes
                     PCond = pCond 
                     }
-
-
             match pInstrTmp with
             | Ok x -> 
                 match x with
-                | LabelO y -> 
-                    match y with
-                    | Ok _ -> outputRec x
-                    | Error m -> Error m
-                | MemO y -> 
-                    match y with
-                    | Ok _ -> outputRec x
-                    | Error m -> Error m
-                | AdrO y -> 
-                    match y with
-                    | Ok _ -> outputRec x
-                    | Error m -> Error m
+                | LabelO (Ok _) | MemO (Ok _) | AdrO (Ok _) -> outputRec x
+                | LabelO (Error m) | MemO (Error m) | AdrO (Error m) -> Error m
             | Error m -> Error m     
         [opCodesLabel; opCodesMem; opCodesADR]
         |> List.choose (Map.tryFind ls.OpCode)
