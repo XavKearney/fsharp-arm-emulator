@@ -26,7 +26,7 @@ module Mem
     open CommonLex
     open System
     open System.Text.RegularExpressions
-    open BitArithmetic
+    open ParseExpr
 
 
 
@@ -200,72 +200,7 @@ module Mem
     ///   Eg 2*(6+(3*4)-(6+3))*5
     /// - Add working CheckLiteral function which works for -ve's
     let evalExpression (exp0: string) (symTab: SymbolTable) (labels: bool) =
-        let trimmedList op (list0: string list) = 
-            match (list0.[0],List.last list0) with
-            | ("","") -> 
-                        match op with
-                        | "-" -> List.append ["0"] list0.[1..(List.length list0)-2]
-                        | _ -> list0.[1..(List.length list0)-2]
-            | ("",_) -> 
-                       match op with 
-                       | "-" -> List.append ["0"] list0.[1..(List.length list0)-1]
-                       | _ -> list0.[1..(List.length list0)-1]
-            | (_, "") -> list0.[0..(List.length list0)-2]
-            | (_,_) -> list0
-        let rec evalExpression' (exp: string) = 
-            if String.exists (fun c -> (c ='(')||(c =')')) exp then
-                let mapFunction (x: string) = 
-                    if (String.exists (fun c -> (c ='(')||(c =')')) x) then 
-                        match ((evalExpression' x.[1..(x.Length-2)])) with
-                        | (Ok y)  -> Ok (y|>string)
-                        | Error m -> Error m
-                    else (Ok x)                   
-                match exp with 
-                | Matches @"((\([^)]*\)*)|[^()]*)" tl -> 
-                                                        let bracketsEvaled = 
-                                                            tl
-                                                            |> List.map (mapFunction)
-                                                            |> List.reduce (resultDotBindTwoInp (+))
-                                                        match bracketsEvaled with
-                                                        | (Ok x)  -> evalExpression' x
-                                                        | Error m -> Error m
-                | _ -> Error (sprintf "evalExpression: Brackets were present, but exp (%A) did not match with brakcets regex" exp)
-            elif String.exists (fun c -> (c ='+')) exp then
-                exp.Split('+') 
-                |> Seq.toList
-                |> trimmedList "+" 
-                |> List.map (evalExpression')
-                |> List.reduce (resultDotBindTwoInp (+))
-            elif String.exists (fun c -> (c ='-')) exp then
-                exp.Split('-') 
-                |> Seq.toList
-                |> trimmedList "-"
-                |> List.map (evalExpression')
-                |> List.reduce (resultDotBindTwoInp (-))
-            elif String.exists (fun c -> (c ='*')) exp then
-                exp.Split('*') 
-                |> Seq.toList
-                |> trimmedList "*"
-                |> List.map (evalExpression')
-                |> List.reduce (resultDotBindTwoInp (*))
-            else 
-                let numberOrLabel (item: string) =
-                    let symTabTryFindMonad item =
-                        match symTab.TryFind item with
-                        | None -> Error (sprintf "evalExpression: Couldn't find label (%A)
-                                  in the Symbol Table" item)
-                        | Some x -> x |> string |> uint32 |> Ok
-                    match (labels, (System.UInt32.TryParse item)) with
-                    | (_, (true, num)) -> Ok num
-                    | (true, (false, _)) -> symTabTryFindMonad item
-                    | (false, (false, _)) -> Error "evalExpression-numberOrLabel: Attempting to parse label when labels are not allowed, ie for Fill"
-                match (exp.Trim()) with 
-                | Match @"(0x[0-9]+)" [_; ex] -> ex.Value |> uint32 |> Ok //Matching a hex number, Eg 0x5
-                | Match @"(&[0-9]+)" [_; ex]  -> ("0x"+(ex.Value).[1..(ex.Length-1)]) |> uint32 |> Ok //Matching a hex number, Eg &5
-                | Match @"(0b[0-1]+)" [_; ex] -> ex.Value |> uint32 |> Ok //Matching binary number, Eg 0b11
-                | Match @"(\w+)" [_; _]     -> numberOrLabel (exp.Trim()) //Matching decimal numbers and labels
-                | _ -> Error "evalExpression: End case did not match any of the evalExpression end case options (0x4, 2, 0b11, label2 etc)"
-        evalExpression' exp0
+        evalExpr symTab exp0
 
 
 
