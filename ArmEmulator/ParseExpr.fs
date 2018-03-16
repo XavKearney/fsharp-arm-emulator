@@ -31,7 +31,7 @@ module ParseExpr
         let m = Regex.Matches(inp, pat) in
         if m.Count > 0
         then 
-        [0..m.Count]
+        [0..m.Count-1]
         |> List.map (fun i -> m.Item(i).Value)
         |> Some
         else None
@@ -50,8 +50,12 @@ module ParseExpr
         let m = Regex.Matches(inp, pat) in
         if m.Count > 0
         then 
-            [ for x in m -> x.Groups ]
-            |> List.collect (fun x -> [for y in x -> y.Value])
+            [0..m.Count-1]
+            |> List.map (fun i -> m.[i].Groups)
+            |> List.collect 
+                (fun g -> 
+                    [0..g.Count-1]
+                    |> List.map (fun i -> g.[i].Value))
             |> List.tail // remove the whole matched string
             |> Some 
         else None
