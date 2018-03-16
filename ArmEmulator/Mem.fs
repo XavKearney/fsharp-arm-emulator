@@ -26,7 +26,8 @@ module Mem
     open CommonLex
     open System
     open System.Text.RegularExpressions
-    open ParseExpr
+    open BitArithmetic
+    open VisualTest
 
 
 
@@ -295,6 +296,22 @@ module Mem
         | Ok x -> if (((x|>int) % 4 =0)&&((x|>int)>=0)) then Ok x
                   else Error (sprintf "parseLabelIns: Fill expression (%A) <0 or not divisible by four" x)
 
+    let optionResultAbstract u v w = 
+        match (u,v,w) with
+        | (Some x, _, _) ->
+                           match x with 
+                           | Ok _ -> Ok 0
+                           | Error m -> Error m
+        | (_, Some y, _) -> 
+                           match y with 
+                           | Ok _ -> Ok 0
+                           | Error m -> Error m
+        | (_, _, Some z) -> 
+                           match z with 
+                           | Ok _ -> Ok 0
+                           | Error m -> Error m        
+        | (_, _, _) -> Error "optionResultAbstract: All inputs none"
+
     ///Parse function for Label based instructions such as EQU
     /// FILL and DCD. Returns a record with all the information
     /// needed to execute an LDR or STR instruction.
@@ -347,8 +364,10 @@ module Mem
             {InstructionType = instTypeTmp; Name = Ok nO; 
                 EQUExpr = equExp; DCDValueList = valList; 
                 FillN = fillN}
+        let errorMessage1 = optionResultAbstract fillN valList equExp
+        let errorMessage2 = resultDotBindTwoInp selectFirst errorMessage1 nameOut
         let realOut =
-            match (instTypeTmp, nameOut) with
+            match (instTypeTmp, errorMessage2) with
             | (Error x, Error y) -> Error (x+"\n"+y)
             | (Error x, _) -> Error x
             | (_, Error y) -> Error y
