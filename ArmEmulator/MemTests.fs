@@ -62,7 +62,8 @@ module MemTests
                     makeTest "FILL" (ldFunc "labelT" "123") "FILL 123" (Error "parseLabelIns: Fill expression (123u) <0 or not divisible by four")
                     makeTest "FILL" (ldFunc "labelT" "-1") "FILL -1" (Error "parseLabelIns: Fill expression (4294967295u) <0 or not divisible by four")
                     makeTest "FILL" (ldFunc "labelT" "-4") "FILL -4" (Error "parseLabelIns: Fill expression (4294967292u) <0 or not divisible by four")
-                    
+                    makeTest "FILL" (ldFunc "labelT" "") "FILL No Input" (Error "evalExpression: End case did not match any of the evalExpression end case options (0x4, 2, 0b11, label2 etc)")
+
                     //DCD Working Tests
                     makeTest "DCD" (ldFunc "labelT" "1") "DCD 1" (Ok {InstructionType = Ok DCD; Name = (Ok (Some "labelT"));
                                                                                     EQUExpr = None; DCDValueList = Some (Ok ["1"]);
@@ -210,6 +211,7 @@ module MemTests
                                                                     ShiftExtraRegBy= None;})
 
 
+
                     //LDR tests with Bytes
                     makeTest "LDR" "B" (ldFunc "R0, [R1]") "LDR Base Case, bytes" (Ok {InstructionType= Ok LDR;
                                                                     DestSourceReg= Ok R0; AddressReg= Ok R1;
@@ -323,7 +325,7 @@ module MemTests
                                                                     PreIndexRb= true; PostIndexRb= false; 
                                                                     ExtraAddressReg= None;
                                                                     ShiftExtraRegBy= None;})
-                
+
                     //STR tests with Bytes
                     makeTest "STR" "B" (ldFunc "R0, [R1]") "STR Base Case, bytes" (Ok {InstructionType= Ok STR;
                                                                     DestSourceReg= Ok R0; AddressReg= Ok R1;
@@ -381,8 +383,17 @@ module MemTests
                                                                     ShiftExtraRegBy= None;})
                 
                 
-                
                     //LDR & STR Error Message Tests
+                    makeTest "LDR" "" (ldFunc "") "error: LDR No Input" (Error "ops didn't match anything, ops: \"\"")
+                    makeTest "LDR" "B" (ldFunc "") "error: LDR No Input, bytes" (Error "ops didn't match anything, ops: \"\"")
+                    makeTest "STR" "" (ldFunc "") "error: STR No Input" (Error "ops didn't match anything, ops: \"\"")
+                    makeTest "STR" "B" (ldFunc "") "error: STR No Input, bytes" (Error "ops didn't match anything, ops: \"\"")
+                    makeTest "LDR" "" (ldFunc ", [R1]") "error: LDR Missing Ra" (Error "ops didn't match anything, ops: \", [R1]\"")
+                    makeTest "LDR" "" (ldFunc "R0, [R]") "error: LDR Wrong Rb" (Error "ops didn't match anything, ops: \"R0, [R]\"")
+                    makeTest "STR" "" (ldFunc ", [R1]") "error: STR Missing Ra" (Error "ops didn't match anything, ops: \", [R1]\"")
+                    makeTest "STR" "" (ldFunc "R0, [R]") "error: STR Wrong Rb" (Error "ops didn't match anything, ops: \"R0, [R]\"")
+
+
                 ]
 
 
@@ -420,8 +431,9 @@ module MemTests
                                                                                 DestReg= Ok R0;
                                                                                 SecondOp= Ok 4u;})
                     //ADR Error Message Tests
-                    makeTest "ADR" (ldFunc st "R0, ") "ADR No Input" (Error "evalExpression: End case did not match any of the evalExpression end case options (0x4, 2, 0b11, label2 etc)" )
+                    makeTest "ADR" (ldFunc st "R0, ") "ADR No Literal" (Error "evalExpression: End case did not match any of the evalExpression end case options (0x4, 2, 0b11, label2 etc)" )
                     makeTest "ADR" (ldFunc st ", 4") "ADR No Register" (Error "parseAdrIns: Line Data in incorrect form\nls.Operands: \", 4\"\nparseAdrIns: No destination register identified in parseAdrIns\nls.Operands: \", 4\"")
+                    makeTest "ADR" (ldFunc st "") "ADR No Input" (Error"parseAdrIns: Line Data in incorrect form\nls.Operands: \"\"\nparseAdrIns: No destination register identified in parseAdrIns\nls.Operands: \"\"")
 
 
                 ]
@@ -574,6 +586,29 @@ module MemTests
                                                                                     ShiftExtraRegBy= None;});
                                                                     PLabel = Some ("labelTest", 100u);
                                                                     PSize = 4u; PCond = Cal}))
+                    
+                    //parse Error Tests
+                    makeTest (ldFunc st "ADR" "") "parse ADR No Input2" (Some (Ok {PInstr = AdrO (Error"parseAdrIns: Line Data in incorrect form\nls.Operands: \"\"\nparseAdrIns: No destination register identified in parseAdrIns\nls.Operands: \"\"");
+                                                                    PLabel = Some ("labelTest", 100u);
+                                                                    PSize = 4u; PCond = Cal}))
+                    makeTest (ldFuncAll 200u "labelTestTwo" st "DCD" "1,a,5") "parse: DCD No Input" (Some (Ok {PInstr = LabelO (Error "parseLabelIns: Input to DCD function not valid (No input etc)");
+                                                                    PLabel = Some ("labelTestTwo", 200u);
+                                                                    PSize = 0u; PCond = Cal}))
+                    makeTest (ldFuncAll 100u "labelTest" st "EQU" "") "parse: EQU No Input" (Some (Ok {PInstr = LabelO (Error "evalExpression: End case did not match any of the evalExpression end case options (0x4, 2, 0b11, label2 etc)");
+                                                                    PLabel = Some ("labelTest", 100u);
+                                                                    PSize = 0u; PCond = Cal}))
+                    makeTest (ldFuncAll 100u "labelTest" st "FILL" "") "parse: Fill No Input" (Some (Ok {PInstr = LabelO (Error "evalExpression: End case did not match any of the evalExpression end case options (0x4, 2, 0b11, label2 etc)");
+                                                                    PLabel = Some ("labelTest", 100u);
+                                                                    PSize = 4u; PCond = Cal}))
+                    makeTest (ldFuncAll 100u "labelTest" st "LDR" "R0, [R]") "parse: LDR wrong Rb2" (Some (Ok {PInstr = MemO (Error "ops didn't match anything, ops: \"R0, [R]\"");
+                                                                    PLabel = Some ("labelTest", 100u);
+                                                                    PSize = 4u; PCond = Cal}))
+                    makeTest (ldFuncAll 100u "labelTest" st "STR" "R6, [R5, ]") "parse: STR Wrong Rc" (Some (Ok {PInstr = MemO (Error "ops didn't match anything, ops: \"R6, [R5, ]\"");
+                                                                    PLabel = Some ("labelTest", 100u);
+                                                                    PSize = 4u; PCond = Cal}))
+
+
+
 
                 ]
 
