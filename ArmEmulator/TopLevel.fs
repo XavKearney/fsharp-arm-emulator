@@ -1,4 +1,5 @@
-module TopLevel
+namespace Emulator
+module TopLevel = 
     open CommonLex
     open CommonData
 

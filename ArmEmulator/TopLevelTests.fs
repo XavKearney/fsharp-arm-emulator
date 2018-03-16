@@ -6,7 +6,7 @@ module TopLevelTests
     open Arithmetic
     open Mem
     open MultMem
-    open TopLevel
+    open Emulator.TopLevel
 
     /// take a function f, test name
     /// and list of (input, output) tuples
