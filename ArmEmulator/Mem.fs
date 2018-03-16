@@ -137,7 +137,7 @@ module Mem
                 let shft, rC = isPos shft0 rC0
                 Ok {(defaultRecord rA rB) with Rc= rC; Shift= shft;}
             | _ -> 
-                Error (sprintf "ops didn't match anything\nops: %A\n" ops)
+                Error (sprintf "ops didn't match anything, ops: %A" ops)
 
         let makeOutFromParseOps _ (x: FromOps) =
             {InstructionType= instTypeTmp;
@@ -647,14 +647,14 @@ module Mem
             | Ok (a,b,c) -> Ok ((dP.MM).Add(WA (b+c), DataLoc a))
             | Error m -> Error m
         let updatedRegMap = 
-            let test = interpretingRecord dP inputRecord
+            let regVals = interpretingRecord dP inputRecord
             let sndTup tup = 
                 match tup with
                 | (_,y,_) -> y
             let thrdTup tup = 
                 match tup with
                 | (_,_,z) -> z
-            match (inputRecord.AddressReg, test) with
+            match (inputRecord.AddressReg, regVals) with
             | (Error _, Error _) -> Map.empty
             | (Error _, _) -> Map.empty
             | (_, Error _) -> Map.empty                       
