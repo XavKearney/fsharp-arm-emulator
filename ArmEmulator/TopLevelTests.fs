@@ -70,9 +70,9 @@ module TopLevelTests
 
             // test invalid instructions
             "NOTANOPCODE R1, R2, #93", 
-            Error (ERRTOPLEVEL "Instruction not implemented: \"NOTANOPCODE R1, R2, #93\"")
-            "", Error (ERRTOPLEVEL "Invalid instruction: \"\"")
-            "blah", Error (ERRTOPLEVEL "Invalid instruction: \"blah\"")
+            Error (ERRTOPLEVEL "Instruction not implemented: NOTANOPCODE R1, R2, #93")
+            "", Error (ERRTOPLEVEL "Invalid instruction: ")
+            "blah", Error (ERRTOPLEVEL "Invalid instruction: blah")
         ]
 
     /// tests the function execParsedLine with unit tests
@@ -97,7 +97,7 @@ module TopLevelTests
                 Ok ({cpuData with Regs = cpuData.Regs.Add (R0, 1u)}, symtab.Add ("test", 0u))
             // test invalid lines
             (parseLine (someSymTab) (WA 0u) "ADDM R0, R0, #1"), 
-                Error (ERRTOPLEVEL "Instruction not implemented: \"ADDM R0, R0, #1\"")
+                Error (ERRTOPLEVEL "Instruction not implemented: ADDM R0, R0, #1")
             (parseLine (someSymTab) (WA 0u) "ADD R16, R0, #1"), 
                 Error (ERRIARITH "Destination is not a valid register")
             (parseLine (someSymTab) (WA 0u) "LDM R0, R0, {}"), 
