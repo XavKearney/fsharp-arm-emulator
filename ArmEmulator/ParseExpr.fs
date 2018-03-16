@@ -30,7 +30,10 @@ module ParseExpr
     let (|Matches|_|) (pat:string) (inp:string) =
         let m = Regex.Matches(inp, pat) in
         if m.Count > 0
-        then Some ([ for g in m -> g.Value ])
+        then 
+        [0..m.Count]
+        |> List.map (fun i -> m.Item(i).Value)
+        |> Some
         else None
 
     /// matches a string with regex pattern
