@@ -541,9 +541,7 @@ module MemTests
                                                                                     FillN = Some (Ok 4u)});
                                                                     PLabel = Some ("labelTest", 100u);
                                                                     PSize = 4u; PCond = Cal}))
-                    makeTest (ldFuncAll 100u "labelTest" st "FILL" "-1") "parse: Fill Error Case" (Some (Ok {PInstr = LabelO (Error "parseLabelIns: Fill expression (4294967295u) <0 or not divisible by four");
-                                                                    PLabel = Some ("labelTest", 100u);
-                                                                    PSize = 4u; PCond = Cal}))
+                    makeTest (ldFuncAll 100u "labelTest" st "FILL" "-1") "parse: Fill Error Case" (Some (Error "parseLabelIns: Fill expression (4294967295u) <0 or not divisible by four"))
                     //LDR
                     makeTest (ldFuncAll 100u "labelTest" st "LDR" "R0, [R1]") "parse: LDR Base Case" (Some (Ok {PInstr = MemO (Ok {InstructionType= Ok LDR;
                                                                                     DestSourceReg= Ok R0; AddressReg= Ok R1;
@@ -588,24 +586,12 @@ module MemTests
                                                                     PSize = 4u; PCond = Cal}))
                     
                     //parse Error Tests
-                    makeTest (ldFunc st "ADR" "") "parse ADR No Input2" (Some (Ok {PInstr = AdrO (Error"parseAdrIns: Line Data in incorrect form\nls.Operands: \"\"\nparseAdrIns: No destination register identified in parseAdrIns\nls.Operands: \"\"");
-                                                                    PLabel = Some ("labelTest", 100u);
-                                                                    PSize = 4u; PCond = Cal}))
-                    makeTest (ldFuncAll 200u "labelTestTwo" st "DCD" "1,a,5") "parse: DCD No Input" (Some (Ok {PInstr = LabelO (Error "parseLabelIns: Input to DCD function not valid (No input etc)");
-                                                                    PLabel = Some ("labelTestTwo", 200u);
-                                                                    PSize = 0u; PCond = Cal}))
-                    makeTest (ldFuncAll 100u "labelTest" st "EQU" "") "parse: EQU No Input" (Some (Ok {PInstr = LabelO (Error "evalExpression: End case did not match any of the evalExpression end case options (0x4, 2, 0b11, label2 etc)");
-                                                                    PLabel = Some ("labelTest", 100u);
-                                                                    PSize = 0u; PCond = Cal}))
-                    makeTest (ldFuncAll 100u "labelTest" st "FILL" "") "parse: Fill No Input" (Some (Ok {PInstr = LabelO (Error "evalExpression: End case did not match any of the evalExpression end case options (0x4, 2, 0b11, label2 etc)");
-                                                                    PLabel = Some ("labelTest", 100u);
-                                                                    PSize = 4u; PCond = Cal}))
-                    makeTest (ldFuncAll 100u "labelTest" st "LDR" "R0, [R]") "parse: LDR wrong Rb2" (Some (Ok {PInstr = MemO (Error "ops didn't match anything, ops: \"R0, [R]\"");
-                                                                    PLabel = Some ("labelTest", 100u);
-                                                                    PSize = 4u; PCond = Cal}))
-                    makeTest (ldFuncAll 100u "labelTest" st "STR" "R6, [R5, ]") "parse: STR Wrong Rc" (Some (Ok {PInstr = MemO (Error "ops didn't match anything, ops: \"R6, [R5, ]\"");
-                                                                    PLabel = Some ("labelTest", 100u);
-                                                                    PSize = 4u; PCond = Cal}))
+                    makeTest (ldFunc st "ADR" "") "parse ADR No Input2" (Some (Error"parseAdrIns: Line Data in incorrect form\nls.Operands: \"\"\nparseAdrIns: No destination register identified in parseAdrIns\nls.Operands: \"\""))
+                    makeTest (ldFuncAll 200u "labelTestTwo" st "DCD" "1,a,5") "parse: DCD No Input" (Some (Error "parseLabelIns: Input to DCD function not valid (No input etc)"))
+                    makeTest (ldFuncAll 100u "labelTest" st "EQU" "") "parse: EQU No Input" (Some (Error "evalExpression: End case did not match any of the evalExpression end case options (0x4, 2, 0b11, label2 etc)"))
+                    makeTest (ldFuncAll 100u "labelTest" st "FILL" "") "parse: Fill No Input" (Some (Error "evalExpression: End case did not match any of the evalExpression end case options (0x4, 2, 0b11, label2 etc)"))
+                    makeTest (ldFuncAll 100u "labelTest" st "LDR" "R0, [R]") "parse: LDR wrong Rb2" (Some (Error "ops didn't match anything, ops: \"R0, [R]\""))
+                    makeTest (ldFuncAll 100u "labelTest" st "STR" "R6, [R5, ]") "parse: STR Wrong Rc" (Some (Error "ops didn't match anything, ops: \"R6, [R5, ]\""))
 
 
 
