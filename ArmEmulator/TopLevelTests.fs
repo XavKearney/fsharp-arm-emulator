@@ -79,8 +79,12 @@ module TopLevelTests
             "blah", Error (ERRTOPLEVEL "Invalid instruction: blah")
         ]
 
-    /// tests the function execParsedLine with unit tests
+    // tests the function execParsedLine with unit tests
     let testExecParsedLine = 
+        let removeResult x = 
+            match x with
+            | Ok y -> y
+            | Error _ -> failwithf "Should never happen."
         let cpuData = 
             match initDataPath None None None with
             | Ok x -> x
@@ -91,7 +95,7 @@ module TopLevelTests
             match f ld with
             | Some x -> x
             | None -> failwithf "Should never happen."
-        makeUnitTestListWithTwoParams execParsedLine (cpuData, symtab) "Unit Test execParsedLine" [
+        makeUnitTestListWithTwoParams (removeResult >> execParsedLine) (cpuData, symtab) "Unit Test execParsedLine" [
             // test valid lines
             (parseLine (someSymTab) (WA 0u) "STM R0, {R1}"), 
                 Ok ({cpuData with MM = cpuData.MM.Add (WA 0u, DataLoc 0u)}, symtab)
@@ -101,15 +105,10 @@ module TopLevelTests
                 Ok ({cpuData with Regs = cpuData.Regs.Add (R0, 1u)}, symtab.Add ("test", 0u))
             (parseLine (someSymTab) (WA 0u) "ADR R0, 4"), 
                 Ok ({cpuData with Regs = cpuData.Regs.Add (R0, 4u)}, symtab)
+            (parseLine (someSymTab) (WA 0u) "ADDEQ R0, R0, #4"), 
+                Ok (cpuData, symtab)
             (parseLine (someSymTab) (WA 0u) "test DCD 1"), 
                 Ok ({cpuData with MM = cpuData.MM.Add (WA 0x104u, DataLoc 1u)}, symtab.Add ("test", 1u))
-            // test invalid lines
-            (parseLine (someSymTab) (WA 0u) "ADDM R0, R0, #1"), 
-                Error (ERRTOPLEVEL "Instruction not implemented: ADDM R0, R0, #1")
-            (parseLine (someSymTab) (WA 0u) "ADD R16, R0, #1"), 
-                Error (ERRIARITH "Destination is not a valid register")
-            (parseLine (someSymTab) (WA 0u) "LDM R0, R0, {}"), 
-                Error (ERRIMULTMEM "Incorrectly formatted operands.")
          ]
 
          
@@ -119,31 +118,135 @@ module TopLevelTests
             match initDataPath None None None with
             | Ok x -> x
             | Error _ -> failwithf "Should never happen."
-        let symtab = ["test", 0u] |> Map.ofList
+        let symtab = ["test", 0x100u] |> Map.ofList
         let someSymTab = Some (symtab)
         let getParsed f ld = 
             match f ld with
             | Some x -> x
             | None -> failwithf "Should never happen."
         makeUnitTestListWithTwoParams parseThenExecLines (cpuData, someSymTab) "Unit Test execParsedLines" [
-            // test single valid lines
-            ["STM R0, {R1}"], 
-                Ok ({cpuData with MM = cpuData.MM.Add (WA 0u, DataLoc 0u)}, symtab)
+            // // test single valid lines
             ["ADD R0, R0, #1"], 
-                Ok ({cpuData with Regs = cpuData.Regs.Add (R0, 1u)}, symtab)
-            // test multiple valid lines
-            ["STM R0, {R1}"; "ADD R0, R0, #1"], 
+                Ok ({cpuData with 
+                        Regs = cpuData.Regs
+                            |> Map.add R0 1u
+                            |> Map.add R15 8u
+                        MM = cpuData.MM
+                            |> Map.add (WA 0u) 
+                                (Code (IARITH (ArithI {InstrType = Some ADD;
+                                            SuffixSet = false;
+                                            Target = R0;
+                                            Op1 = R0;
+                                            Op2 = Literal 1u;})))
+                    }, symtab)
+
+            ["ADDEQ R0, R0, #1"], 
+                Ok ({cpuData with 
+                        Regs = cpuData.Regs
+                            |> Map.add R0 0u
+                            |> Map.add R15 8u
+                        MM = cpuData.MM
+                            |> Map.add (WA 0u) 
+                                (Code (IARITH (ArithI {InstrType = Some ADD;
+                                            SuffixSet = false;
+                                            Target = R0;
+                                            Op1 = R0;
+                                            Op2 = Literal 1u;})))
+                    }, symtab)
+
+            ["ADD R0, R0, #1"; "END"; "ADD R0,R0,#1";], 
             Ok ({cpuData with 
-                    Regs = cpuData.Regs.Add (R0, 1u);MM = cpuData.MM.Add (WA 0u, DataLoc 0u)}, symtab)
-            ["ADD R0, R0, #5"; "SUB R0, R0, #3"], 
+                    Regs = cpuData.Regs
+                        |> Map.add R0 1u
+                        |> Map.add R15 12u
+                    MM = cpuData.MM
+                        |> Map.add (WA 0u) 
+                            (Code (IARITH (ArithI {InstrType = Some ADD;
+                                        SuffixSet = false;
+                                        Target = R0;
+                                        Op1 = R0;
+                                        Op2 = Literal 1u;})))
+                        |> Map.add (WA 4u) 
+                            (Code (IMULTMEM (EndI END)))
+                        |> Map.add (WA 8u) 
+                            (Code (IARITH (ArithI {InstrType = Some ADD;
+                                        SuffixSet = false;
+                                        Target = R0;
+                                        Op1 = R0;
+                                        Op2 = Literal 1u;})))
+                }, symtab)      
+      
+            ["ADD R0, R0, #1"; "ENDEQ"; "ADD R0,R0,#1";], 
             Ok ({cpuData with 
-                    Regs = cpuData.Regs.Add (R0, 2u);}, symtab)
-            ["ADD R0, R0, #5"; "test2 SUB R0, R0, #3"], 
+                    Regs = cpuData.Regs
+                        |> Map.add R0 2u
+                        |> Map.add R15 16u
+                    MM = cpuData.MM
+                        |> Map.add (WA 0u) 
+                            (Code (IARITH (ArithI {InstrType = Some ADD;
+                                        SuffixSet = false;
+                                        Target = R0;
+                                        Op1 = R0;
+                                        Op2 = Literal 1u;})))
+                        |> Map.add (WA 4u) 
+                            (Code (IMULTMEM (EndI END)))
+                        |> Map.add (WA 8u) 
+                            (Code (IARITH (ArithI {InstrType = Some ADD;
+                                        SuffixSet = false;
+                                        Target = R0;
+                                        Op1 = R0;
+                                        Op2 = Literal 1u;})))
+                }, symtab)
+
+            ["ADD R0, R0, #3"; "start ADD R3,R3,#1"; "SUBS R0,R0,#1"; "BNE start"], 
             Ok ({cpuData with 
-                    Regs = cpuData.Regs.Add (R0, 2u);}, symtab.Add ("test2", 4u))
+                    Regs = cpuData.Regs
+                        |> Map.add R3 3u
+                        |> Map.add R15 20u
+                    Fl = {N = false; C = true; Z = true; V = false;}
+                    MM = cpuData.MM
+                        |> Map.add (WA 0u) 
+                            (Code (IARITH (ArithI {InstrType = Some ADD;
+                                        SuffixSet = false;
+                                        Target = R0;
+                                        Op1 = R0;
+                                        Op2 = Literal 3u;})))
+                        |> Map.add (WA 4u) 
+                            (Code (IARITH (ArithI {InstrType = Some ADD;
+                                        SuffixSet = false;
+                                        Target = R3;
+                                        Op1 = R3;
+                                        Op2 = Literal 1u;})))
+                        |> Map.add (WA 8u) 
+                            (Code (IARITH (ArithI {InstrType = Some SUB;
+                                        SuffixSet = true;
+                                        Target = R0;
+                                        Op1 = R0;
+                                        Op2 = Literal 1u;})))
+                        |> Map.add (WA 12u) 
+                            (Code (IMULTMEM (BranchI {BranchAddr = 12u; LinkAddr=None})))
+                }, symtab.Add ("start", 4u))
+
             ["ADD R0, R0, #test3"; "test3 SUB R0, R0, #3"], 
             Ok ({cpuData with 
-                    Regs = cpuData.Regs.Add (R0, 1u);}, symtab.Add ("test3", 4u))
+                    Regs = cpuData.Regs
+                        |> Map.add R0 1u
+                        |> Map.add R15 12u
+                    MM = cpuData.MM
+                        |> Map.add (WA 0u) 
+                            (Code (IARITH (ArithI {InstrType = Some ADD;
+                                        SuffixSet = false;
+                                        Target = R0;
+                                        Op1 = R0;
+                                        Op2 = Literal 4u;})))
+                        |> Map.add (WA 4u) 
+                            (Code (IARITH (ArithI {InstrType = Some SUB;
+                                        SuffixSet = false;
+                                        Target = R0;
+                                        Op1 = R0;
+                                        Op2 = Literal 3u;})))
+                }, symtab.Add ("test3", 4u))
+
             // test invalid single lines
             ["LDM R0, R0, {}"], 
                 Error (ERRIMULTMEM "Incorrectly formatted operands.")
