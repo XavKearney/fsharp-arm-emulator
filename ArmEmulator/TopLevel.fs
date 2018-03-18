@@ -15,7 +15,6 @@ module TopLevel =
         | IMEM of Mem.ReturnInstr
         // multiple memory instructions (and branch & end)
         | IMULTMEM of MultMem.ReturnInstr
-        | IEND of MultMem.EndInstr
 
     
     /// allows different modules to return different error info
@@ -151,7 +150,7 @@ module TopLevel =
         | Cgt -> (not z) && (n = v)   // execute if Z = 0 and N = V 
         | Cle -> z && (n = not v)     // execute if Z = 1 and N != V"
         | Cnv -> true
-        | Cal -> false
+        | Cal -> true
 
     // function to execute any parsed instruction from any module
     // returns the modified datapath (or an error)
@@ -237,11 +236,25 @@ module TopLevel =
             |> WA
             |> insMap.TryFind
             |> function
-                | None | Some({PInstr=IEND _}) -> true
+                | Some({PInstr=IMULTMEM (EndI _); PCond=cond}) 
+                    when checkCond cpu'.Fl cond -> true
+                | _ -> false
+        let checkStop cpu' (insMap: Map<WAddr, Parse<Instr>>) =
+            cpu'.Regs.[R15] - 8u
+            |> WA
+            |> insMap.TryFind
+            |> function
+                | None -> true
                 | _ -> false
 
         let incrProgCount size cpu' =
             {cpu' with Regs = cpu'.Regs.Add (R15, cpu'.Regs.[R15] + size)}
+        
+        let checkBranch p = 
+            match p with
+            | {PInstr=IMULTMEM (BranchI _)} -> true
+            | _ -> false
+
 
         let rec execLines cpu' (insMap: Map<WAddr, Parse<Instr>>) symtab' = 
             // check if the program has reached the end
@@ -256,16 +269,22 @@ module TopLevel =
                     execParsedLine p cpu' symtab'
                     |> Result.bind (
                         fun (newCpu, newSymTab) -> 
+                            let branch = checkBranch p
+                            let executed = checkCond cpu'.Fl p.PCond
                             // need to check if program is about to end
-                            let nextCpu = incrProgCount p.PSize newCpu
-                            checkEnd nextCpu insMap
+                            let nextCpu = 
+                                match branch && executed with
+                                // if instruction branched, don't change PC
+                                | true -> newCpu
+                                // otherwise, increment PC
+                                | false -> incrProgCount p.PSize newCpu
+                            checkStop nextCpu insMap 
                             |> function
                                 // if so, return
                                 | true -> Ok (newCpu, newSymTab)
                                 // if not, increment PC and continue exection
                                 | false -> execLines nextCpu insMap newSymTab
                     )
-
         setProgCount cpuData
         |> fun cpu -> putCodeInMemory parsedLines cpu Map.empty 0u
         |> Result.bind (fun (cpu', insMap) -> execLines cpu' insMap symtab)
