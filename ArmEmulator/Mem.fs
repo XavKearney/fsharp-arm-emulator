@@ -71,9 +71,9 @@ module Mem
         else
             let m = Regex.Match(input, pattern, RegexOptions.Compiled)
             if m.Success then
-            [0..m.Groups.Count-1]
-            |> List.map (fun i -> m.Groups.[i])
-            |> Some
+                [0..m.Groups.Count-1]
+                |> List.map (fun i -> m.Groups.[i])
+                |> Some
             else None
     ///Match a Regex pattern multiple times
     let (|Matches|_|) pattern input =
@@ -81,9 +81,9 @@ module Mem
         else
             let m = Regex.Matches(input, pattern, RegexOptions.Compiled)
             if m.Count > 0 then 
-            [0..m.Count-1]
-            |> List.map (fun i -> m.[i].Value)
-            |> Some
+                [0..m.Count-1]
+                |> List.map (fun i -> m.[i].Value)
+                |> Some
             else None
 
     ///A record to return all the data from the regexs
@@ -205,7 +205,7 @@ module Mem
     /// - Add multiple bracket functionality 
     ///   Eg 2*(6+(3*4)-(6+3))*5
     /// - Add working CheckLiteral function which works for -ve's
-    let evalExpression (exp0: string) (symTab: SymbolTable) (labels: bool) =
+    let evalExpression (exp0: string) (symTab: SymbolTable) (_: bool) =
         evalExpr symTab exp0
 
 
