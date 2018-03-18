@@ -127,6 +127,32 @@ module TopLevel =
         | Error s -> Error (fMap s)
         | Ok x -> Ok x
 
+    // checks whether an instruction should be executed
+    // based on condition code and current flags
+    let checkCond flags cond =
+        let n, z, c, v = flags.N, flags.Z, flags.C, flags.V
+        let exeDecide flag exeCondition =
+            match flag = exeCondition with
+            | true -> true
+            | false -> false
+        match cond with 
+        | Ceq -> z                // execute if Z=1
+        | Cne -> not z            // execute if Z=0      
+        | Cmi -> n                // execute if N=1
+        | Cpl -> not n            // execute if N=0
+        | Cvs -> v                // execute if V = 1
+        | Cvc -> not v            // execute if V = 0            
+        | Chs -> c                // execute if C = 1
+        | Clo -> not c            // execute if C = 0            
+        | Cge -> n = v            // execute if N = V            
+        | Clt -> n = not v        // execute if N != V            
+        | Chi -> c && (not z)     // execute if C = 1 and Z = 0
+        | Cls -> (not c) || z     // execute if C = 0 or Z = 1
+        | Cgt -> (not z) && (n = v)   // execute if Z = 0 and N = V 
+        | Cle -> z && (n = not v)     // execute if Z = 1 and N != V"
+        | Cnv -> true
+        | Cal -> false
+
     // function to execute any parsed instruction from any module
     // returns the modified datapath (or an error)
     let execParsedLine ins d (symtab: SymbolTable) =
@@ -135,9 +161,11 @@ module TopLevel =
             { PInstr = ins'; PLabel = p.PLabel; PCond = p.PCond; PSize = p.PSize }
             |> f
             |> mapErr err
-        
-        ins |> (
-            function
+
+        // check if instruction should be executed
+        match checkCond d.Fl ins.PCond with
+        | true ->
+            match ins with
             | {PInstr=IMEM ins';} as p -> 
                 exec' p (Mem.execInstr d symtab) ins' ERRIMEM
             | {PInstr=IMULTMEM ins';} as p -> 
@@ -146,7 +174,7 @@ module TopLevel =
             | {PInstr=IARITH ins';} as p -> 
                 exec' p (Arithmetic.execArithmeticInstr d) ins' ERRIARITH
                 |> Result.map (fun cpu -> cpu, symtab)
-        )
+        | false -> Ok (d, symtab)
 
     /// takes a list of lines as string
     /// and optionally, a symbol table
@@ -182,6 +210,7 @@ module TopLevel =
                     | Error s -> Error s :: parseLines' rest (loadaddr + 4u) symtab'
         parseLines' lines 0u symtab
         |> fun p -> p, createSymTab symtab p
+
 
 
     /// execute a list of parsed lines
