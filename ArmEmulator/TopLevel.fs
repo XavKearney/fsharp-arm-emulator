@@ -1,4 +1,5 @@
 namespace Emulator
+open MultMem
 module TopLevel = 
     open CommonLex
     open CommonData
@@ -14,6 +15,7 @@ module TopLevel =
         | IMEM of Mem.ReturnInstr
         // multiple memory instructions (and branch & end)
         | IMULTMEM of MultMem.ReturnInstr
+        | IEND of MultMem.EndInstr
 
     
     /// allows different modules to return different error info
@@ -133,11 +135,11 @@ module TopLevel =
             { PInstr = ins'; PLabel = p.PLabel; PCond = p.PCond; PSize = p.PSize }
             |> f
             |> mapErr err
-
-        ins |> Result.bind (
+        
+        ins |> (
             function
             | {PInstr=IMEM ins';} as p -> 
-                exec' p (Mem.execInstr d symtab) ins' ERRIMULTMEM
+                exec' p (Mem.execInstr d symtab) ins' ERRIMEM
             | {PInstr=IMULTMEM ins';} as p -> 
                 exec' p (MultMem.execInstr d) ins' ERRIMULTMEM
                 |> Result.map (fun cpu -> cpu, symtab)
@@ -186,14 +188,58 @@ module TopLevel =
     /// returns modified DataPath and symbol table
     /// binds any errors in the execution or parsed lines
     let execParsedLines parsedLines cpuData symtab = 
-        let rec execLines lines cpu' symtab' = 
+        // this puts each line of code in its correct memory location
+        // starting at 0u, increasing by PSize each time
+        let rec putCodeInMemory lines cpu' (insMap: Map<WAddr, Parse<Instr>>) currAddr = 
             match lines with
-            // no more lines to return, so return cpu and symtab
-            | [] -> Ok (cpu', symtab')
-            | line :: rest ->
-                execParsedLine line cpu' symtab'
-                |> Result.bind (fun (newCpu, newSymTab) -> execLines rest newCpu newSymTab)
-        execLines parsedLines cpuData symtab
+            | [] -> Ok (cpu', insMap)
+            | Ok line :: rest ->
+                {cpu' with MM = cpu'.MM.Add (WA currAddr, Code line.PInstr) }
+                |> fun c ->
+                    insMap.Add (WA currAddr, line)
+                    |> fun iMap -> putCodeInMemory rest c iMap (currAddr + line.PSize)
+            | Error s :: _ -> Error s
+
+        let setProgCount cpu' = 
+            {cpu' with Regs = cpu'.Regs.Add (R15, 8u)}
+
+        let checkEnd cpu' (insMap: Map<WAddr, Parse<Instr>>) =
+            cpu'.Regs.[R15] - 8u
+            |> WA
+            |> insMap.TryFind
+            |> function
+                | None | Some({PInstr=IEND _}) -> true
+                | _ -> false
+
+        let incrProgCount size cpu' =
+            {cpu' with Regs = cpu'.Regs.Add (R15, cpu'.Regs.[R15] + size)}
+
+        let rec execLines cpu' (insMap: Map<WAddr, Parse<Instr>>) symtab' = 
+            // check if the program has reached the end
+            match checkEnd cpu' insMap with
+            // if so, return 
+            | true -> Ok (cpu', symtab')
+            // otherwise, execute the next instruction
+            | false ->
+                cpu'.Regs.[R15] - 8u
+                |> fun a -> insMap.[WA a]
+                |> fun p -> 
+                    execParsedLine p cpu' symtab'
+                    |> Result.bind (
+                        fun (newCpu, newSymTab) -> 
+                            // need to check if program is about to end
+                            let nextCpu = incrProgCount p.PSize newCpu
+                            checkEnd nextCpu insMap
+                            |> function
+                                // if so, return
+                                | true -> Ok (newCpu, newSymTab)
+                                // if not, increment PC and continue exection
+                                | false -> execLines nextCpu insMap newSymTab
+                    )
+
+        setProgCount cpuData
+        |> fun cpu -> putCodeInMemory parsedLines cpu Map.empty 0u
+        |> Result.bind (fun (cpu', insMap) -> execLines cpu' insMap symtab)
 
 
     /// takes a list of lines as string, a datapath and an optional symbol table
