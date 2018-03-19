@@ -2,6 +2,8 @@ module Arithmetic
     open CommonData
     open CommonLex
     open System.Text.RegularExpressions
+    open ParseExpr
+    open System.Xml.Linq
 
     // DUs for the instructions in Arithmetic
     type ArithInstrType = ADD | ADC | SUB | SBC | RSB | RSC
@@ -195,94 +197,21 @@ module Arithmetic
             | true -> Ok x
             | false -> Error ("Invalid 32 bit number")
 
-    /// Recursively split an expression and evaluate
-    /// Combine expression in BIDMAD format
+    /// Gets expression and symbol table and
+    /// passes to a parser that returns a result
+    /// which is then checked for valid 32 bit number
     let recursiveSplit expression (symTable:SymbolTable option) =
-        // Lift result type up through recursive function
-        let lift op a b =
-            match a,b with
-            | Ok x, Ok y -> Ok (op x y)
-            | _, _ -> Error ("Invalid 32 bit number")
-
-        match expression with
-        | FlexParse "([+*-]{2})" _ ->
-            Error ("Invalid expression")
-        
-        | FlexParse "([+*-])$" _ ->
-            Error ("Invalid expression")
-
-        | FlexParse "^([*])" _ ->
-            Error ("Invalid expression")
-            
-        | _ ->   
-            let rec recursiveSplit' expression = 
-                if String.exists (fun c -> c='+') expression then
-                    expression.Split('+')
-                    |> Array.map (fun s-> s.Trim()) 
-                    |> Array.toList
-                    |> List.map ((fun s -> if s = "" then "0" else s) >> recursiveSplit')
-                    |> List.reduce (lift (+))
-
-                elif String.exists (fun c -> c='-') expression then
-                    expression.Split('-')
-                    |> Array.map (fun s -> s.Trim())
-                    |> Array.toList
-                    |> List.map ((fun s -> if s = "" then "0" else s) >> recursiveSplit')
-                    |> List.reduce (lift (-))
-
-                elif String.exists (fun c -> c='*') expression then
-                    expression.Split('*')
-                    |> Array.map (fun s-> s.Trim()) 
-                    |> Array.toList
-                    |> List.map recursiveSplit'
-                    |> List.reduce (lift (*))
-
-                else
-                    match expression with
-                    // Binary string
-                    | FlexParse "^(-?0b[0-1]+)$" [binStr] -> 
-                        match binStr.Length with
-                        | x when x > 38 -> Error ("Op2 is not a valid 32 bit number")
-                        | _ -> 
-                            match check32BitBound binStr with
-                            | Ok binInt -> Ok (binInt)
-                            | _ -> Error ("Op2 is not a valid 32 bit number")  
-
-                    // Hex string
-                    | FlexParse "^(-?0x[0-9A-F]+|-?&[0-9A-F]+)$" [hexStr] -> 
-                        match hexStr.Length with
-                        | x when x > 14 -> Error ("Op2 is not a valid 32 bit number")
-                        | _ -> 
-                            match hexStr with
-                            | Prefix "&" hexOut ->
-                                let finalHex = "0x" + hexOut
-                                match check32BitBound finalHex with
-                                | Ok hexInt -> Ok (hexInt)
-                                | _ -> Error ("Invalid 32 bit number")
-                            | _ ->
-                                match check32BitBound hexStr with
-                                | Ok hexInt -> Ok (hexInt)
-                                | _ -> Error ("Invalid 32 bit number")
-
-                    // Decimal string
-                    | FlexParse "^(-?[0-9]+)$" [numStr] ->
-                        match numStr.Length with
-                        | x when x > 14 -> Error ("Op2 is not a valid 32 bit number")
-                        | _ ->
-                            match check32BitBound numStr with
-                            | Ok numInt -> Ok (numInt)
-                            | _ -> Error ("Invalid 32 bit number")
-                    
-                    // Otherwise could be symbol or otherwise invalid expression
-                    | _ -> 
-                        match symTable with
-                        | Some symMap -> 
-                            match symMap.TryFind expression with
-                            | Some sym -> Ok (int64 sym)
-                            | _ -> Error ("Symbol does not exist")
-                        | _ -> Error ("Invalid op2 expression")
-
-            recursiveSplit' expression
+        match symTable with
+        | Some symTab -> 
+            let result = ParseExpr.evalExpr symTab expression
+            match result with
+            | Ok res ->
+                match check32BitBound res with
+                | Ok x -> Ok x
+                | Error err -> Error err
+            | Error err -> Error err
+        | _ ->
+            Error ("No symbol table properly defined")
 
     /// Parse a line for CMP and CMN instructions
     let parseCompLine (line:string) (symTable:SymbolTable option) = 
