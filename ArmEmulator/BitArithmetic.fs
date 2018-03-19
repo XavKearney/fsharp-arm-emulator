@@ -102,11 +102,14 @@ module BitArithmetic
         | FirstMatch @"^(-?[0-9]+)$" x -> Some (int x)
         | _ -> None
 
+    let listAllPairs xs ys = 
+        xs |> List.collect (fun x -> ys |> List.map (fun y -> x, y))
+
     /// checks if an integer can be created by rotating an 8 bit number in a 32 bit word 
     let allowedLiterals num =
         let valid =
             [0..2..30] 
-            |> List.allPairs [(uint32 num)] 
+            |> listAllPairs [(uint32 num)] 
             |> List.map (fun (n,r) -> (n >>> r) ||| (n <<< (32-r)))
             |> List.collect (fun n -> [n < 256u])
             |> List.contains true

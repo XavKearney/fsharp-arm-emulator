@@ -454,7 +454,7 @@ module ArithmeticTests
                 }
 
                 // Use my code with the same input values to obtain hopefully the same output
-                let results = execArithmeticInstr parsed cpuData
+                let results = execArithmeticInstr cpuData parsed
 
                 match results with
                 | Ok resCpu ->
@@ -554,7 +554,7 @@ module ArithmeticTests
                     MM = Map.empty;
                 }
 
-                let results = execArithmeticInstr parsed cpuData
+                let results = execArithmeticInstr cpuData parsed
 
                 match results with
                 | Ok resCpu -> 

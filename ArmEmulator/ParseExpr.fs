@@ -20,8 +20,8 @@ module ParseExpr
 
     /// checks if a string contains a character
     /// if so, split at that character and return list
-    let (|SplitAt|_|) (c:string) (str:string) =
-        if str.Contains(c) 
+    let (|SplitAt|_|) (c:char) (str:string) =
+        if str.Contains(c.ToString()) 
         then Some(str.Split(c) |> Seq.toList)
         else None
 
@@ -30,7 +30,10 @@ module ParseExpr
     let (|Matches|_|) (pat:string) (inp:string) =
         let m = Regex.Matches(inp, pat) in
         if m.Count > 0
-        then Some ([ for g in m -> g.Value ])
+        then 
+        [0..m.Count-1]
+        |> List.map (fun i -> m.Item(i).Value)
+        |> Some
         else None
 
     /// matches a string with regex pattern
@@ -47,20 +50,57 @@ module ParseExpr
         let m = Regex.Matches(inp, pat) in
         if m.Count > 0
         then 
-            [ for x in m -> x.Groups ]
-            |> List.collect (fun x -> [for y in x -> y.Value])
+            [0..m.Count-1]
+            |> List.map (fun i -> m.[i].Groups)
+            |> List.collect 
+                (fun g -> 
+                    [0..g.Count-1]
+                    |> List.map (fun i -> g.[i].Value))
             |> List.tail // remove the whole matched string
             |> Some 
         else None
+
+    // parses a string of hex characters 0-9A-F into a uint32
+    let parseHex (s:string) =
+        let charMap = 
+            [('0',0u);('1',1u);('2',2u);('3',3u);('4',4u);('5',5u);('6',6u);('7',7u);('8',8u);
+                ('9',9u);('A',10u);('B',11u);('C',12u);('D',13u);('E',14u);('F',15u)]
+            |> Map.ofList
+        let rec parseHex' charLst n i =
+            match charLst with
+            | [] -> n
+            | c :: rest ->
+                parseHex' rest (n + i * charMap.[c]) (i*16u)
+        s
+        |> Seq.map System.Char.ToUpper
+        |> Seq.toList
+        |> List.rev
+        |> fun chars -> parseHex' chars 0u 1u
+
+    // parses a string of binary characters 0-1 into a uint32
+    let parseBin (s:string) =
+        let charMap = 
+            [('0',0u);('1',1u);]
+            |> Map.ofList
+        let rec parseBin' charLst n i =
+            match charLst with
+            | [] -> n
+            | c :: rest ->
+                parseBin' rest (n + i * charMap.[c]) (i*2u)
+        s
+        |> Seq.map System.Char.ToUpper
+        |> Seq.toList
+        |> List.rev
+        |> fun chars -> parseBin' chars 0u 1u
     
     /// matches a literal in hex form (0x.. or &..),
     /// in binary form (0b..) or as a standard number
     /// if no match, try and find the string in the SymbolTable
     let (|Literal|_|) (symTab:SymbolTable) (inp:string) =
         match inp with
-        | Match1 @"^(0[xX][a-fA-F0-9]+)$" x -> uint32 x |> Some
-        | Match1 @"^(&[a-fA-F0-9]+)$" x -> "0x"+x.[1..] |> uint32 |> Some
-        | Match1 @"^(0b[0-1]+)$" x -> uint32 x |> Some
+        | Match1 @"^(0[xX][a-fA-F0-9]+)$" x -> parseHex x.[2..] |> Some
+        | Match1 @"^(&[a-fA-F0-9]+)$" x -> parseHex x.[1..] |> uint32 |> Some
+        | Match1 @"^(0b[0-1]+)$" x -> parseBin x.[2..] |> Some
         | Match1 @"^([0-9]+)$" x -> uint32 x |> Some
         | label -> symTab.TryFind label
 
@@ -135,12 +175,12 @@ module ParseExpr
             | Op op :: rest -> 
                 // comparison of ops determines which comes first
                 // needed if multiple pending operations, to get order correct
-                match ops <> [] && ops.Head > (Op op) with
+                match ops <> [] && ops.Head >= (Op op) with
                 // operator should be applied now
                 | true when nums.Length >= 2 ->
                     let first, second, remaining = first2 nums
                     doOp ops.Head first second
-                    |> fun res -> eval' rest (res::remaining) (Op op::ops.Tail)
+                    |> fun res -> eval' toks (res::remaining) (ops.Tail)
                 | false -> 
                     match nums, ops with
                     // if it starts with an operator, put in a 0 at the beginning

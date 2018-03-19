@@ -91,7 +91,7 @@ module MultMem
         // get the target register as a string, e.g. "R10!"
         let targetStr = sLst.Head
         // check for writeback suffix '!'
-        let wb = targetStr.EndsWith('!')
+        let wb = targetStr.EndsWith("!")
         // get the target register's RName from string without '!' suffix
         let target = regNames.TryFind (targetStr.Trim('!'))
         // recombine the list of registers
@@ -334,19 +334,13 @@ module MultMem
             // and set LR to link address
             Ok {branchedCpu with Regs = cpuData.Regs.Add (R14, lAddr)}
 
-    /// execution function to take result of parse
-    /// and return the correct execution function        
+    /// generic execution for any parsed instruction
+    /// handled by this module        
     let execInstr cpuData parsed =
-        parsed |> Option.map (
-            fun r -> r |> Result.bind (fun x ->
-                match x.PInstr with
-                | BranchI _ -> execBranchInstr x cpuData
-                | MemI _ -> execMultMem x cpuData
-                | EndI _ -> Error "Cannot execute an END instruction."
-            )
-        )
+        match parsed.PInstr with
+        | BranchI _ -> execBranchInstr parsed cpuData
+        | MemI _ -> execMultMem parsed cpuData
+        | EndI _ -> Error "Cannot execute an END instruction."
 
     /// Parse Active Pattern used by top-level code
     let (|IMatch|_|)  = parse
-
-

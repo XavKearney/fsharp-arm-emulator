@@ -49,6 +49,9 @@ module Arithmetic
             Op2: Op2Types;
         }
 
+    // error instruction type
+    type ErrInstr = string
+
     // Defines the spec for all the Arithmetic instructions
     let CompSpec = {
         InstrC = COMP
@@ -74,10 +77,18 @@ module Arithmetic
     
     // Flexible operand 2 string parsing -> Returns group matches
     let (|FlexParse|_|) pattern input = 
-        let flexMatch = Regex.Match(input, pattern)
-        match flexMatch.Success with
-        | true -> Some (List.tail [for strMatch in flexMatch.Groups -> strMatch.Value ])
-        | false -> None
+        let m = Regex.Matches(input, pattern) in
+        if m.Count > 0
+        then 
+            [0..m.Count-1]
+            |> List.map (fun i -> m.[i].Groups)
+            |> List.collect 
+                (fun g -> 
+                    [0..g.Count-1]
+                    |> List.map (fun i -> g.[i].Value))
+            |> List.tail // remove the whole matched string
+            |> Some 
+        else None
 
     // Matches the first character of a string and returns the rest
     let (|Prefix|_|) (p:string) (s:string) =
@@ -440,7 +451,7 @@ module Arithmetic
         match parseArithLine operands symTable with
         | Ok (dest, op1, op2) -> 
             // Converts suffix string into bool option
-            let suffType = suffix.EndsWith('S') 
+            let suffType = suffix.EndsWith("S") 
 
             // Creates basic ArithInstr type
             let baseArithInstr = {
@@ -526,7 +537,7 @@ module Arithmetic
 
     /// Execute an arithmetic instruction
     /// Performs arithmetic on given cpuData
-    let execArithmeticInstr (input: Parse<ReturnInstr>) cpuData = 
+    let execArithmeticInstr cpuData (input: Parse<ReturnInstr>) = 
         // Register map
         let regMap = cpuData.Regs
 
