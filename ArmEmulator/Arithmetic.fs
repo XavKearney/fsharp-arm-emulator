@@ -183,10 +183,9 @@ module Arithmetic
 
     /// Checks if input conforms to restrictions on literals
     let check32BitBound input =
-        match int64 input with
-        | x when x > int64 System.Int32.MaxValue -> Error ("Invalid 32 bit number")
-        | x when x < int64 System.Int32.MinValue -> Error ("Invalid 32 bit number")
-        | x -> 
+        let inverseInput = ~~~input
+        
+        let doCheck x = 
             let rotates = [0;2;4;6;8;10;12;14;16;18;20;22;24;26;28;30]
             let valid = 
                 List.map (fun a -> uint32((x <<< (32-a)) + (x >>> a))) rotates
@@ -196,6 +195,15 @@ module Arithmetic
             match valid with
             | true -> Ok x
             | false -> Error ("Invalid 32 bit number")
+
+        let actualValid = 
+            List.map doCheck [input; inverseInput]
+            |> List.collect (fun x -> match x with | Ok _ -> [true] | _ -> [false])
+            |> List.contains true
+        
+        match actualValid with
+        | true -> Ok input
+        | _ -> Error ("Invalid 32 bit number")
 
     /// Gets expression and symbol table and
     /// passes to a parser that returns a result
