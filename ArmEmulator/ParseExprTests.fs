@@ -16,6 +16,7 @@ module ParseExprTests
                 "97-6", Ok(97u-6u)
                 "-97+1", Ok(0u-97u+1u)
                 "+97+1", Ok(97u+1u)
+                "4294967295", Ok 4294967295u
                 // test combining multiple operators
                 "97-6+7", Ok(97u-6u+7u)
                 "97-6+7-19", Ok(97u-6u+7u-19u)
@@ -60,6 +61,7 @@ module ParseExprTests
                     Ok(0u-3u*(10u+23u)*(0xFFu-0xAu*0b110011u*(23u-0xABCu*10u)))
                 // test invalid input
                 "*97+1", Error "Expression cannot start with *."
+                "4294967296", Error "Invalid literal at end of expression."
                 "2**1", Error "Invalid expression."
                 "2*()", Error "Invalid expression."
                 "2*(3*()+79)", Error "Invalid expression."

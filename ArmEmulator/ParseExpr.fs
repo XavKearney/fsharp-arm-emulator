@@ -92,6 +92,14 @@ module ParseExpr
         |> Seq.toList
         |> List.rev
         |> fun chars -> parseBin' chars 0u 1u
+
+    let (|BelowMaxUint32|_|) (inp:string) =
+        inp
+        |> uint64
+        |> function
+            | x when uint64 System.UInt32.MinValue <= x 
+                && x <= uint64 System.UInt32.MaxValue -> Some x
+            | _ -> None
     
     /// matches a literal in hex form (0x.. or &..),
     /// in binary form (0b..) or as a standard number
@@ -101,7 +109,10 @@ module ParseExpr
         | Match1 @"^(0[xX][a-fA-F0-9]{1,8})$" x -> parseHex x.[2..] |> Some
         | Match1 @"^(&[a-fA-F0-9]{1,8})$" x -> parseHex x.[1..] |> uint32 |> Some
         | Match1 @"^(0b[0-1]{1,32})$" x -> parseBin x.[2..] |> Some
-        | Match1 @"^([0-9]+)$" x -> uint32 x |> Some
+        | Match1 @"^([0-9]{1,11})$" x -> 
+            match x with
+            | BelowMaxUint32 i -> uint32 i |> Some
+            | _ -> None
         | label -> symTab.TryFind label
 
     let (|Contains|_|) element lst =
