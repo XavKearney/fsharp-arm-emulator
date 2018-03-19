@@ -98,9 +98,9 @@ module ParseExpr
     /// if no match, try and find the string in the SymbolTable
     let (|Literal|_|) (symTab:SymbolTable) (inp:string) =
         match inp with
-        | Match1 @"^(0[xX][a-fA-F0-9]+)$" x -> parseHex x.[2..] |> Some
-        | Match1 @"^(&[a-fA-F0-9]+)$" x -> parseHex x.[1..] |> uint32 |> Some
-        | Match1 @"^(0b[0-1]+)$" x -> parseBin x.[2..] |> Some
+        | Match1 @"^(0[xX][a-fA-F0-9]{1,8})$" x -> parseHex x.[2..] |> Some
+        | Match1 @"^(&[a-fA-F0-9]{1,8})$" x -> parseHex x.[1..] |> uint32 |> Some
+        | Match1 @"^(0b[0-1]{1,32})$" x -> parseBin x.[2..] |> Some
         | Match1 @"^([0-9]+)$" x -> uint32 x |> Some
         | label -> symTab.TryFind label
 
@@ -182,9 +182,11 @@ module ParseExpr
                     doOp ops.Head first second
                     |> fun res -> eval' toks (res::remaining) (ops.Tail)
                 | false -> 
-                    match nums, ops with
+                    match nums, ops, op with
                     // if it starts with an operator, put in a 0 at the beginning
-                    | [], [] -> eval' rest (0u::nums) (Op op::ops)
+                    | [], [], (Add | Sub) -> eval' rest (0u::nums) (Op op::ops)
+                    // if it starts with an operator, put in a 0 at the beginning
+                    | [], [], _ -> Error "Expression cannot start with *."
                     // otherwise just add the operator to the stack
                     | _ -> eval' rest nums (Op op::ops)
                 | _ -> Error "Invalid expression."
