@@ -141,7 +141,7 @@ module ArithmeticTests
         opcodeStr, suffixStr, operandStr
 
     
-    //[<Tests>]
+    [<Tests>]
     let testArithParse = 
         // Test parse function for arithmetic opcodes
         let makeTestLineData wa opcode suffix target op1 op2 = 
@@ -236,7 +236,7 @@ module ArithmeticTests
         opcodeStr, operandStr
 
 
-   // [<Tests>]
+    [<Tests>]
     let testCompParse = 
         // Test parse function for comparison instructions
         let makeTestLineData wa opcode op1 op2 = 
@@ -288,7 +288,7 @@ module ArithmeticTests
 
 
 
-    //[<Tests>]
+    [<Tests>]
     let testArithExec =
         let makeTestExecStr opcode suffix target op1 op2 = 
             let opcodeStr, suffixStr, operandStr = makeArithInstrString opcode suffix target op1 op2
@@ -471,7 +471,7 @@ module ArithmeticTests
                     Expect.equal flagsActual resCpu.Fl "Flags"
                 | Error _ -> ()
 
-    //[<Tests>]
+    [<Tests>]
     let testCompExec =
         let makeTestExecStr opcode op1 op2 = 
             let opcodeStr, operandStr = makeCompInstrString opcode op1 op2
