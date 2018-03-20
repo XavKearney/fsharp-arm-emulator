@@ -115,14 +115,73 @@ module TopLevelTests
                 Ok ({cpuData with MM = cpuData.MM.Add (WA 0u, DataLoc 0u)}, symtab)
             (parseLine (someSymTab) (WA 0u) "ADD R0, R0, #1"), 
                 Ok ({cpuData with Regs = cpuData.Regs.Add (R0, 1u)}, symtab)
-            (parseLine (someSymTab) (WA 0u) "test ADD R0, R0, #1"), 
-                Ok ({cpuData with Regs = cpuData.Regs.Add (R0, 1u)}, symtab.Add ("test", 0u))
+            (parseLine (someSymTab) (WA 0u) "SUB R0, R0, #1"), 
+                Ok ({cpuData with Regs = cpuData.Regs.Add (R0, 0u-1u)}, symtab)
+            (parseLine (someSymTab) (WA 0u) "ADC R0, R0, #0xFF"), 
+                Ok ({cpuData with Regs = cpuData.Regs.Add (R0, 0xFFu)}, symtab)
+            (parseLine (someSymTab) (WA 0u) "SBC R0, R0, #0xFF"), 
+                Ok ({cpuData with Regs = cpuData.Regs.Add (R0, 0u-1u-0xFFu)}, symtab)
+            (parseLine (someSymTab) (WA 0u) "RSB R0, R0, #&FF"), 
+                Ok ({cpuData with Regs = cpuData.Regs.Add (R0, 0xFFu)}, symtab)
+            (parseLine (someSymTab) (WA 0u) "RSC R0, R0, #0b11"), 
+                Ok ({cpuData with Regs = cpuData.Regs.Add (R0, 0b11u-1u)}, symtab)
+            (parseLine (someSymTab) (WA 0u) "CMP R0, #0b0000"), 
+                Ok ({cpuData with Fl = {N=false;Z=true;V=false;C=false;}}, symtab)
+            (parseLine (someSymTab) (WA 0u) "CMN R0, #0b0000"), 
+                Ok ({cpuData with Fl = {N=false;Z=true;V=false;C=false;}}, symtab)
+
+            // test BitArithmetic instructions
+            (parseLine (someSymTab) (WA 0u) "MOV R0, #&DE"), 
+                Ok ({cpuData with Regs = cpuData.Regs.Add (R0, 0xDEu)}, symtab)
+            (parseLine (someSymTab) (WA 0u) "MVN R0, #&DE"), 
+                Ok ({cpuData with Regs = cpuData.Regs.Add (R0, ~~~0xDEu)}, symtab)
+            (parseLine (someSymTab) (WA 0u) "AND R0, R0, #0xFF"), 
+                Ok ({cpuData with Regs = cpuData.Regs.Add (R0, 0u)}, symtab)
+            (parseLine (someSymTab) (WA 0u) "ORR R0, R0, #0xFA"), 
+                Ok ({cpuData with Regs = cpuData.Regs.Add (R0, 0xFAu)}, symtab)
+            (parseLine (someSymTab) (WA 0u) "EOR R0, R0, #0b1111"), 
+                Ok ({cpuData with Regs = cpuData.Regs.Add (R0, 0b1111u)}, symtab)
+            (parseLine (someSymTab) (WA 0u) "BIC R0, R0, #0b1111"), 
+                Ok ({cpuData with Regs = cpuData.Regs.Add (R0, 0u)}, symtab)
+            (parseLine (someSymTab) (WA 0u) "LSL R0, R0, #3"), 
+                Ok (cpuData, symtab)
+            (parseLine (someSymTab) (WA 0u) "LSR R0, R0, #-1"), 
+                Ok (cpuData, symtab)
+            (parseLine (someSymTab) (WA 0u) "ASR R0, R0, #0xFF"), 
+                Ok (cpuData, symtab)
+            (parseLine (someSymTab) (WA 0u) "ROR R0, R0, #0b1101"), 
+                Ok (cpuData, symtab)
+            (parseLine (someSymTab) (WA 0u) "RRX R0, R0"), 
+                Ok (cpuData, symtab)
+            (parseLine (someSymTab) (WA 0u) "TST R0, #0b1111"), 
+                Ok ({cpuData with Fl = {cpuData.Fl with Z=true}}, symtab)
+            (parseLine (someSymTab) (WA 0u) "TEQ R0, #0"), 
+                Ok ({cpuData with Fl = {cpuData.Fl with Z=true}}, symtab)
+
+            // test Mem instructions
+            (parseLine (someSymTab) (WA 0u) "LDR R0, [R1]"), 
+                Error (ERRIMEM "execLDR-interpretingRecord: Error accesing memory location")
+            (parseLine (someSymTab) (WA 0u) "STR R0, [R1]"), 
+                Ok ({cpuData with MM = cpuData.MM.Add (WA 0u, DataLoc 0u)}, symtab)
             (parseLine (someSymTab) (WA 0u) "ADR R0, 4"), 
                 Ok ({cpuData with Regs = cpuData.Regs.Add (R0, 4u)}, symtab)
-            (parseLine (someSymTab) (WA 0u) "ADDEQ R0, R0, #4"), 
-                Ok (cpuData, symtab)
             (parseLine (someSymTab) (WA 0u) "test DCD 1"), 
                 Ok ({cpuData with MM = cpuData.MM.Add (WA 0x100u, DataLoc 1u)}, symtab.Add ("test", 1u))
+            (parseLine (someSymTab) (WA 0u) "test EQU 44"), 
+                Ok (cpuData, symtab.Add ("test", 44u))
+            (parseLine (someSymTab) (WA 0u) "test FILL 4"), 
+                Ok ({cpuData with MM = cpuData.MM.Add (WA 0x100u, DataLoc 0u)}, symtab.Add ("test", 0x100u))
+
+            // test MultMem instructions
+            (parseLine (someSymTab) (WA 0u) "STM R0, {R1}"), 
+                Ok ({cpuData with MM = cpuData.MM.Add (WA 0u, DataLoc 0u)}, symtab)
+            (parseLine (someSymTab) (WA 0u) "LDM R0, {R1}"), 
+                Error (ERRIMULTMEM "Invalid memory address.")
+
+            (parseLine (someSymTab) (WA 0u) "test ADD R0, R0, #1"), 
+                Ok ({cpuData with Regs = cpuData.Regs.Add (R0, 1u)}, symtab.Add ("test", 0u))
+            (parseLine (someSymTab) (WA 0u) "ADDEQ R0, R0, #4"), 
+                Ok (cpuData, symtab)
          ]
 
          
