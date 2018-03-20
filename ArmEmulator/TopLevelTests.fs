@@ -33,15 +33,17 @@ module TopLevelTests
 
     [<Tests>]
     let testParseLine = 
-        makeUnitTestList (parseLine None (WA 0u)) "Unit Test parseLine" [
+        makeUnitTestList (parseLine (Some Map.empty) (WA 0u)) "Unit Test parseLine" [
             // test valid instructions
             "ADD R0, R0, #5", 
             Ok {PInstr = IARITH (ArithI {InstrType = Some ADD; SuffixSet = false;
                              Target = R0; Op1 = R0; Op2 = Literal 5u;});
                 PLabel = None; PSize = 4u; PCond = Cal;}
             "ADR R0, 4", 
-            Ok {PInstr = IMEM (AdrO (Error "parseAdrIns: ls.SymTab = None"));
-                PLabel = None; PSize = 4u; PCond = Cal;}
+                Ok {PInstr = IMEM (AdrO (Ok {InstructionType = Ok ADRm;
+                                                 DestReg = Ok R0;
+                                                 SecondOp = Ok 4u;}));
+                    PLabel = None;PSize = 4u;PCond = Cal;}
                 
             // TODO: add all instructions here
 
@@ -80,6 +82,7 @@ module TopLevelTests
         ]
 
     // tests the function execParsedLine with unit tests
+    [<Tests>]
     let testExecParsedLine = 
         let removeResult x = 
             match x with
@@ -108,11 +111,12 @@ module TopLevelTests
             (parseLine (someSymTab) (WA 0u) "ADDEQ R0, R0, #4"), 
                 Ok (cpuData, symtab)
             (parseLine (someSymTab) (WA 0u) "test DCD 1"), 
-                Ok ({cpuData with MM = cpuData.MM.Add (WA 0x104u, DataLoc 1u)}, symtab.Add ("test", 1u))
+                Ok ({cpuData with MM = cpuData.MM.Add (WA 0x100u, DataLoc 1u)}, symtab.Add ("test", 1u))
          ]
 
          
     /// tests the function parseThenExecLines with unit tests
+    [<Tests>]
     let testParseThenExecLines = 
         let cpuData = 
             match initDataPath None None None with
