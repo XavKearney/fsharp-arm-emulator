@@ -150,6 +150,20 @@ module TopLevelTests
                                             Op1 = R0;
                                             Op2 = Literal 1u;})))
                     }, symtab)
+            // test valid line with blank lines
+            [""; "ADD R0, R0, #1"; ""], 
+                Ok ({cpuData with 
+                        Regs = cpuData.Regs
+                            |> Map.add R0 1u
+                            |> Map.add R15 8u
+                        MM = cpuData.MM
+                            |> Map.add (WA 0u) 
+                                (Code (IARITH (ArithI {InstrType = Some ADD;
+                                            SuffixSet = false;
+                                            Target = R0;
+                                            Op1 = R0;
+                                            Op2 = Literal 1u;})))
+                    }, symtab)
 
             ["ADDEQ R0, R0, #1"], 
                 Ok ({cpuData with 
@@ -210,6 +224,36 @@ module TopLevelTests
                 }, symtab)
 
             ["ADD R0, R0, #3"; "start ADD R3,R3,#1"; "SUBS R0,R0,#1"; "BNE start"], 
+            Ok ({cpuData with 
+                    Regs = cpuData.Regs
+                        |> Map.add R3 3u
+                        |> Map.add R15 20u
+                    Fl = {N = false; C = true; Z = true; V = false;}
+                    MM = cpuData.MM
+                        |> Map.add (WA 0u) 
+                            (Code (IARITH (ArithI {InstrType = Some ADD;
+                                        SuffixSet = false;
+                                        Target = R0;
+                                        Op1 = R0;
+                                        Op2 = Literal 3u;})))
+                        |> Map.add (WA 4u) 
+                            (Code (IARITH (ArithI {InstrType = Some ADD;
+                                        SuffixSet = false;
+                                        Target = R3;
+                                        Op1 = R3;
+                                        Op2 = Literal 1u;})))
+                        |> Map.add (WA 8u) 
+                            (Code (IARITH (ArithI {InstrType = Some SUB;
+                                        SuffixSet = true;
+                                        Target = R0;
+                                        Op1 = R0;
+                                        Op2 = Literal 1u;})))
+                        |> Map.add (WA 12u) 
+                            (Code (IMULTMEM (BranchI {BranchAddr = 12u; LinkAddr=None})))
+                }, symtab.Add ("start", 4u))
+
+            // test branch with blank lines
+            [""; "ADD R0, R0, #3"; ""; "start ADD R3,R3,#1"; ""; "SUBS R0,R0,#1"; "BNE start"], 
             Ok ({cpuData with 
                     Regs = cpuData.Regs
                         |> Map.add R3 3u
@@ -300,7 +344,14 @@ module TopLevelTests
             // test invalid single lines
             ["LDM R0, R0, {}"], 
                 Error (ERRLINE (ERRIMULTMEM "Incorrectly formatted operands.", 0u))
-            // test multiple invalid lines - only returns the first error (TODO: change)
+            // test multiple invalid lines 
             ["LDM R0, R0, {}"; "ADD R16, R0, #1"], 
                 Error (ERRLINE (ERRIMULTMEM "Incorrectly formatted operands.", 0u))
+            ["LDM R0, {R4}"; "ADD R16, R0, #1"], 
+                Error (ERRLINE (ERRIARITH "Destination is not a valid register",1u))
+            // test errors on blank lines
+            ["LDM R0, {R4}"; ""; "ADD R16, R0, #1"], 
+                Error (ERRLINE (ERRIARITH "Destination is not a valid register",2u))
+            [""; "LDM R0, {R4}"; ""; "ADD R16, R0, #1"], 
+                Error (ERRLINE (ERRIARITH "Destination is not a valid register",3u))
          ]

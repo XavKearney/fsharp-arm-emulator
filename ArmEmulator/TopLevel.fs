@@ -15,6 +15,8 @@ module TopLevel =
         | IMEM of Mem.ReturnInstr
         // multiple memory instructions (and branch & end)
         | IMULTMEM of MultMem.ReturnInstr
+        // blank lines need to be counted
+        | BLANKLINE
 
     
     /// allows different modules to return different error info
@@ -61,19 +63,27 @@ module TopLevel =
                 | lineWithComment -> lineWithComment.[0]
         /// split line on whitespace into an array
         let splitIntoWords ( line:string ) =
-            line.Split( ([||] : char array), 
-                System.StringSplitOptions.RemoveEmptyEntries)
+            line.Split( ([||] : char array))
         /// try to parse 1st word, or 2nd word, as opcode
         /// If 2nd word is opcode 1st word must be label
+        let blankInstr = (Ok {
+                                PInstr = BLANKLINE;
+                                PLabel = None;
+                                PCond = Cal;
+                                PSize = 0u;})
         let matchLine words =
             let pNoLabel =
                 match words with
+                // if the line is blank, return BLANKLINE
+                | "" :: _ -> Some blankInstr
                 | opc :: operands -> 
                     makeLineData opc operands 
                     |> IMatch
                 | _ -> None
             match pNoLabel, words with
-            | Some pa, _ -> pa
+            | Some pa, _ -> pa 
+            // if the line is blank, return BLANKLINE
+            | None, _ :: "" :: _ -> blankInstr
             | None, label :: opc :: operands -> 
                 match { makeLineData opc operands with Label=Some label} |> IMatch with
                 | None -> 
@@ -174,6 +184,8 @@ module TopLevel =
             | {PInstr=IARITH ins';} as p -> 
                 exec' p (Arithmetic.execArithmeticInstr d) ins' ERRIARITH
                 |> Result.map (fun cpu -> cpu, symtab)
+            | {PInstr=BLANKLINE;} -> 
+                Ok (d, symtab)
         | false -> Ok (d, symtab)
 
     /// takes a list of lines as string
@@ -222,6 +234,7 @@ module TopLevel =
         let rec putCodeInMemory lines lineNum cpu' (insMap: Map<WAddr, Parse<Instr> * uint32>) currAddr = 
             match lines with
             | [] -> Ok (cpu', insMap)
+            | Ok {PInstr = BLANKLINE;} :: rest -> putCodeInMemory rest (lineNum+1u) cpu' insMap currAddr
             | Ok line :: rest ->
                 {cpu' with MM = cpu'.MM.Add (WA currAddr, Code line.PInstr) }
                 |> fun c ->
