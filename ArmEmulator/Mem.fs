@@ -179,21 +179,6 @@ module Mem
 
 
 
-    type Literal = {Base: uint32; R: int} // best practice, see later
-
-    let checkLiteralMonad (l:uint32) =
-        let rotate (k:uint32) n = (k >>> n) ||| (k <<< 32 - n),n
-        let literal = 
-            [0..2..30] 
-            |> List.map (rotate 0xFFu)
-            |> List.tryFind (fun (mask,_) -> (mask &&& l) = l)
-            |> Option.map (fun (_,n) -> { Base=(rotate l (32 - n)) |> fst; R=n/2})
-        match literal with 
-        | None -> Error (sprintf "Expression result (%A) cannot be made by a rotated 8 bit number" l)
-        | Some _ -> Ok l
-
-
-
     ///Evaluates an expression involving +-* and labels
     /// which evaluate to the addresses they represent
     ///NEEDS DOING:
@@ -355,6 +340,11 @@ module Mem
         | Ok x -> if (((x|>int) % 4 =0)&&((x|>int)>=0)) then Ok x
                   else Error (sprintf "parseLabelIns: Fill expression (%A) <0 or not divisible by four" x)
 
+///This function returns an idicator of whether or not one
+/// of the three instruction specific fields of the label
+/// instruction is an error. As they are all different 
+/// if cannot return the field if it is Ok _ so it returns
+/// an integer instead. 
     let optionResultAbstract u v w = 
         match (u,v,w) with
         | (Some x, _, _) ->
@@ -685,8 +675,7 @@ module Mem
         |> interpretingRecord dP 
         |> updatedSTRMachineMem 
         |> Result.map (fun x -> {dP with MM = x; Regs = updatedRegMap}) 
-        |> fun a -> (a, Ok symbolTab)
-        |> Ok
+        |> fun a -> Ok (a, Ok symbolTab)
         |> abstractResults
 
 
