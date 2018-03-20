@@ -300,3 +300,10 @@ ArmEmulator/VisualTesting/visualWork/**
 
 # DS_Store for Mac
 .DS_Store
+# orion
+checks
+checks/*
+**/checker.fsx
+
+# orion
+*/Tester.fsx
