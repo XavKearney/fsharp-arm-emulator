@@ -180,6 +180,9 @@ module TopLevel =
             | {PInstr=IARITH ins';} as p -> 
                 exec' p (Arithmetic.execArithmeticInstr d) ins' ERRIARITH
                 |> Result.map (fun cpu -> cpu, symtab)
+            | {PInstr=IBITARITH ins';} as p -> 
+                exec' p (BitArithmetic.exeInstr d) ins' ERRIARITH
+                |> Result.map (fun cpu -> cpu, symtab)
             | {PInstr=BLANKLINE;} -> 
                 Ok (d, symtab)
         | false -> Ok (d, symtab)
