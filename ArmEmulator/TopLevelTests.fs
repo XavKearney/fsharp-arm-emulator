@@ -31,6 +31,17 @@ module TopLevelTests
         List.map (fun (i, o) -> makeTest i o) inOutLst
         |> testList (sprintf "%s Test List" name) 
 
+    /// takes a function f, and a list of two parameters
+    /// it applies (f inp param1 param2) where twoParams = (param1, param2)
+    /// creates an expecto testlist with unit tests testing each case
+    let makeUnitTestListWithThreeParams f threeParams name inOutLst=
+        let makeTest inp outp =
+            let testName = (sprintf "%s: %A" name inp)
+            testCase testName <| fun () ->
+                Expect.equal (f inp <||| threeParams) outp testName
+        List.map (fun (i, o) -> makeTest i o) inOutLst
+        |> testList (sprintf "%s Test List" name) 
+
     [<Tests>]
     let testParseLine = 
         makeUnitTestList (parseLine (Some Map.empty) (WA 0u)) "Unit Test parseLine" [
@@ -98,7 +109,7 @@ module TopLevelTests
             match f ld with
             | Some x -> x
             | None -> failwithf "Should never happen."
-        makeUnitTestListWithTwoParams (removeResult >> execParsedLine) (cpuData, symtab) "Unit Test execParsedLine" [
+        makeUnitTestListWithThreeParams (removeResult >> execParsedLine) (cpuData, symtab, 0u) "Unit Test execParsedLine" [
             // test valid lines
             (parseLine (someSymTab) (WA 0u) "STM R0, {R1}"), 
                 Ok ({cpuData with MM = cpuData.MM.Add (WA 0u, DataLoc 0u)}, symtab)
@@ -131,6 +142,20 @@ module TopLevelTests
         makeUnitTestListWithTwoParams parseThenExecLines (cpuData, someSymTab) "Unit Test execParsedLines" [
             // // test single valid lines
             ["ADD R0, R0, #1"], 
+                Ok ({cpuData with 
+                        Regs = cpuData.Regs
+                            |> Map.add R0 1u
+                            |> Map.add R15 8u
+                        MM = cpuData.MM
+                            |> Map.add (WA 0u) 
+                                (Code (IARITH (ArithI {InstrType = Some ADD;
+                                            SuffixSet = false;
+                                            Target = R0;
+                                            Op1 = R0;
+                                            Op2 = Literal 1u;})))
+                    }, symtab)
+            // test valid line with blank lines
+            ["; some comment here"; "ADD R0, R0, #1"; ""], 
                 Ok ({cpuData with 
                         Regs = cpuData.Regs
                             |> Map.add R0 1u
@@ -231,6 +256,36 @@ module TopLevelTests
                             (Code (IMULTMEM (BranchI {BranchAddr = 12u; LinkAddr=None})))
                 }, symtab.Add ("start", 4u))
 
+            // test branch with blank lines
+            [""; "ADD R0, R0, #3"; "; some comment"; "start ADD R3,R3,#1"; ""; "SUBS R0,R0,#1"; "BNE start"], 
+            Ok ({cpuData with 
+                    Regs = cpuData.Regs
+                        |> Map.add R3 3u
+                        |> Map.add R15 20u
+                    Fl = {N = false; C = true; Z = true; V = false;}
+                    MM = cpuData.MM
+                        |> Map.add (WA 0u) 
+                            (Code (IARITH (ArithI {InstrType = Some ADD;
+                                        SuffixSet = false;
+                                        Target = R0;
+                                        Op1 = R0;
+                                        Op2 = Literal 3u;})))
+                        |> Map.add (WA 4u) 
+                            (Code (IARITH (ArithI {InstrType = Some ADD;
+                                        SuffixSet = false;
+                                        Target = R3;
+                                        Op1 = R3;
+                                        Op2 = Literal 1u;})))
+                        |> Map.add (WA 8u) 
+                            (Code (IARITH (ArithI {InstrType = Some SUB;
+                                        SuffixSet = true;
+                                        Target = R0;
+                                        Op1 = R0;
+                                        Op2 = Literal 1u;})))
+                        |> Map.add (WA 12u) 
+                            (Code (IMULTMEM (BranchI {BranchAddr = 12u; LinkAddr=None})))
+                }, symtab.Add ("start", 4u))
+
             ["ADD R0, R0, #test3"; "test3 SUB R0, R0, #3"], 
             Ok ({cpuData with 
                     Regs = cpuData.Regs
@@ -292,8 +347,17 @@ module TopLevelTests
 
             // test invalid single lines
             ["LDM R0, R0, {}"], 
-                Error (ERRIMULTMEM "Incorrectly formatted operands.")
-            // test multiple invalid lines - only returns the first error (TODO: change)
+                Error (ERRLINE (ERRIMULTMEM "Incorrectly formatted operands.", 0u))
+            // test multiple invalid lines 
             ["LDM R0, R0, {}"; "ADD R16, R0, #1"], 
-                Error (ERRIMULTMEM "Incorrectly formatted operands.")
+                Error (ERRLINE (ERRIMULTMEM "Incorrectly formatted operands.", 0u))
+            ["LDM R0, {R4}"; "ADD R16, R0, #1"], 
+                Error (ERRLINE (ERRIARITH "Destination is not a valid register",1u))
+            // test errors on blank lines
+            ["LDM R0, {R4}"; ""; "ADD R16, R0, #1"], 
+                Error (ERRLINE (ERRIARITH "Destination is not a valid register",2u))
+            [""; "LDM R0, {R4}"; ""; "ADD R16, R0, #1"], 
+                Error (ERRLINE (ERRIARITH "Destination is not a valid register",3u))
+            [""; "ADD R0, R0, #3"; "someLabel"; "start ADD R3,R3,#1"; ""; "SUBS R0,R0,#1"; "BNE start"], 
+                Error (ERRLINE (ERRTOPLEVEL "Invalid instruction: someLabel",2u))
          ]

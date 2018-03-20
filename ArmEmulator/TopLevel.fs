@@ -15,6 +15,8 @@ module TopLevel =
         | IMEM of Mem.ReturnInstr
         // multiple memory instructions (and branch & end)
         | IMULTMEM of MultMem.ReturnInstr
+        // blank lines need to be counted
+        | BLANKLINE
 
     
     /// allows different modules to return different error info
@@ -25,6 +27,7 @@ module TopLevel =
         | ERRIMEM of Mem.ErrInstr
         | ERRIMULTMEM of MultMem.ErrInstr
         | ERRTOPLEVEL of string
+        | ERRLINE of ErrInstr * uint32
 
     type CondInstr = Condition * Instr
 
@@ -60,19 +63,27 @@ module TopLevel =
                 | lineWithComment -> lineWithComment.[0]
         /// split line on whitespace into an array
         let splitIntoWords ( line:string ) =
-            line.Split( ([||] : char array), 
-                System.StringSplitOptions.RemoveEmptyEntries)
+            line.Split( ([||] : char array))
         /// try to parse 1st word, or 2nd word, as opcode
         /// If 2nd word is opcode 1st word must be label
+        let blankInstr = (Ok {
+                                PInstr = BLANKLINE;
+                                PLabel = None;
+                                PCond = Cal;
+                                PSize = 0u;})
         let matchLine words =
             let pNoLabel =
                 match words with
+                // if the line is blank, return BLANKLINE
+                | "" :: _ -> Some blankInstr
                 | opc :: operands -> 
                     makeLineData opc operands 
                     |> IMatch
                 | _ -> None
             match pNoLabel, words with
-            | Some pa, _ -> pa
+            | Some pa, _ -> pa 
+            // if the line is blank, return BLANKLINE
+            | None, _ :: "" :: _ -> blankInstr
             | None, label :: opc :: operands -> 
                 match { makeLineData opc operands with Label=Some label} |> IMatch with
                 | None -> 
@@ -121,9 +132,9 @@ module TopLevel =
     
     // map a function which returns its own error type
     // to one which returns a top-level error type
-    let mapErr fMap ins = 
+    let mapErr lineNum fMap ins = 
         match ins with
-        | Error s -> Error (fMap s)
+        | Error s -> Error (ERRLINE (fMap s, lineNum))
         | Ok x -> Ok x
 
     // checks whether an instruction should be executed
@@ -150,12 +161,12 @@ module TopLevel =
 
     // function to execute any parsed instruction from any module
     // returns the modified datapath (or an error)
-    let execParsedLine ins d (symtab: SymbolTable) =
+    let execParsedLine ins d (symtab: SymbolTable) lineNum =
         /// executes a given instruction with the correct execution function f
         let exec' p f ins' err = 
             { PInstr = ins'; PLabel = p.PLabel; PCond = p.PCond; PSize = p.PSize }
             |> f
-            |> mapErr err
+            |> mapErr lineNum err
 
         // check if instruction should be executed
         match checkCond d.Fl ins.PCond with
@@ -169,6 +180,8 @@ module TopLevel =
             | {PInstr=IARITH ins';} as p -> 
                 exec' p (Arithmetic.execArithmeticInstr d) ins' ERRIARITH
                 |> Result.map (fun cpu -> cpu, symtab)
+            | {PInstr=BLANKLINE;} -> 
+                Ok (d, symtab)
         | false -> Ok (d, symtab)
 
     /// takes a list of lines as string
@@ -214,28 +227,29 @@ module TopLevel =
     let execParsedLines parsedLines cpuData symtab = 
         // this puts each line of code in its correct memory location
         // starting at 0u, increasing by PSize each time
-        let rec putCodeInMemory lines cpu' (insMap: Map<WAddr, Parse<Instr>>) currAddr = 
+        let rec putCodeInMemory lines lineNum cpu' (insMap: Map<WAddr, Parse<Instr> * uint32>) currAddr = 
             match lines with
             | [] -> Ok (cpu', insMap)
+            | Ok {PInstr = BLANKLINE;} :: rest -> putCodeInMemory rest (lineNum+1u) cpu' insMap currAddr
             | Ok line :: rest ->
                 {cpu' with MM = cpu'.MM.Add (WA currAddr, Code line.PInstr) }
                 |> fun c ->
-                    insMap.Add (WA currAddr, line)
-                    |> fun iMap -> putCodeInMemory rest c iMap (currAddr + line.PSize)
-            | Error s :: _ -> Error s
+                    insMap.Add (WA currAddr, (line, lineNum))
+                    |> fun iMap -> putCodeInMemory rest (lineNum + 1u) c iMap (currAddr + line.PSize)
+            | Error s :: _ -> Error (ERRLINE (s, lineNum))
 
         let setProgCount cpu' = 
             {cpu' with Regs = cpu'.Regs.Add (R15, 8u)}
 
-        let checkEnd cpu' (insMap: Map<WAddr, Parse<Instr>>) =
+        let checkEnd cpu' (insMap: Map<WAddr, Parse<Instr> * uint32>) =
             cpu'.Regs.[R15] - 8u
             |> WA
             |> insMap.TryFind
             |> function
-                | Some({PInstr=IMULTMEM (EndI _); PCond=cond}) 
+                | Some({PInstr=IMULTMEM (EndI _); PCond=cond}, _) 
                     when checkCond cpu'.Fl cond -> true
                 | _ -> false
-        let checkStop cpu' (insMap: Map<WAddr, Parse<Instr>>) =
+        let checkStop cpu' (insMap: Map<WAddr, Parse<Instr> * uint32>) =
             cpu'.Regs.[R15] - 8u
             |> WA
             |> insMap.TryFind
@@ -265,9 +279,9 @@ module TopLevel =
                 cpu'.Regs.[R15] - 8u
                 // get the instruction at that PC value in memory
                 |> fun a -> insMap.[WA a]
-                |> fun p -> 
+                |> fun (p, lineNum) -> 
                     // execute the instruction
-                    execParsedLine p cpu' symtab'
+                    execParsedLine p cpu' symtab' lineNum
                     |> Result.bind (
                         fun (newCpu, newSymTab) -> 
                             let branch = checkBranch p
@@ -287,7 +301,7 @@ module TopLevel =
                                 | false -> execLines nextCpu insMap newSymTab newBranchCount
                     )
         setProgCount cpuData
-        |> fun cpu -> putCodeInMemory parsedLines cpu Map.empty 0u
+        |> fun cpu -> putCodeInMemory parsedLines 0u cpu Map.empty 0u
         |> Result.bind (fun (cpu', insMap) -> execLines cpu' insMap symtab 0u)
 
 
