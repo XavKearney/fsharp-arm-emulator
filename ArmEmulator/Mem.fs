@@ -27,8 +27,6 @@ module Mem
     open System
     open System.Text.RegularExpressions
     open ParseExpr
-    open BitArithmetic
-    open VisualTest
 
 
 
@@ -192,7 +190,7 @@ module Mem
     /// - Add multiple bracket functionality 
     ///   Eg 2*(6+(3*4)-(6+3))*5
     /// - Add working CheckLiteral function which works for -ve's
-    let evalExpression (exp0: string) (symTab: SymbolTable) (labels: bool) =
+    let evalExpression (exp0: string) (symTab: SymbolTable) (_: bool) =
         evalExpr symTab exp0
 
 
