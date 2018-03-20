@@ -304,3 +304,6 @@ ArmEmulator/VisualTesting/visualWork/**
 checks
 checks/*
 **/checker.fsx
+
+# orion
+*/Tester.fsx
