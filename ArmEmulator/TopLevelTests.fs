@@ -354,4 +354,6 @@ module TopLevelTests
                 Error (ERRLINE (ERRIARITH "Destination is not a valid register",2u))
             [""; "LDM R0, {R4}"; ""; "ADD R16, R0, #1"], 
                 Error (ERRLINE (ERRIARITH "Destination is not a valid register",3u))
+            [""; "ADD R0, R0, #3"; "someLabel"; "start ADD R3,R3,#1"; ""; "SUBS R0,R0,#1"; "BNE start"], 
+                Error (ERRLINE (ERRTOPLEVEL "Invalid instruction: someLabel",2u))
          ]
