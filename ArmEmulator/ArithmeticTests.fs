@@ -46,10 +46,10 @@ module ArithmeticTests
                 ("R7,,R3", Error "Op1 is not a valid register");
                 ("R7,R3,", Error "Op2 is not a valid register or expression");
                 (",R7,R3", Error "Destination is not a valid register");
-                ("R7,R3,#0b12", Error ("Symbol does not exist"));
-                ("R7,R3,#11111111111111111111", Error ("Op2 is not a valid 32 bit number"));
-                ("R7,R3,#abc", Error ("Symbol does not exist"));
-                ("R7,R3,#0xFFFFFFFF2", Error ("Invalid 32 bit number"));
+                ("R7,R3,#0b12", Error ("Invalid literal at end of expression."));
+                ("R7,R3,#11111111111111111111", Error ("Invalid literal at end of expression."));
+                ("R7,R3,#abc", Error ("Invalid literal at end of expression."));
+                ("R7,R3,#0xFFFFFFFF2", Error ("Invalid literal at end of expression."));
                 ("R7,R3,#2, LSL #1", Error ("Invalid op2 register"));
                 ("R7,R3,R0, LSL #1", Ok (R7,R3, RegisterShift (R0, LSL, 1)));
                 ("R7,R3,R0, LSP #1", Error ("Invalid shift operation"));
@@ -61,21 +61,24 @@ module ArithmeticTests
                 ("R0, R12, #3*6-1", Ok (R0, R12, Literal (uint32 17)));
                 ("R0, R12, #3+6*2", Ok (R0, R12, Literal (uint32 15)));
                 ("R0, R12, #-3*6+1", Ok (R0, R12, Literal (uint32 -17)));
-                ("R0, R12, #-3*6+-1", Error ("Invalid expression"));
+                ("R0, R12, #-3*6+-1", Error ("Invalid expression."));
                 ("R0, R12, #0b11*6+1", Ok (R0, R12, Literal (uint32 19)));
-                ("R0, R12, #0b12*6+1", Error ("Invalid 32 bit number"));
-                ("R0, R12, #3-2-", Error ("Invalid expression"));
-                ("R7,R3,#0b111101001101101", Error ("Op2 is not a valid 32 bit number"));
-                ("R7,R3,#0b111111110", Error ("Op2 is not a valid 32 bit number"));
+                ("R0, R12, #0b12*6+1", Error ("Invalid literal in expression."));
+                ("R0, R12, #3-2-", Error ("Invalid expression."));
+                ("R7,R3,#0b111101001101101", Error ("Invalid 32 bit number"));
+                ("R7,R3,#0b111111110", Error ("Invalid 32 bit number"));
                 ("R7,R3,#0b1111111100", Ok (R7, R3, Literal (uint32 1020)));
                 ("R0, R12, #+1", Ok (R0, R12, Literal (uint32 1)));
-                ("R0, R12, #*6", Error ("Invalid expression")); 
+                ("R0, R12, #*6", Error ("Expression cannot start with *.")); 
                 ("R0, R12, #&F", Ok (R0, R12, Literal (uint32 15)));
                 ("R0, R12, #-97  +   1", Ok (R0, R12, Literal (uint32 -96)));     
-                ("R0, R12, #2*-3", Error ("Invalid expression")); 
+                ("R0, R12, #2*-3", Error ("Invalid expression.")); 
                 ("R0, R12, #test", Ok (R0, R12, Literal (uint32 2)));
                 ("R0, R12, R0, RRX", Ok (R0, R12, RegisterShift (R0, RRX, int32 1)));
                 ("R0, R12, R0, RRX #1", Error ("RRX always has a shift of 1"));
+
+                ("R0, R12, #8*8*8*8*23+1", Error ("Invalid 32 bit number"));
+
 
             ]
 
@@ -90,7 +93,7 @@ module ArithmeticTests
                 ("R7,fd,,", Error ("Invalid compare instruction"));
                 ("Radfsa", Error ("Invalid compare instruction"));
                 ("R7,#test*4+2", Ok (R7, Literal (uint32 10)));
-                ("R7,#lol", Error ("Symbol does not exist"));
+                ("R7,#lol", Error ("Invalid literal at end of expression."));
                 ("R7,#test*&A", Ok (R7, Literal (uint32 20)));
                 ("R7,#test*4+2, LSL #5", Error ("Op2 is an invalid register"));
                 ("R7,R1, LSL #1", Ok (R7, RegisterShift (R1, LSL, int32 1)));
