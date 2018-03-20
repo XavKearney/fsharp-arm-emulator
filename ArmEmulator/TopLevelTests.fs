@@ -31,6 +31,17 @@ module TopLevelTests
         List.map (fun (i, o) -> makeTest i o) inOutLst
         |> testList (sprintf "%s Test List" name) 
 
+    /// takes a function f, and a list of two parameters
+    /// it applies (f inp param1 param2) where twoParams = (param1, param2)
+    /// creates an expecto testlist with unit tests testing each case
+    let makeUnitTestListWithThreeParams f threeParams name inOutLst=
+        let makeTest inp outp =
+            let testName = (sprintf "%s: %A" name inp)
+            testCase testName <| fun () ->
+                Expect.equal (f inp <||| threeParams) outp testName
+        List.map (fun (i, o) -> makeTest i o) inOutLst
+        |> testList (sprintf "%s Test List" name) 
+
     [<Tests>]
     let testParseLine = 
         makeUnitTestList (parseLine None (WA 0u)) "Unit Test parseLine" [
@@ -95,7 +106,7 @@ module TopLevelTests
             match f ld with
             | Some x -> x
             | None -> failwithf "Should never happen."
-        makeUnitTestListWithTwoParams (removeResult >> execParsedLine) (cpuData, symtab) "Unit Test execParsedLine" [
+        makeUnitTestListWithThreeParams (removeResult >> execParsedLine) (cpuData, symtab, 0u) "Unit Test execParsedLine" [
             // test valid lines
             (parseLine (someSymTab) (WA 0u) "STM R0, {R1}"), 
                 Ok ({cpuData with MM = cpuData.MM.Add (WA 0u, DataLoc 0u)}, symtab)
@@ -288,8 +299,8 @@ module TopLevelTests
 
             // test invalid single lines
             ["LDM R0, R0, {}"], 
-                Error (ERRIMULTMEM "Incorrectly formatted operands.")
+                Error (ERRLINE (ERRIMULTMEM "Incorrectly formatted operands.", 0u))
             // test multiple invalid lines - only returns the first error (TODO: change)
             ["LDM R0, R0, {}"; "ADD R16, R0, #1"], 
-                Error (ERRIMULTMEM "Incorrectly formatted operands.")
+                Error (ERRLINE (ERRIMULTMEM "Incorrectly formatted operands.", 0u))
          ]
