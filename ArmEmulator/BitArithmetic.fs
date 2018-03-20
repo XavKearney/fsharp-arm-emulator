@@ -91,20 +91,21 @@ module BitArithmetic
 // check litteral 
 
 
-
+    let listAllPairs xs ys = 
+            xs |> List.collect (fun x -> ys |> List.map (fun y -> x, y))
 
 
     /// checks if an integer can be created by rotating an 8 bit number in a 32 bit word 
     let allowedLiterals num =
         let valid0 =
             [0..2..30] 
-            |> List.allPairs [(uint32 num)] 
+            |> listAllPairs [(uint32 num)] 
             |> List.map (fun (n,r) -> (n >>> r) ||| (n <<< (32-r)))
             |> List.collect (fun n -> [n < 256u])
             |> List.contains true
         let valid1 =
             [0..2..30] 
-            |> List.allPairs [~~~ (uint32 num)] 
+            |> listAllPairs [~~~ (uint32 num)] 
             |> List.map (fun (n,r) -> (n >>> r) ||| (n <<< (32-r)))
             |> List.collect (fun n -> [n < 256u])
             |> List.contains true        
@@ -308,81 +309,78 @@ module BitArithmetic
 
 
     /// executes the instruction
-    /// takes the current CPU data (register values, flags ect), the output from parser
-    /// and the symbol table. Results in updating registers and/or flags based on 
+    /// takes the current CPU data (register values, flags ect), the output from parser 
+    /// if no error and the symbol table. Results in updating registers and/or flags based on 
     /// instruction
-    let exeInstr cpuData parseOut symTable =
+    let exeInstr cpuData symTable parseOut =
 
-        match parseOut with
-        | Some (Ok exeInfo) ->
+        let instr = parseOut.PInstr.Instruction 
+        let operands = parseOut.PInstr
+        let suffix = parseOut.PInstr.Suff
+        let flags = cpuData.Fl
 
-            let suffix = exeInfo.PInstr.Suff
-            let flags = cpuData.Fl
+        let updateRegs dest lit = Map.add dest lit cpuData.Regs
+        let updateFlags result carry = {flags with N = (int32 result) < 0 ; C = carry; Z = (result = 0u)} 
 
-            let updateRegs dest lit = Map.add dest lit cpuData.Regs
-            let updateFlags result carry = {flags with N = (int32 result) < 0 ; C = carry; Z = (result = 0u)} 
+        
+        /// evaluates flexible operator
+        /// returns (evaluated operand as a uint32 , carry from flexible operator calculation) 
+        let flexEval op =
+            let carry = cpuData.Fl.C 
+            match op with
+            | Literal lit -> lit,false
 
-            
-            /// evaluates flexible operator
-            /// returns (evaluated operand as a uint32 , carry from flexible operator calculation) 
-            let flexEval op =
-                let carry = cpuData.Fl.C 
-                match op with
-                | Literal lit -> lit,false
+            | Register reg -> cpuData.Regs.[reg],false  
 
-                | Register reg -> cpuData.Regs.[reg],false  
+            | RegShiftLit (regTarget,shift,lit) ->
+                doShift cpuData.Regs.[regTarget] shift lit
 
-                | RegShiftLit (regTarget,shift,lit) ->
-                    doShift cpuData.Regs.[regTarget] shift lit
+            | RegShiftReg (regTarget,shift,reg) ->
+                doShift cpuData.Regs.[regTarget] shift cpuData.Regs.[reg]
 
-                | RegShiftReg (regTarget,shift,reg) ->
-                    doShift cpuData.Regs.[regTarget] shift cpuData.Regs.[reg]
+            | RegRRX reg -> 
+                doRRX cpuData.Regs.[reg] (System.Convert.ToUInt32(carry)) 
 
-                | RegRRX reg -> 
-                    doRRX cpuData.Regs.[reg] (System.Convert.ToUInt32(carry)) 
+        /// preforms the instruction on the given data
+        /// op1 and op2 are both uint32 
+        /// if operand was flexible opperator it would have 
+        /// already been evaluated by this point 
+        /// carry is the carry calculated from evaluating the flexible opperand
+        let doOpCode op1 op2 carry =
+            match instr with 
+            | MOV -> op1,carry
+            | MVN -> ~~~ op1,carry
+            | AND | TST -> op1 &&& op2,carry
+            | EOR | TEQ -> op1 ^^^ op2,carry         
+            | ORR -> op1 ||| op2,carry
+            | BIC -> op1 &&& (~~~  op2),carry
+            | LSL -> doShift op1 Lsl op2
+            | LSR -> doShift op1 Lsr op2
+            | ASR -> doShift op1 Asr op2
+            | ROR -> doShift op1 Ror op2
+            | RRX -> doRRX op1 (System.Convert.ToUInt32(flags.C))
 
-            /// preforms the instruction on the given data
-            /// op1 and op2 are both uint32 
-            /// if operand was flexible opperator it would have 
-            /// already been evaluated by this point 
-            /// carry is the carry calculated from evaluating the flexible opperand
-            let doOpCode op1 op2 carry =
-                match exeInfo.PInstr.Instruction with 
-                | MOV -> op1,carry
-                | MVN -> ~~~ op1,carry
-                | AND | TST -> op1 &&& op2,carry
-                | EOR | TEQ -> op1 ^^^ op2,carry         
-                | ORR -> op1 ||| op2,carry
-                | BIC -> op1 &&& (~~~  op2),carry
-                | LSL -> doShift op1 Lsl op2
-                | LSR -> doShift op1 Lsr op2
-                | ASR -> doShift op1 Asr op2
-                | ROR -> doShift op1 Ror op2
-                | RRX -> doRRX op1 (System.Convert.ToUInt32(flags.C))
+        match instr, operands.Dest, operands.Op1, operands.Op2 with    
+        | (MOV | MVN | RRX), Some dest, Ok op1, Error ""  -> 
+            let flexVal,flexCarry = flexEval op1 
+            let totVal,totCarry = doOpCode flexVal 0u flexCarry
+            match suffix with
+            | S -> Ok {cpuData with Regs = updateRegs dest totVal ;  Fl = updateFlags totVal totCarry}
+            | NA -> Ok {cpuData with Regs = updateRegs dest totVal}
 
-            match exeInfo.PInstr.Instruction, exeInfo.PInstr.Dest, exeInfo.PInstr.Op1, exeInfo.PInstr.Op2 with    
-            | (MOV | MVN | RRX), Some dest, Ok op1, Error ""  -> 
-                let flexVal,flexCarry = flexEval op1 
-                let totVal,totCarry = doOpCode flexVal 0u flexCarry
-                match suffix with
-                | S -> Ok {cpuData with Regs = updateRegs dest totVal ;  Fl = updateFlags totVal totCarry}
-                | NA -> Ok {cpuData with Regs = updateRegs dest totVal}
-
-            | (TST | TEQ), Some dest, Ok op1, Error ""  -> 
-                let flexVal,flexCarry = flexEval op1 
-                let totVal,totCarry = doOpCode cpuData.Regs.[dest] flexVal flexCarry
-                Ok {cpuData with Fl = updateFlags totVal totCarry}
-   
-
-            | (AND | ORR | EOR | BIC | LSL | LSR | ASR | ROR), Some dest, Ok (Register reg), Ok op2 ->
-                let flexVal,flexCarry = flexEval op2 
-                let totVal,totCarry = doOpCode cpuData.Regs.[reg] flexVal flexCarry
-                match suffix with
-                | S -> Ok {cpuData with Regs = updateRegs dest totVal ;  Fl = updateFlags totVal totCarry}
-                | NA -> Ok {cpuData with Regs = updateRegs dest totVal}
+        | (TST | TEQ), Some dest, Ok op1, Error ""  -> 
+            let flexVal,flexCarry = flexEval op1 
+            let totVal,totCarry = doOpCode cpuData.Regs.[dest] flexVal flexCarry
+            Ok {cpuData with Fl = updateFlags totVal totCarry}
 
 
-            | _ -> Error "Execution error"
+        | (AND | ORR | EOR | BIC | LSL | LSR | ASR | ROR), Some dest, Ok (Register reg), Ok op2 ->
+            let flexVal,flexCarry = flexEval op2 
+            let totVal,totCarry = doOpCode cpuData.Regs.[reg] flexVal flexCarry
+            match suffix with
+            | S -> Ok {cpuData with Regs = updateRegs dest totVal ;  Fl = updateFlags totVal totCarry}
+            | NA -> Ok {cpuData with Regs = updateRegs dest totVal}
 
-        | Some _ -> Error "Return from parse is an error"
-        | _ -> Error "Return from parse is none" 
+
+        | _ -> Error "Execution error"
+
