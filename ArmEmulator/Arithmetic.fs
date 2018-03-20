@@ -186,10 +186,9 @@ module Arithmetic
         let doCheck x = 
             let rotates = [0;2;4;6;8;10;12;14;16;18;20;22;24;26;28;30]
             let valid = 
-                List.map (fun a -> uint32((x <<< (32-a)) + (x >>> a))) rotates
-                |> List.collect (fun b -> [b <= uint32(255)])
+                List.map (fun a -> uint32((x <<< (32-a)) ||| (x >>> a))) rotates
+                |> List.collect (fun b -> [b <= 255u])
                 |> List.contains true 
-                
             match valid with
             | true -> Ok x
             | false -> Error ("Invalid 32 bit number")
@@ -460,14 +459,16 @@ module Arithmetic
                 | Error s -> Error s 
             | _ -> Error ("Instruction class not supported.")
         
-        
-        let arithInstr = Map.tryFind ls.OpCode arithOpCodes
-        let compInstr = Map.tryFind ls.OpCode compOpCodes
-
-        match arithInstr, compInstr with
-        | Some (ari), None -> Some(parse' ari)
-        | None, Some (com) -> Some(parse' com)
-        | _ -> None
+        // check each of the opcode maps to see if any match
+        [arithOpCodes; compOpCodes]
+        |> List.choose (Map.tryFind ls.OpCode)
+        |> function 
+            // should only be a single result, if so, parse it
+            | [instr] -> parse' instr
+                        |> function
+                        | Error "No symbol table properly defined" -> None
+                        | x -> Some x
+            | _ -> None
    
 
     /// Execute an arithmetic instruction

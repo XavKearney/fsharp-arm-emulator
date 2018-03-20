@@ -151,7 +151,7 @@ module ArithmeticTests
             {
                 LoadAddr = wa;
                 Label = None;
-                SymTab = None;
+                SymTab = Some Map.empty;
                 OpCode = opcodeStr + suffixStr;
                 Operands = operandStr
             }
@@ -246,7 +246,7 @@ module ArithmeticTests
             {
                 LoadAddr = wa;
                 Label = None;
-                SymTab = None;
+                SymTab = Some Map.empty;
                 OpCode = opcodeStr;
                 Operands = operandStr
             }
