@@ -143,7 +143,7 @@ module Mem
                 let shft, rC = isPos shft0 rC0
                 Ok {(defaultRecord rA rB) with Rc= rC; Shift= shft;}
             | _ -> 
-                Error (sprintf "ops didn't match anything\nops: %A\n" ops)
+                Error (sprintf "ops didn't match anything, ops: %A" ops)
 
         let makeOutFromParseOps _ (x: FromOps) =
             {InstructionType= instTypeTmp;
@@ -184,28 +184,13 @@ module Mem
 
 
 
-    type Literal = {Base: uint32; R: int} // best practice, see later
-
-    let checkLiteralMonad (l:uint32) =
-        let rotate (k:uint32) n = (k >>> n) ||| (k <<< 32 - n),n
-        let literal = 
-            [0..2..30] 
-            |> List.map (rotate 0xFFu)
-            |> List.tryFind (fun (mask,_) -> (mask &&& l) = l)
-            |> Option.map (fun (_,n) -> { Base=(rotate l (32 - n)) |> fst; R=n/2})
-        match literal with 
-        | None -> Error (sprintf "Expression result (%A) cannot be made by a rotated 8 bit number" l)
-        | Some _ -> Ok l
-
-
-
     ///Evaluates an expression involving +-* and labels
     /// which evaluate to the addresses they represent
     ///NEEDS DOING:
     /// - Add multiple bracket functionality 
     ///   Eg 2*(6+(3*4)-(6+3))*5
     /// - Add working CheckLiteral function which works for -ve's
-    let evalExpression (exp0: string) (symTab: SymbolTable) (labels: bool) =
+    let evalExpression (exp0: string) (symTab: SymbolTable) (_: bool) =
         evalExpr symTab exp0
 
 
@@ -295,6 +280,27 @@ module Mem
         | Ok x -> if (((x|>int) % 4 =0)&&((x|>int)>=0)) then Ok x
                   else Error (sprintf "parseLabelIns: Fill expression (%A) <0 or not divisible by four" x)
 
+///This function returns an idicator of whether or not one
+/// of the three instruction specific fields of the label
+/// instruction is an error. As they are all different 
+/// if cannot return the field if it is Ok _ so it returns
+/// an integer instead. 
+    let optionResultAbstract u v w = 
+        match (u,v,w) with
+        | (Some x, _, _) ->
+                           match x with 
+                           | Ok _ -> Ok 0
+                           | Error m -> Error m
+        | (_, Some y, _) -> 
+                           match y with 
+                           | Ok _ -> Ok 0
+                           | Error m -> Error m
+        | (_, _, Some z) -> 
+                           match z with 
+                           | Ok _ -> Ok 0
+                           | Error m -> Error m        
+        | (_, _, _) -> Error "optionResultAbstract: All inputs none"
+
     ///Parse function for Label based instructions such as EQU
     /// FILL and DCD. Returns a record with all the information
     /// needed to execute an LDR or STR instruction.
@@ -347,8 +353,10 @@ module Mem
             {InstructionType = instTypeTmp; Name = Ok nO; 
                 EQUExpr = equExp; DCDValueList = valList; 
                 FillN = fillN}
+        let errorMessage1 = optionResultAbstract fillN valList equExp
+        let errorMessage2 = resultDotBindTwoInp selectFirst errorMessage1 nameOut
         let realOut =
-            match (instTypeTmp, nameOut) with
+            match (instTypeTmp, errorMessage2) with
             | (Error x, Error y) -> Error (x+"\n"+y)
             | (Error x, _) -> Error x
             | (_, Error y) -> Error y
@@ -403,15 +411,13 @@ module Mem
                 | MISC -> (Ok (LabelO (parseLabelIns root ls)))
                 | MEM   -> (Ok (MemO (parseMemIns root suffix ls)))
                 | ADR   -> (Ok (AdrO (parseAdrIns root ls)))
-                | _ -> Error "Instruction class not supported."
+                | _ -> Error "parse: Instruction class not supported."
 
-
-            match pInstrTmp with
-            | Ok x -> 
+            let outputRec pIn = 
                 let pSizeTmp =
                     match root with
                     | "EQU" -> 0u
-                    | "DCD" -> findDcdPSize x
+                    | "DCD" -> findDcdPSize pIn
                     | _     -> 4u
                 Ok { 
                     // Normal (non-error) return from result monad
@@ -419,7 +425,7 @@ module Mem
                     // the operands. Not done in the sample.
                     // Note the record type returned must be written by the module author.
                     // PInstr={InstructionType= (); DestSourceReg= (); SecondOp= ();}; 
-                    PInstr = x
+                    PInstr = pIn
 
 
                     // This is normally the line label as contained in
@@ -442,7 +448,12 @@ module Mem
                     // this part never changes
                     PCond = pCond 
                     }
-            | Error s -> Error s     
+            match pInstrTmp with
+            | Ok x -> 
+                match x with
+                | LabelO (Ok _) | MemO (Ok _) | AdrO (Ok _) -> outputRec x
+                | LabelO (Error m) | MemO (Error m) | AdrO (Error m) -> Error m
+            | Error m -> Error m     
         [opCodesLabel; opCodesMem; opCodesADR]
         |> List.choose (Map.tryFind ls.OpCode)
         |> function 
@@ -483,10 +494,10 @@ module Mem
                 (Map.find Ra dP.Regs, Map.find Rb dP.Regs)
             resultDotBindTwoInp getOriginalRegisterVals inputRecord.DestSourceReg inputRecord.AddressReg
 
-        let makeBytes (bytes: bool) (x,y) =
+        let makeBytes (bytes: bool) (x,y,z) =
             match bytes with
-            | false -> (x,y)
-            | true -> (x&&&0xFFu,y&&&0xFFu)
+            | false -> (x,y,z)
+            | true -> (x&&&0xFFu,y,z)
 
         let incrementRbValue (inputRecord: MemInstr) (dP: DataPath<'INS>) =                
             let powerF (baseF: uint32) (expF: uint32) = 
@@ -500,6 +511,7 @@ module Mem
                        | Some y -> if y >= 0 then Ok (rC*(powerF 2u (y|>uint32)))
                                     else Ok 0u
 
+
         ///Returns the Ra and Rb values
         let preOrPost pre post (inputRecord: MemInstr) (dP: DataPath<'INS>) x (rABTup: (uint32 * uint32)) =
             let rA = fst rABTup
@@ -508,40 +520,36 @@ module Mem
             | Ok LDR -> 
                        match (pre,post) with
                        | (true,true) -> Error "execLDR-interpretingRecord: pre and post can't both be true"
-                       | (true, _) -> Ok (accessMemoryLocation dP (WA (rB+x)), rB+x)
-                       | (_, true) -> Ok (accessMemoryLocation dP (WA (rB)), rB+x)
-                       | (false,false) -> Ok (accessMemoryLocation dP (WA (rB+x)), rB)
+                       | (true, _) -> Ok (accessMemoryLocation dP (WA (rB+x)), rB+x, 0u)
+                       | (_, true) -> Ok (accessMemoryLocation dP (WA (rB)), rB+x, 0u)
+                       | (false,false) -> Ok (accessMemoryLocation dP (WA (rB+x)), rB, x)
             | Ok STR -> 
                        match (pre,post) with
                        | (true,true) -> Error "execLDR-interpretingRecord: pre and post can't both be true"
-                       | (true, _) -> Ok (Ok rA, rB+x)
-                       | (_, true) -> Ok (Ok rA, rB+x)
-                       | (false,false) -> Ok (Ok rA, rB) 
+                       | (true, _) -> Ok (Ok rA, rB+x, 0u)
+                       | (_, true) -> Ok (Ok rA, rB+x, (-1|>uint32)*x)
+                       | (false,false) -> Ok (Ok rA, rB, x) 
             | Error m -> Error (sprintf "interpretingRecord-preOrPost: Given instruction type not STR of LDR\n%A" m)                    
 
         ///Removes unnecessary levels of Result
-        let changeType (v: Result<Result<(Result<uint32,string> * uint32),string>,string>) = 
+        let changeType (v: Result<Result<(Result<uint32,string> * uint32 * uint32),string>,string>) = 
             match v with
             | Ok x ->   
                      match x with
                      | Ok y -> 
                               match y with
-                              | (Ok z, u) -> Ok (z,u)
-                              | (_, _) -> Error "execLDR-interpretingRecord: Error accesing memory location"
+                              | (Ok z, u, v) -> Ok (z,u,v)
+                              | (_, _, _) -> Error "execLDR-interpretingRecord: Error accesing memory location"
                      | Error m -> Error m
             | Error m -> Error m
-
-        let changedToBytes (inputRecord: MemInstr) (a: Result<(uint32 * uint32),string>) =
+        let changedToBytes (inputRecord: MemInstr) (a: Result<(uint32 * uint32 * uint32),string>) =
             resultDotBindTwoInp makeBytes inputRecord.BytesNotWords a 
-
-
-        changedToBytes inputRecord 
-            (changeType 
-                (resultDotBindTwoInp 
-                    (preOrPost inputRecord.PreIndexRb inputRecord.PostIndexRb inputRecord dP) 
-                    (incrementRbValue inputRecord dP) 
-                    (getOrigVal inputRecord dP)))
-
+        (getOrigVal inputRecord dP)
+        |> resultDotBindTwoInp 
+            (preOrPost inputRecord.PreIndexRb inputRecord.PostIndexRb inputRecord dP) 
+            (incrementRbValue inputRecord dP)
+        |> changeType
+        |> changedToBytes inputRecord                    
 
     let makeTuple a b = (a,b)
 
@@ -553,20 +561,18 @@ module Mem
     
     ///Will just update the DataPath, SymbolTable is untouched
     let execLDR (symbolTab: SymbolTable) (dP: DataPath<'INS>) (inputRecord: MemInstr) = 
-        
         let fstRecTuple x =
             match x with 
-            | Ok (a,_) -> Ok a
+            | Ok (a,_,_) -> Ok a
             | Error m -> Error m 
         let sndRecTuple x =
             match x with 
-            | Ok (_,b) -> Ok b
+            | Ok (_,b,_) -> Ok b
             | Error m -> Error m 
         let regsMapF (dPF: Result<DataPath<'INS>,string>) reg x = 
             match dPF with 
             | Ok y -> (resultDotBindTwoInp (updateRegister y) reg x)
             | Error m -> Error m
-
 
         let updatedDP2 = 
             let updateDP f field dP0 = 
@@ -587,16 +593,28 @@ module Mem
 
     ///Will just update the DataPath, SymbolTable is untouched
     let execSTR (symbolTab: SymbolTable) (dP: DataPath<'INS>) (inputRecord: MemInstr) = 
-        let updatedSTRMachineMem (tuple: Result<(uint32 * uint32),string>) =
+        let updatedSTRMachineMem (tuple: Result<(uint32 * uint32 * uint32),string>) =
             match tuple with
-            | Ok (a,b) -> Ok ((dP.MM).Add(WA b, DataLoc a))
+            | Ok (a,b,c) -> Ok ((dP.MM).Add(WA (b+c), DataLoc a))
             | Error m -> Error m
+        let updatedRegMap = 
+            let regVals = interpretingRecord dP inputRecord
+            let sndTup tup = 
+                match tup with
+                | (_,y,_) -> y
+            let thrdTup tup = 
+                match tup with
+                | (_,_,z) -> z
+            match (inputRecord.AddressReg, regVals) with
+            | (Error _, Error _) -> Map.empty
+            | (Error _, _) -> Map.empty
+            | (_, Error _) -> Map.empty                       
+            | (Ok x, Ok y) -> updateRegister dP x (sndTup y)
         inputRecord
         |> interpretingRecord dP 
         |> updatedSTRMachineMem 
-        |> Result.map (fun x -> {dP with MM = x}) 
-        |> fun a -> (a, Ok symbolTab)
-        |> Ok
+        |> Result.map (fun x -> {dP with MM = x; Regs = updatedRegMap}) 
+        |> fun a -> Ok (a, Ok symbolTab)
         |> abstractResults
 
 
@@ -690,7 +708,7 @@ module Mem
 
         let findAddrs (dP: DataPath<'INS>) :Result<uint32 list, string>=
             if ((dP.MM).IsEmpty) then
-                getAddrList [0x100u] (Result.map (List.length) dataValList)
+                getAddrList [0xFCu] (Result.map (List.length) dataValList)
             else 
                 getAddrList [findMaxAddr dP] (Result.map (List.length) dataValList)
 
