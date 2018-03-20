@@ -312,28 +312,3 @@ module BitArithmeticTests
 
 
 
-    [<Tests>]
-    let tests = 
-        testList "Minimal Visual Unit Tests"
-            [
-            // MOV tests with decimals
-            vTest "MOV test 1" "MOV R0, #1" "0000" [R 0, 1]
-            vTest "MOV test 2" "MOVS R1, #0" "0100" [R 1, 0]
-            vTest "MOV test 3" "MOV R2, #137" "0000" [R 2, 137]
-            vTest "MOV test 4" "MOV R3, #4080" "0000" [R 3, 4080]
-            // MOV tests with hex numbers
-            vTest "MOV test 5" "MOV R4, #0x0" "0000" [R 4, 0]
-            vTest "MOV tes 6" "MOV R5, #0xA" "0000" [R 5, 10]
-            vTest "MOV test 7" "MOV R6, #0x2300" "0000" [R 6, 8960]
-            // MOV tests with hex binary
-            vTest "MOV test 8" "MOV R4, #0b0" "0000" [R 4, 0]
-            vTest "MOV test 9" "MOV R0, #0b1010" "0000" [R 0, 10]
-            vTest "MOV test 10" "MOV R0, #0b10001100000000" "0000" [R 0, 8960]
-
-            // AND tests with decimals
-            vTest "AND test 1" "AND R2, R1, R0" "0000" [R 0, -2]
-            vTest "AND test 2" "AND R3, R2, R0" "0000" [R 0, -2]
-            vTest "AND test 3" "AND R2, R2, R0" "0000" [R 2, -138]
-            vTest "AND test 4" "AND R3, R3, R3" "0000" [R 3, -4081]  
-            ]
-
