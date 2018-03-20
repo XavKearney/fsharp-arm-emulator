@@ -6,6 +6,7 @@ module BitArithmeticTests
     open VisualTest.VTest
     open Expecto
     open VisualTest.VCommon
+    open VisualTest
 
 
     let config = { FsCheckConfig.defaultConfig with maxTest = 10000 }
@@ -311,4 +312,99 @@ module BitArithmeticTests
             Expect.equal (fst rorBy32) n "ROR by 32 is equal to its selft"
 
 
+    [<Tests>]
+    // tests property that ROR by integer multiple of 32 is equal to its selft
+    let testParseRandomised = 
+        testPropertyWithConfig config  "Property Test Parse" <| 
+        fun wa root suff dest op1 op2 ->
+            let lineData = 
+                let rootStr r = 
+                    match r with
+                    | MOV -> "MOV"
+                    | MVN -> "MVN"
+                    | AND -> "AND"
+                    | ORR -> "ORR"
+                    | EOR -> "EOR"
+                    | BIC -> "BIC"
+                    | LSL -> "LSL"
+                    | LSR -> "LSR"
+                    | ASR -> "ASR"
+                    | ROR -> "ROR"
+                    | RRX -> "RRX"
+                    | TST -> "TST"
+                    | TEQ -> "TEQ"
+                let shifterToStr s =
+                    match s with
+                    | Lsl -> "LSL"
+                    | Lsr -> "LSR"
+                    | Asr -> "ASR"
+                    | Ror -> "ROR"
+                let suffStr = 
+                    match suff with
+                    | S -> "S"
+                    | NA -> ""
+                let destStr = regStrings.[dest]
+                let flexOpToStr op = 
+                    match op with
+                    | Literal i -> sprintf "%d" i
+                    | Register r -> regStrings.[r]
+                    | RegShiftReg (r1, s, r2) -> 
+                        regStrings.[r1] + "," + (shifterToStr s) + " " + regStrings.[r2]
+                    | RegShiftLit (r1, s, i) -> 
+                        regStrings.[r1] + "," + (shifterToStr s) + (sprintf " %d" i)
+                    | RegRRX (r) -> 
+                        regStrings.[r] + ", RRX"
+                let op1Str = flexOpToStr op1
+                let op2Str = flexOpToStr op2
+                {
+                    LoadAddr = wa; 
+                    Label = None; 
+                    SymTab = None;
+                    OpCode = (rootStr root) + suffStr;
+                    Operands = (destStr + "," + op1Str + "," + op2Str);
+                }
+            let instr = {
+                Instruction = root;
+                Suff = suff;
+                Dest = Some (dest);
+                Op1 = Ok(op1);
+                Op2 = Ok(op2);
+            }
+            let expected = 
+                match instr with
+                | _ ->
+                    Some ( Ok {
+                        PInstr = instr;
+                        PLabel = None; PSize = 4u; PCond = Cal;
+                    })
+            let res = parse lineData
+            Expect.equal res expected "property test parse"
 
+    // type InstRoots =  MOV | MVN | AND | ORR | EOR | BIC 
+    //                 | LSL | LSR | ASR | ROR | RRX 
+    //                 | TST | TEQ 
+
+    // // type Shifter = Lsl | Lsr | Asr | Ror
+
+    // type Suffix = S | NA
+
+    // /// parse error
+    // type ErrInstr = string
+
+    // /// Flexible opperator
+    // /// either a number or a register with an optional shift
+    // type FlexOp = 
+    //     | Literal of uint32
+    //     | Register of RName
+    //     | RegShiftReg of RName*Shifter*RName
+    //     | RegShiftLit of RName*Shifter*uint32
+    //     | RegRRX of RName
+
+    // /// Infromation needed for instruction execution
+    // /// Part of the return from parse
+    // type InstDecomp = { Instruction: InstRoots
+    //                     Suff: Suffix
+    //                     Dest: RName Option
+    //                     Op1: Result<FlexOp,string>
+    //                     Op2: Result<FlexOp,string>
+    //                     }
