@@ -130,10 +130,6 @@ module TopLevel =
     // based on condition code and current flags
     let checkCond flags cond =
         let n, z, c, v = flags.N, flags.Z, flags.C, flags.V
-        let exeDecide flag exeCondition =
-            match flag = exeCondition with
-            | true -> true
-            | false -> false
         match cond with 
         | Ceq -> z                // execute if Z=1
         | Cne -> not z            // execute if Z=0      
