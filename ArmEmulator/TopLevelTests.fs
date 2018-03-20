@@ -247,6 +247,43 @@ module TopLevelTests
                                         Op2 = Literal 3u;})))
                 }, symtab.Add ("test3", 4u))
 
+            ["ADD R0, R0, #0xFF"; "ADD R1, R1, #0xA9"; "ADD R2, R2, #0xD3";
+                "STM R0!, {R1,R2}"], 
+            Ok ({cpuData with 
+                    Regs = cpuData.Regs
+                        |> Map.add R0 263u
+                        |> Map.add R1 0xA9u
+                        |> Map.add R2 0xD3u
+                        |> Map.add R15 20u
+                    MM = cpuData.MM
+                        |> Map.add (WA 0u) 
+                            (Code (IARITH (ArithI {InstrType = Some ADD;
+                                        SuffixSet = false;
+                                        Target = R0;
+                                        Op1 = R0;
+                                        Op2 = Literal 0xFFu;})))
+                        |> Map.add (WA 4u) 
+                            (Code (IARITH (ArithI {InstrType = Some ADD;
+                                        SuffixSet = false;
+                                        Target = R1;
+                                        Op1 = R1;
+                                        Op2 = Literal 0xA9u;})))
+                        |> Map.add (WA 8u) 
+                            (Code (IARITH (ArithI {InstrType = Some ADD;
+                                        SuffixSet = false;
+                                        Target = R2;
+                                        Op1 = R2;
+                                        Op2 = Literal 0xD3u;})))
+                        |> Map.add (WA 12u) 
+                            (Code (IMULTMEM (MemI {InsType = Some STM;
+                                        Direction = Some EA;
+                                        Target = R0;
+                                        WriteBack = true;
+                                        RegList = [R1; R2];})))
+                        |> Map.add (WA 255u)  (DataLoc 0xA9u)
+                        |> Map.add (WA 259u)  (DataLoc 211u)
+                }, symtab)
+
             // test invalid single lines
             ["LDM R0, R0, {}"], 
                 Error (ERRIMULTMEM "Incorrectly formatted operands.")
