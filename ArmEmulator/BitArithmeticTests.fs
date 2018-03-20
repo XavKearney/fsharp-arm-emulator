@@ -371,7 +371,7 @@ module BitArithmeticTests
                 Op2 = Ok(op2);
             }
             let expected = 
-                match instr with
+                match root, suff, dest, op1, op2 with
                 | _ ->
                     Some ( Ok {
                         PInstr = instr;
