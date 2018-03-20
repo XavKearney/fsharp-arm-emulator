@@ -170,9 +170,9 @@ module Mem
     /// information for executing an ADR instruction
     type ADRInstr =
         {
-            InstructionType: Result<ADRInstrType,String>;
-            DestReg: Result<RName,String>;
-            SecondOp: Result<uint32,String>;
+            InstructionType: ADRInstrType;
+            DestReg: RName;
+            SecondOp: uint32;
         }
 
     ///A spec for the ADR Class of instrucions
@@ -213,19 +213,27 @@ module Mem
                 Error (sprintf "parseAdrIns: No destination register identified in parseAdrIns\nls.Operands: %A" (ls.Operands))
         let labelExpVal = 
             match ls.SymTab with
-            | None   -> Error "parseAdrIns: ls.SymTab = None"
+            | None   -> 
+                   match ((ls.Operands).Trim()) with
+                   | Match @"(R[0-9]|1[0-5]) *, *(.*)" [_; _; expression] -> 
+                      evalExpression expression.Value ([] |> Map.ofList) false
+                   | _ -> Error (sprintf "parseAdrIns: Line Data in incorrect form\nls.Operands: %A" ls.Operands)
             | Some x -> 
-                       match ((ls.Operands).Trim()) with
-                       | Match @"(R[0-9]|1[0-5]) *, *(.*)" [_; _; expression] -> 
-                          evalExpression expression.Value x true
-                       | _ -> Error (sprintf "parseAdrIns: Line Data in incorrect form\nls.Operands: %A" ls.Operands)
-        let makeOutFrom x _ =
-            {InstructionType= adrInstrTypeTmp;
-                DestReg= rD;
-                SecondOp= Ok x;}
+                   match ((ls.Operands).Trim()) with
+                   | Match @"(R[0-9]|1[0-5]) *, *(.*)" [_; _; expression] -> 
+                      evalExpression expression.Value x true
+                   | _ -> Error (sprintf "parseAdrIns: Line Data in incorrect form\nls.Operands: %A" ls.Operands)
+        let makeOutFromSO x aITT =
+            {InstructionType= aITT;
+                //Will be overwritten so just a dummy to type-check
+                DestReg= R0; 
+                SecondOp= x;}
+        let makeOutFromSO2 rD x =
+            {x with DestReg= rD;
+            }
         let errorMessage1 = resultDotBindTwoInp selectFirst adrInstrTypeTmp rD  
-        resultDotBindTwoInp makeOutFrom (labelExpVal) errorMessage1 
-
+        resultDotBindTwoInp makeOutFromSO labelExpVal errorMessage1 
+        |> resultDotBindTwoInp makeOutFromSO2 rD
 
 
 
@@ -756,8 +764,7 @@ module Mem
     let execDCD (symbolTab: SymbolTable) (dP: DataPath<'INS>) (inputRecord: LabelInstr) = 
         removeOptionD (inputRecord.DCDValueList)
         |> updateSymbolTable symbolTab inputRecord
-        |> fun b -> ((updateMemoryDataPath inputRecord dP), b)
-        |> Ok
+        |> fun b -> Ok ((updateMemoryDataPath inputRecord dP), b)
         |> abstractResults
 
     ///Takes in the current state of the program in the form
@@ -768,16 +775,14 @@ module Mem
     let execEQU (symbolTab: SymbolTable) (dP: DataPath<'INS>) (inputRecord: LabelInstr) = 
         inputRecord.EQUExpr
         |> updateSymbolTable symbolTab inputRecord
-        |> fun b -> (Ok dP, b)
-        |> Ok
+        |> fun b -> Ok (Ok dP, b)
         |> abstractResults 
     
     ///Executes a Fill instruction, updates Symbol Table and DataPath
     let execFILL (symbolTab: SymbolTable) (dP: DataPath<'INS>) (inputRecord: LabelInstr) = 
         inputRecord.FillN
         |> updateSymbolTable symbolTab inputRecord 
-        |> fun b -> (updateMemoryDataPath inputRecord dP, b)
-        |> Ok
+        |> fun b -> Ok (updateMemoryDataPath inputRecord dP, b)
         |> abstractResults 
 
 
@@ -785,12 +790,11 @@ module Mem
 
     let execADR (symbolTab: SymbolTable) (dP: DataPath<'INS>) (inputRecord: ADRInstr) = 
         let updateRegMap (dP: DataPath<'INS>) (inputRecord: ADRInstr) = 
-            resultDotBindTwoInp (updateRegister dP) inputRecord.DestReg inputRecord.SecondOp 
+            updateRegister dP inputRecord.DestReg inputRecord.SecondOp
         inputRecord
         |> updateRegMap dP 
-        |> Result.map (updateDataPathRegs dP) 
-        |> fun a -> (a, Ok symbolTab)
-        |> Ok
+        |> updateDataPathRegs dP
+        |> fun a -> Ok (Ok a, Ok symbolTab)
         |> abstractResults 
 
         

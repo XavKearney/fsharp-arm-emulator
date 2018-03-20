@@ -3,6 +3,7 @@ module MemTests
     open CommonData
     open CommonLex
     open Expecto
+    open FsCheck
     open Mem
     open VisualTest
 
@@ -44,7 +45,7 @@ module MemTests
                                                                                     EQUExpr = (Some (Ok 0u)); DCDValueList = None;
                                                                                     FillN = None})
                     //EQU Error Message Tests
-                    makeTest "EQU" (ldFunc "labelT" "") "EQU No Literal" (Error "evalExpression: End case did not match any of the evalExpression end case options (0x4, 2, 0b11, label2 etc)")
+                    makeTest "EQU" (ldFunc "labelT" "") "EQU No Literal" (Error "No input expression supplied.")
 
 
                     //Fill Working Tests
@@ -62,7 +63,7 @@ module MemTests
                     makeTest "FILL" (ldFunc "labelT" "123") "FILL 123" (Error "parseLabelIns: Fill expression (123u) <0 or not divisible by four")
                     makeTest "FILL" (ldFunc "labelT" "-1") "FILL -1" (Error "parseLabelIns: Fill expression (4294967295u) <0 or not divisible by four")
                     makeTest "FILL" (ldFunc "labelT" "-4") "FILL -4" (Error "parseLabelIns: Fill expression (4294967292u) <0 or not divisible by four")
-                    makeTest "FILL" (ldFunc "labelT" "") "FILL No Input" (Error "evalExpression: End case did not match any of the evalExpression end case options (0x4, 2, 0b11, label2 etc)")
+                    makeTest "FILL" (ldFunc "labelT" "") "FILL No Input" (Error "No input expression supplied.")
 
                     //DCD Working Tests
                     makeTest "DCD" (ldFunc "labelT" "1") "DCD 1" (Ok {InstructionType = Ok DCD; Name = (Ok (Some "labelT"));
@@ -89,12 +90,7 @@ module MemTests
                     makeTest "DCD" (ldFunc "labelT" "1, ,5") "DCD invalid space list input" (Error "parseLabelIns: Input to DCD function not valid (No input etc)")
                     makeTest "DCD" (ldFunc "labelT" "1, a, 5") "DCD invalid list input" (Error "parseLabelIns: Input to DCD function not valid (No input etc)")
 
-
-                
                 ]
-
-
-
 
 
 
@@ -124,7 +120,6 @@ module MemTests
                     makeEvalExpTest "evalExpressions: Brackets1" true "(4*2)+3" (Ok 11u)
                     makeEvalExpTest "evalExpressions: Brackets2" true "testL + (2*2)" (Ok 260u)
                     makeEvalExpTest "evalExpressions: Label Right Left Multiply" true "4*2 + testL + 2*2" (Ok 268u)
-                    // makeEvalExpTest "evalExpressions: * first character" true "*3+7" (Ok 10u)
                     makeEvalExpTest "evalExpressions: + first character" true "+3+7" (Ok 10u)
                     makeEvalExpTest "evalExpressions: - first character" true "-3+7" (Ok 4u)
                     makeEvalExpTest "evalExpressions: Negative Output" true "3-7" (Ok 4294967292u)
@@ -411,31 +406,86 @@ module MemTests
         Expecto.Tests.testList "parseAdrIns Tests"
                 [   
                     //ADR Working tests
-                    makeTest "ADR" (ldFunc stTwoItem "R0, testL") "ADR Base Case" (Ok {InstructionType= Ok ADRm;
-                                                                                DestReg= Ok R0;
-                                                                                SecondOp= Ok 256u;})
-                    makeTest "ADR" (ldFunc stTwoItem "R9, testL") "ADR R9 Test" (Ok {InstructionType= Ok ADRm;
-                                                                                DestReg= Ok R9;
-                                                                                SecondOp= Ok 256u;})
-                    makeTest "ADR" (ldFunc stTwoItem "R10, testL") "ADR R10 Test" (Ok {InstructionType= Ok ADRm;
-                                                                                DestReg= Ok R10;
-                                                                                SecondOp= Ok 256u;})
-                    makeTest "ADR" (ldFunc stTwoItem "R15, testL") "ADR R15 Test" (Ok {InstructionType= Ok ADRm;
-                                                                                DestReg= Ok R15;
-                                                                                SecondOp= Ok 256u;})
-                    makeTest "ADR" (ldFunc stTwoItem "R2, testL2") "ADR NumLabel Test" (Ok {InstructionType= Ok ADRm;
-                                                                                DestReg= Ok R2;
-                                                                                SecondOp= Ok 260u;})
-                    makeTest "ADR" (ldFunc stTwoItem "R0, 4") "ADR Number Only Exp" (Ok {InstructionType= Ok ADRm;
-                                                                                DestReg= Ok R0;
-                                                                                SecondOp= Ok 4u;})
+                    makeTest "ADR" (ldFunc stTwoItem "R0, testL") "ADR Base Case" (Ok {InstructionType= ADRm;
+                                                                                DestReg= R0;
+                                                                                SecondOp= 256u;})
+                    makeTest "ADR" (ldFunc stTwoItem "R9, testL") "ADR R9 Test" (Ok {InstructionType= ADRm;
+                                                                                DestReg= R9;
+                                                                                SecondOp= 256u;})
+                    makeTest "ADR" (ldFunc stTwoItem "R10, testL") "ADR R10 Test" (Ok {InstructionType= ADRm;
+                                                                                DestReg= R10;
+                                                                                SecondOp= 256u;})
+                    makeTest "ADR" (ldFunc stTwoItem "R15, testL") "ADR R15 Test" (Ok {InstructionType= ADRm;
+                                                                                DestReg= R15;
+                                                                                SecondOp= 256u;})
+                    makeTest "ADR" (ldFunc stTwoItem "R2, testL2") "ADR NumLabel Test" (Ok {InstructionType= ADRm;
+                                                                                DestReg= R2;
+                                                                                SecondOp= 260u;})
+                    makeTest "ADR" (ldFunc stTwoItem "R0, 4") "ADR Number Only Exp" (Ok {InstructionType= ADRm;
+                                                                                DestReg= R0;
+                                                                                SecondOp= 4u;})
                     //ADR Error Message Tests
-                    makeTest "ADR" (ldFunc stTwoItem "R0, ") "ADR No Literal" (Error "evalExpression: End case did not match any of the evalExpression end case options (0x4, 2, 0b11, label2 etc)" )
-                    makeTest "ADR" (ldFunc stTwoItem ", 4") "ADR No Register" (Error "parseAdrIns: Line Data in incorrect form\nls.Operands: \", 4\"\nparseAdrIns: No destination register identified in parseAdrIns\nls.Operands: \", 4\"")
-                    makeTest "ADR" (ldFunc stTwoItem "") "ADR No Input" (Error"parseAdrIns: Line Data in incorrect form\nls.Operands: \"\"\nparseAdrIns: No destination register identified in parseAdrIns\nls.Operands: \"\"")
+                    makeTest "ADR" (ldFunc stTwoItem "R0, ") "ADR No Literal" (Error "No input expression supplied.")
+                    makeTest "ADR" (ldFunc stTwoItem ", 4") "ADR No Register" (Error"parseAdrIns: No destination register identified in parseAdrIns\nls.Operands: \", 4\"\nparseAdrIns: Line Data in incorrect form\nls.Operands: \", 4\"\nparseAdrIns: No destination register identified in parseAdrIns\nls.Operands: \", 4\"")
+                    makeTest "ADR" (ldFunc stTwoItem "") "ADR No Input" (Error"parseAdrIns: No destination register identified in parseAdrIns\nls.Operands: \"\"\nparseAdrIns: Line Data in incorrect form\nls.Operands: \"\"\nparseAdrIns: No destination register identified in parseAdrIns\nls.Operands: \"\"")
 
 
                 ]
+
+
+
+    let config = { FsCheckConfig.defaultConfig with maxTest = 10000 }
+
+    /// choose an item from list at random
+    let chooseFromList lst = 
+        Gen.elements lst
+        |> Gen.sample 0 1
+        |> List.head
+
+
+    /// property-based testing of parse function
+    /// for randomly generated LDM/STM instructions
+    [<Tests>]
+    let parseAdrInsTestRandomised =
+        let removeResult x =
+            match x with
+            | Ok y -> y
+            | Error _ -> failwithf "parseAdrInsTestRandomised: Should never happen"
+        let makeLineData wa opcode suffixStr rD secondOp = 
+            // (Ok {InstructionType= Ok ADRm;
+            // DestReg= Ok R0;
+            // SecondOp= Ok 256u;})
+            let opCodeStr = 
+                match opcode with
+                | ADRm -> "ADR"
+            let operands = regStrings.[rD] + ", " + (secondOp |> string)
+            operands
+            |> fun operandStr ->
+            {
+                LoadAddr = wa; 
+                Label = None; 
+                SymTab = None;
+                OpCode = opCodeStr + suffixStr;
+                Operands = operandStr;
+            }
+
+        testPropertyWithConfig config "Property Test parseAdrIns" <| 
+        fun wa opcode rD secondOp ->
+            // choose a random suffix string, including aliases
+            let suffixStr = chooseFromList [""]
+            // make the correct input data from random params
+            let ld = makeLineData wa opcode suffixStr rD secondOp
+            // determine correct output based on params
+            let expected = 
+                Ok {InstructionType= opcode;
+                    DestReg= rD;
+                    SecondOp= secondOp;}
+            let res = parseAdrIns "ADR" ld
+            Expect.equal res expected "message"
+
+
+
+
 
 
 
@@ -460,19 +510,19 @@ module MemTests
                 [   
                     //parse Working Tests
                     //ADR
-                    makeTest (ldFunc stTwoItem "ADR" "R0, 4") "parse ADR Base Test" (Some (Ok {PInstr = AdrO (Ok {InstructionType= Ok ADRm;
-                                                                                DestReg= Ok R0;
-                                                                                SecondOp= Ok 4u;});
+                    makeTest (ldFunc stTwoItem "ADR" "R0, 4") "parse ADR Base Test" (Some (Ok {PInstr = AdrO (Ok {InstructionType= ADRm;
+                                                                                DestReg= R0;
+                                                                                SecondOp= 4u;});
                                                                     PLabel = Some ("labelTest", 100u);
                                                                     PSize = 4u; PCond = Cal}))
-                    makeTest (ldFunc stTwoItem "ADR" "R9, testL") "parse ADR Label" (Some (Ok {PInstr = AdrO (Ok {InstructionType= Ok ADRm;
-                                                                                DestReg= Ok R9;
-                                                                                SecondOp= Ok 256u;});
+                    makeTest (ldFunc stTwoItem "ADR" "R9, testL") "parse ADR Label" (Some (Ok {PInstr = AdrO (Ok {InstructionType= ADRm;
+                                                                                DestReg= R9;
+                                                                                SecondOp= 256u;});
                                                                     PLabel = Some ("labelTest", 100u);
                                                                     PSize = 4u; PCond = Cal}))
-                    makeTest (ldFunc stTwoItem "ADR" "R15, testL") "parse ADR R15" (Some (Ok {PInstr = AdrO (Ok {InstructionType= Ok ADRm;
-                                                                                DestReg= Ok R15;
-                                                                                SecondOp= Ok 256u;});
+                    makeTest (ldFunc stTwoItem "ADR" "R15, testL") "parse ADR R15" (Some (Ok {PInstr = AdrO (Ok {InstructionType= ADRm;
+                                                                                DestReg= R15;
+                                                                                SecondOp= 256u;});
                                                                     PLabel = Some ("labelTest", 100u);
                                                                     PSize = 4u; PCond = Cal}))
                     //DCD
@@ -553,10 +603,10 @@ module MemTests
                                                                     PSize = 4u; PCond = Cal}))
                     
                     //parse Error Tests
-                    makeTest (ldFunc stTwoItem "ADR" "") "parse ADR No Input2" (Some (Error"parseAdrIns: Line Data in incorrect form\nls.Operands: \"\"\nparseAdrIns: No destination register identified in parseAdrIns\nls.Operands: \"\""))
+                    makeTest (ldFunc stTwoItem "ADR" "") "parse ADR No Input" (Some (Error"parseAdrIns: No destination register identified in parseAdrIns\nls.Operands: \"\"\nparseAdrIns: Line Data in incorrect form\nls.Operands: \"\"\nparseAdrIns: No destination register identified in parseAdrIns\nls.Operands: \"\""))
                     makeTest (ldFuncAll 200u "labelTestTwo" stTwoItem "DCD" "1,a,5") "parse: DCD No Input" (Some (Error "parseLabelIns: Input to DCD function not valid (No input etc)"))
-                    makeTest (ldFuncAll 100u "labelTest" stTwoItem "EQU" "") "parse: EQU No Input" (Some (Error "evalExpression: End case did not match any of the evalExpression end case options (0x4, 2, 0b11, label2 etc)"))
-                    makeTest (ldFuncAll 100u "labelTest" stTwoItem "FILL" "") "parse: Fill No Input" (Some (Error "evalExpression: End case did not match any of the evalExpression end case options (0x4, 2, 0b11, label2 etc)"))
+                    makeTest (ldFuncAll 100u "labelTest" stTwoItem "EQU" "") "parse: EQU No Input" (Some (Error "No input expression supplied."))
+                    makeTest (ldFuncAll 100u "labelTest" stTwoItem "FILL" "") "parse: Fill No Input" (Some (Error "No input expression supplied."))
                     makeTest (ldFuncAll 100u "labelTest" stTwoItem "LDR" "R0, [R]") "parse: LDR wrong Rb2" (Some (Error "ops didn't match anything, ops: \"R0, [R]\""))
                     makeTest (ldFuncAll 100u "labelTest" stTwoItem "STR" "R6, [R5, ]") "parse: STR Wrong Rc" (Some (Error "ops didn't match anything, ops: \"R6, [R5, ]\""))
 
