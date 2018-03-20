@@ -1,4 +1,5 @@
 namespace Emulator
+open MultMem
 module TopLevel = 
     open CommonLex
     open CommonData
@@ -125,6 +126,28 @@ module TopLevel =
         | Error s -> Error (fMap s)
         | Ok x -> Ok x
 
+    // checks whether an instruction should be executed
+    // based on condition code and current flags
+    let checkCond flags cond =
+        let n, z, c, v = flags.N, flags.Z, flags.C, flags.V
+        match cond with 
+        | Ceq -> z                // execute if Z=1
+        | Cne -> not z            // execute if Z=0      
+        | Cmi -> n                // execute if N=1
+        | Cpl -> not n            // execute if N=0
+        | Cvs -> v                // execute if V = 1
+        | Cvc -> not v            // execute if V = 0            
+        | Chs -> c                // execute if C = 1
+        | Clo -> not c            // execute if C = 0            
+        | Cge -> n = v            // execute if N = V            
+        | Clt -> n = not v        // execute if N != V            
+        | Chi -> c && (not z)     // execute if C = 1 and Z = 0
+        | Cls -> (not c) || z     // execute if C = 0 or Z = 1
+        | Cgt -> (not z) && (n = v)   // execute if Z = 0 and N = V 
+        | Cle -> z && (n = not v)     // execute if Z = 1 and N != V"
+        | Cnv -> true
+        | Cal -> true
+
     // function to execute any parsed instruction from any module
     // returns the modified datapath (or an error)
     let execParsedLine ins d (symtab: SymbolTable) =
@@ -134,17 +157,19 @@ module TopLevel =
             |> f
             |> mapErr err
 
-        ins |> Result.bind (
-            function
+        // check if instruction should be executed
+        match checkCond d.Fl ins.PCond with
+        | true ->
+            match ins with
             | {PInstr=IMEM ins';} as p -> 
-                exec' p (Mem.execInstr d symtab) ins' ERRIMULTMEM
+                exec' p (Mem.execInstr d symtab) ins' ERRIMEM
             | {PInstr=IMULTMEM ins';} as p -> 
                 exec' p (MultMem.execInstr d) ins' ERRIMULTMEM
                 |> Result.map (fun cpu -> cpu, symtab)
             | {PInstr=IARITH ins';} as p -> 
                 exec' p (Arithmetic.execArithmeticInstr d) ins' ERRIARITH
                 |> Result.map (fun cpu -> cpu, symtab)
-        )
+        | false -> Ok (d, symtab)
 
     /// takes a list of lines as string
     /// and optionally, a symbol table
@@ -182,18 +207,83 @@ module TopLevel =
         |> fun p -> p, createSymTab symtab p
 
 
+
     /// execute a list of parsed lines
     /// returns modified DataPath and symbol table
     /// binds any errors in the execution or parsed lines
     let execParsedLines parsedLines cpuData symtab = 
-        let rec execLines lines cpu' symtab' = 
+        // this puts each line of code in its correct memory location
+        // starting at 0u, increasing by PSize each time
+        let rec putCodeInMemory lines cpu' (insMap: Map<WAddr, Parse<Instr>>) currAddr = 
             match lines with
-            // no more lines to return, so return cpu and symtab
-            | [] -> Ok (cpu', symtab')
-            | line :: rest ->
-                execParsedLine line cpu' symtab'
-                |> Result.bind (fun (newCpu, newSymTab) -> execLines rest newCpu newSymTab)
-        execLines parsedLines cpuData symtab
+            | [] -> Ok (cpu', insMap)
+            | Ok line :: rest ->
+                {cpu' with MM = cpu'.MM.Add (WA currAddr, Code line.PInstr) }
+                |> fun c ->
+                    insMap.Add (WA currAddr, line)
+                    |> fun iMap -> putCodeInMemory rest c iMap (currAddr + line.PSize)
+            | Error s :: _ -> Error s
+
+        let setProgCount cpu' = 
+            {cpu' with Regs = cpu'.Regs.Add (R15, 8u)}
+
+        let checkEnd cpu' (insMap: Map<WAddr, Parse<Instr>>) =
+            cpu'.Regs.[R15] - 8u
+            |> WA
+            |> insMap.TryFind
+            |> function
+                | Some({PInstr=IMULTMEM (EndI _); PCond=cond}) 
+                    when checkCond cpu'.Fl cond -> true
+                | _ -> false
+        let checkStop cpu' (insMap: Map<WAddr, Parse<Instr>>) =
+            cpu'.Regs.[R15] - 8u
+            |> WA
+            |> insMap.TryFind
+            |> function
+                | None -> true
+                | _ -> false
+
+        let incrProgCount size cpu' =
+            {cpu' with Regs = cpu'.Regs.Add (R15, cpu'.Regs.[R15] + size)}
+        
+        let checkBranch p = 
+            match p with
+            | {PInstr=IMULTMEM (BranchI _)} -> true
+            | _ -> false
+
+
+        let rec execLines cpu' (insMap: Map<WAddr, Parse<Instr>>) symtab' = 
+            // check if the program has reached the end
+            match checkEnd cpu' insMap with
+            // if so, return 
+            | true -> Ok (cpu', symtab')
+            // otherwise, execute the next instruction
+            | false ->
+                cpu'.Regs.[R15] - 8u
+                |> fun a -> insMap.[WA a]
+                |> fun p -> 
+                    execParsedLine p cpu' symtab'
+                    |> Result.bind (
+                        fun (newCpu, newSymTab) -> 
+                            let branch = checkBranch p
+                            let executed = checkCond cpu'.Fl p.PCond
+                            // need to check if program is about to end
+                            let nextCpu = 
+                                match branch && executed with
+                                // if instruction branched, don't change PC
+                                | true -> newCpu
+                                // otherwise, increment PC
+                                | false -> incrProgCount p.PSize newCpu
+                            checkStop nextCpu insMap 
+                            |> function
+                                // if so, return
+                                | true -> Ok (newCpu, newSymTab)
+                                // if not, increment PC and continue exection
+                                | false -> execLines nextCpu insMap newSymTab
+                    )
+        setProgCount cpuData
+        |> fun cpu -> putCodeInMemory parsedLines cpu Map.empty 0u
+        |> Result.bind (fun (cpu', insMap) -> execLines cpu' insMap symtab)
 
 
     /// takes a list of lines as string, a datapath and an optional symbol table
