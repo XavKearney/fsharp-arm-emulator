@@ -256,38 +256,43 @@ module TopLevel =
             | _ -> false
 
 
-        let rec execLines cpu' (insMap: Map<WAddr, Parse<Instr>>) symtab' = 
-            // check if the program has reached the end
-            match checkEnd cpu' insMap with
+        let rec execLines cpu' insMap symtab' branchCount = 
+            // check if the program has reached the end, or if branch count exceeds limit
+            match checkEnd cpu' insMap, branchCount > 100000u with
             // if so, return 
-            | true -> Ok (cpu', symtab')
+            | true, _ -> Ok (cpu', symtab')
             // otherwise, execute the next instruction
-            | false ->
+            | _, true -> 
+                Error (ERRTOPLEVEL "Infinite loop detected. Branched more than 100,000 times.")
+            | false, false ->
+                // get the current PC value
                 cpu'.Regs.[R15] - 8u
+                // get the instruction at that PC value in memory
                 |> fun a -> insMap.[WA a]
                 |> fun p -> 
+                    // execute the instruction
                     execParsedLine p cpu' symtab'
                     |> Result.bind (
                         fun (newCpu, newSymTab) -> 
                             let branch = checkBranch p
                             let executed = checkCond cpu'.Fl p.PCond
                             // need to check if program is about to end
-                            let nextCpu = 
+                            let nextCpu, newBranchCount = 
                                 match branch && executed with
                                 // if instruction branched, don't change PC
-                                | true -> newCpu
+                                | true -> newCpu, branchCount + 1u
                                 // otherwise, increment PC
-                                | false -> incrProgCount p.PSize newCpu
+                                | false -> incrProgCount p.PSize newCpu, branchCount
                             checkStop nextCpu insMap 
                             |> function
                                 // if so, return
                                 | true -> Ok (newCpu, newSymTab)
                                 // if not, increment PC and continue exection
-                                | false -> execLines nextCpu insMap newSymTab
+                                | false -> execLines nextCpu insMap newSymTab newBranchCount
                     )
         setProgCount cpuData
         |> fun cpu -> putCodeInMemory parsedLines cpu Map.empty 0u
-        |> Result.bind (fun (cpu', insMap) -> execLines cpu' insMap symtab)
+        |> Result.bind (fun (cpu', insMap) -> execLines cpu' insMap symtab 0u)
 
 
     /// takes a list of lines as string, a datapath and an optional symbol table
