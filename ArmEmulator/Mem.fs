@@ -131,15 +131,15 @@ module Mem
         let defaultRecord ra rb = {Ra= regNamesTryFindMonad ra; Rb=regNamesTryFindMonad rb; IncrVal=0; Post= false; Rc= None; Shift= None;}
         let parseOps ops =
             match ops with
-            | Match @"(R[0-9]|1[0-5]) *, *\[ *(R[0-9]|1[0-5]) *] *, *#([0-9]+)" [_; rA; rB; incV] -> //Post Increment
+            | Match @"(R1[0-5]|R[0-9]) *, *\[ *(R1[0-5]|R[0-9]) *] *, *#([0-9]+)" [_; rA; rB; incV] -> //Post Increment
                 Ok {(defaultRecord rA rB) with IncrVal=(incV.Value|>int); Post= true;}
-            | Match @"(R[0-9]|R1[0-5]) *, *\[ *(R[0-9]|R1[0-5]) *]" [_; rA; rB] -> //Base Case
+            | Match @"(R1[0-5]|R[0-9]) *, *\[ *(R1[0-5]|R[0-9]) *]" [_; rA; rB] -> //Base Case
                 Ok (defaultRecord rA rB)
-            | Match @"(R[0-9]|R1[0-5]) *, *\[ *(R[0-9]|R1[0-5]) *, *#([0-9]+) *\]" [_; rA; rB; incV] -> //Num Increment
+            | Match @"(R1[0-5]|R[0-9]) *, *\[ *(R1[0-5]|R[0-9]) *, *#([0-9]+) *\]" [_; rA; rB; incV] -> //Num Increment
                 Ok {(defaultRecord rA rB) with IncrVal=(incV.Value|>int);}
-            | Match @"(R[0-9]|R1[0-5]) *, *\[ *(R[0-9]|R1[0-5]) *, *(R[0-9]|R1[0-5]) *\]" [_; rA; rB; rC] -> //Adding Registers
+            | Match @"(R1[0-5]|R[0-9]) *, *\[ *(R1[0-5]|R[0-9]) *, *(R1[0-5]|R[0-9]) *\]" [_; rA; rB; rC] -> //Adding Registers
                 Ok {(defaultRecord rA rB) with Rc= Some regNames.[rC.Value];}
-            | Match @"(R[0-9]|R1[0-5]) *, *\[ *(R[0-9]|R1[0-5]) *, *(R[0-9]|R1[0-5]) *, *LSL *#(-*[0-9]+) *\]" [_; rA; rB; rC0; shft0] -> //Shifting
+            | Match @"(R1[0-5]|R[0-9]) *, *\[ *(R1[0-5]|R[0-9]) *, *(R1[0-5]|R[0-9]) *, *LSL *#(-*[0-9]+) *\]" [_; rA; rB; rC0; shft0] -> //Shifting
                 let shft, rC = isPos shft0 rC0
                 Ok {(defaultRecord rA rB) with Rc= rC; Shift= shft;}
             | _ -> 
