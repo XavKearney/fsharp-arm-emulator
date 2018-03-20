@@ -2,8 +2,6 @@ module Arithmetic
     open CommonData
     open CommonLex
     open System.Text.RegularExpressions
-    open ParseExpr
-    open System.Xml.Linq
 
     // DUs for the instructions in Arithmetic
     type ArithInstrType = ADD | ADC | SUB | SBC | RSB | RSC
