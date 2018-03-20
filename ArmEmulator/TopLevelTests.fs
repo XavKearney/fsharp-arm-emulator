@@ -283,6 +283,8 @@ module TopLevelTests
                         |> Map.add (WA 255u)  (DataLoc 0xA9u)
                         |> Map.add (WA 259u)  (DataLoc 211u)
                 }, symtab)
+            ["infinite ADD R0, R0, #1"; "B infinite"],
+                Error (ERRTOPLEVEL "Infinite loop detected. Branched more than 100,000 times.")
 
             // test invalid single lines
             ["LDM R0, R0, {}"], 
