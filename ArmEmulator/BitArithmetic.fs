@@ -94,10 +94,6 @@ module BitArithmetic
     let listAllPairs xs ys = 
             xs |> List.collect (fun x -> ys |> List.map (fun y -> x, y))
 
-
-    let listAllPairs xs ys = 
-        xs |> List.collect (fun x -> ys |> List.map (fun y -> x, y))
-
     /// checks if an integer can be created by rotating an 8 bit number in a 32 bit word 
     let allowedLiterals num =
         let valid0 =
@@ -260,18 +256,24 @@ module BitArithmetic
             let pLab = 
                 match ls.Label,ls.LoadAddr with
                 | Some lab, WA addr -> Some (lab,addr)
-                | _ -> None 
+                | _ -> None     
             match ls.SymTab with 
             Some symTable ->     
                 match parseInstr root ls.Operands suffix symTable with 
                 | Ok pInst -> Ok { PInstr=pInst; PLabel = pLab; PSize = 4u; PCond = pCond }
                 | _ -> Error "Parse error"
-            | _ -> Error "No symbol tabel"
+            | _ -> Error "No symbol table"
+
+        let checkSymtab parseOut =
+            match parseOut with 
+            | Some (Error "No symbol table") -> None
+            | out -> out        
 
         // checks Opcode is processed my this module
         // Calls parse' if Opcode is recognised
         Map.tryFind ls.OpCode opCodes
-        |> Option.map parse'
+        |> Option.map parse' |> checkSymtab
+
 
     /// Parse Active Pattern used by top-level code
     let (|IMatch|_|) = parse
