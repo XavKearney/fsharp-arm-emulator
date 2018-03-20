@@ -19,11 +19,7 @@ NB: To test using the `VisualTest` framework, you must first populate the `visua
 
 
 ## Structure
+[TBC]
 
-[Insert some details on the structure of the project here.]
-
-## Roadmap
-
-- [x] Initial project setup
-- [ ] Create the roadmap
-- [ ] Task delegation
+## Features
+[TBC]
