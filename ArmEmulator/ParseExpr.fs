@@ -31,9 +31,9 @@ module ParseExpr
         let m = Regex.Matches(inp, pat) in
         if m.Count > 0
         then 
-        [0..m.Count-1]
-        |> List.map (fun i -> m.Item(i).Value)
-        |> Some
+            [0..m.Count-1]
+            |> List.map (fun i -> m.Item(i).Value)
+            |> Some
         else None
 
     /// matches a string with regex pattern
