@@ -151,7 +151,7 @@ module TopLevelTests
                                             Op2 = Literal 1u;})))
                     }, symtab)
             // test valid line with blank lines
-            [""; "ADD R0, R0, #1"; ""], 
+            ["; some comment here"; "ADD R0, R0, #1"; ""], 
                 Ok ({cpuData with 
                         Regs = cpuData.Regs
                             |> Map.add R0 1u
@@ -253,7 +253,7 @@ module TopLevelTests
                 }, symtab.Add ("start", 4u))
 
             // test branch with blank lines
-            [""; "ADD R0, R0, #3"; ""; "start ADD R3,R3,#1"; ""; "SUBS R0,R0,#1"; "BNE start"], 
+            [""; "ADD R0, R0, #3"; "; some comment"; "start ADD R3,R3,#1"; ""; "SUBS R0,R0,#1"; "BNE start"], 
             Ok ({cpuData with 
                     Regs = cpuData.Regs
                         |> Map.add R3 3u
