@@ -490,23 +490,21 @@ module TopLevelTests
                                         Op1 = Ok (BitArithmetic.Register R0);
                                         Op2 = Ok (BitArithmetic.Literal 3u);}))
                         |> Map.add (WA 8u) 
-                            (Code (IMEM (MemO (Ok {InstructionType = Ok STR;
-                                      DestSourceReg = Ok R0;
-                                      AddressReg = Ok R0;
-                                      BytesNotWords = Ok false;
-                                      IncrementValue = 0;
-                                      PreIndexRb = false;
-                                      PostIndexRb = false;
-                                      ExtraAddressReg = None;
-                                      ShiftExtraRegBy = None;}))))
+                            (Code (IMEM (MemO (Ok {InstructionType = STR;
+                                        DestSourceReg = R0;
+                                        AddressReg = R0;
+                                        BytesNotWords = false;
+                                        IncrementValue = 0;
+                                        PreOrPostIndRb = Neither;
+                                        ExtraAddressReg = None;
+                                        ShiftExtraRegBy = None;}))))
                         |> Map.add (WA 12u) 
-                            (Code (IMEM (MemO (Ok {InstructionType = Ok LDR;
-                                       DestSourceReg = Ok R4;
-                                       AddressReg = Ok R0;
-                                       BytesNotWords = Ok false;
+                            (Code (IMEM (MemO (Ok {InstructionType = LDR;
+                                       DestSourceReg = R4;
+                                       AddressReg = R0;
+                                       BytesNotWords = false;
                                        IncrementValue = 0;
-                                       PreIndexRb = false;
-                                       PostIndexRb = false;
+                                       PreOrPostIndRb = Neither;
                                        ExtraAddressReg = None;
                                        ShiftExtraRegBy = None;}))))
                         |> Map.add (WA 32u) (DataLoc 32u)
