@@ -241,6 +241,48 @@ module TopLevelTests
                                             Op1 = R0;
                                             Op2 = Literal 1u;})))
                     }, symtab)
+            // test line starting with tab
+            ["\tADDEQ R0, R0, #1"], 
+                Ok ({cpuData with 
+                        Regs = cpuData.Regs
+                            |> Map.add R0 0u
+                            |> Map.add R15 8u
+                        MM = cpuData.MM
+                            |> Map.add (WA 0u) 
+                                (Code (IARITH (ArithI {InstrType = Some ADD;
+                                            SuffixSet = false;
+                                            Target = R0;
+                                            Op1 = R0;
+                                            Op2 = Literal 1u;})))
+                    }, symtab)
+            // test line starting with tab and label
+            ["test\tADDEQ R0, R0, #1"], 
+                Ok ({cpuData with 
+                        Regs = cpuData.Regs
+                            |> Map.add R0 0u
+                            |> Map.add R15 8u
+                        MM = cpuData.MM
+                            |> Map.add (WA 0u) 
+                                (Code (IARITH (ArithI {InstrType = Some ADD;
+                                            SuffixSet = false;
+                                            Target = R0;
+                                            Op1 = R0;
+                                            Op2 = Literal 1u;})))
+                    }, symtab.Add ("test", 0u))
+            // test line starting with spaces
+            ["     ADDEQ R0, R0, #1"], 
+                Ok ({cpuData with 
+                        Regs = cpuData.Regs
+                            |> Map.add R0 0u
+                            |> Map.add R15 8u
+                        MM = cpuData.MM
+                            |> Map.add (WA 0u) 
+                                (Code (IARITH (ArithI {InstrType = Some ADD;
+                                            SuffixSet = false;
+                                            Target = R0;
+                                            Op1 = R0;
+                                            Op2 = Literal 1u;})))
+                    }, symtab)
 
             ["ADD R0, R0, #1"; "END"; "ADD R0,R0,#1";], 
             Ok ({cpuData with 
