@@ -50,6 +50,18 @@ module TopLevelTests
             Ok {PInstr = IARITH (ArithI {InstrType = Some ADD; SuffixSet = false;
                              Target = R0; Op1 = R0; Op2 = Literal 5u;});
                 PLabel = None; PSize = 4u; PCond = Cal;}
+            "add R0, R0, #5", 
+            Ok {PInstr = IARITH (ArithI {InstrType = Some ADD; SuffixSet = false;
+                             Target = R0; Op1 = R0; Op2 = Literal 5u;});
+                PLabel = None; PSize = 4u; PCond = Cal;}
+            "ADD r0, r0, #5", 
+            Ok {PInstr = IARITH (ArithI {InstrType = Some ADD; SuffixSet = false;
+                             Target = R0; Op1 = R0; Op2 = Literal 5u;});
+                PLabel = None; PSize = 4u; PCond = Cal;}
+            "add r0, r0, #5", 
+            Ok {PInstr = IARITH (ArithI {InstrType = Some ADD; SuffixSet = false;
+                             Target = R0; Op1 = R0; Op2 = Literal 5u;});
+                PLabel = None; PSize = 4u; PCond = Cal;}
             "ADR R0, 4", 
                 Ok {PInstr = IMEM (AdrO (Ok {InstructionType = ADRm;
                                                  DestReg = R0;
