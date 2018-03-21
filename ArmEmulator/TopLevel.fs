@@ -45,14 +45,18 @@ module TopLevel =
         | MultMem.IMatch pa -> pConv IMULTMEM ERRIMULTMEM pa
         | _ -> None
 
-    let parseLine (symtab: SymbolTable option) (loadAddr: WAddr) (asmLine:string) =
+    /// attempts to parse an individual line string
+    /// given a symbol table and word load address
+    /// returns either an error from any of the modules
+    /// or on success, a parsed instruction
+    let parseLine (symtab: SymbolTable) (loadAddr: WAddr) (asmLine:string) =
         /// put parameters into a LineData record
         let makeLineData opcode operands = {
             OpCode=opcode
             Operands=String.concat "" operands
             Label=None
             LoadAddr = loadAddr
-            SymTab = symtab
+            SymTab = Some symtab
         }
         let removeWhitespace (txt:string) = 
             txt.Trim()
@@ -68,26 +72,26 @@ module TopLevel =
         /// split line on whitespace into an array
         let splitIntoWords ( line:string ) =
             line.Split( ([||] : char array))
+        /// define a parsed instruction corresponding to a blank line
+        let blankInstr = (Ok {PInstr = BLANKLINE;PLabel = None;PCond = Cal;PSize = 0u;})
         /// try to parse 1st word, or 2nd word, as opcode
         /// If 2nd word is opcode 1st word must be label
-        let blankInstr = (Ok {
-                                PInstr = BLANKLINE;
-                                PLabel = None;
-                                PCond = Cal;
-                                PSize = 0u;})
         let matchLine words =
             let pNoLabel =
                 match words with
                 // if the line is blank, return BLANKLINE
                 | "" :: _ -> Some blankInstr
+                // otherwise, try and parse the line assuming it doesn't have a label
                 | opc :: operands -> 
                     makeLineData opc operands 
                     |> IMatch
                 | _ -> None
             match pNoLabel, words with
+            // if parsing worked, return the result
             | Some pa, _ -> pa 
             // if the line is blank, return BLANKLINE
             | None, _ :: "" :: _ -> blankInstr
+            // otherwise, assume the line has a label and try to parse that
             | None, label :: opc :: operands -> 
                 match { makeLineData opc operands with Label=Some label} |> IMatch with
                 | None -> 
@@ -137,6 +141,7 @@ module TopLevel =
     
     // map a function which returns its own error type
     // to one which returns a top-level error type
+    // including the line number the error occurred on
     let mapErr lineNum fMap ins = 
         match ins with
         | Error s -> Error (ERRLINE (fMap s, lineNum))
@@ -165,7 +170,7 @@ module TopLevel =
         | Cal -> true
 
     // function to execute any parsed instruction from any module
-    // returns the modified datapath (or an error)
+    // returns the modified datapath plus symbol table (or an error)
     let execParsedLine ins d (symtab: SymbolTable) lineNum =
         /// executes a given instruction with the correct execution function f
         let exec' p f ins' err = 
@@ -173,23 +178,28 @@ module TopLevel =
             |> f
             |> mapErr lineNum err
 
+        let includeSyms = Result.map (fun cpu -> cpu, symtab)
         // check if instruction should be executed
         match checkCond d.Fl ins.PCond with
         | true ->
             match ins with
+            // Mem instructions modify both symbol table and datapath
             | {PInstr=IMEM ins';} as p -> 
                 exec' p (Mem.execInstr d symtab) ins' ERRIMEM
+            // the rest of the modules just modify datapath
             | {PInstr=IMULTMEM ins';} as p -> 
                 exec' p (MultMem.execInstr d) ins' ERRIMULTMEM
-                |> Result.map (fun cpu -> cpu, symtab)
+                |> includeSyms
             | {PInstr=IARITH ins';} as p -> 
                 exec' p (Arithmetic.execArithmeticInstr d) ins' ERRIARITH
-                |> Result.map (fun cpu -> cpu, symtab)
+                |> includeSyms
             | {PInstr=IBITARITH ins';} as p -> 
                 exec' p (BitArithmetic.exeInstr d) ins' ERRIARITH
-                |> Result.map (fun cpu -> cpu, symtab)
+                |> includeSyms
+            // if the line is blank, just return with no changes
             | {PInstr=BLANKLINE;} -> 
                 Ok (d, symtab)
+        // if the condition code says don't execute, return with no changes
         | false -> Ok (d, symtab)
 
     /// takes a list of lines as string
@@ -198,34 +208,41 @@ module TopLevel =
     /// returns a list of Ok parsed instructions, or errors
     /// plus the completed symbol table, if given
     let parseLines lines symtab = 
-        // adds all labels in the parsed lines to the symbol table
-        let rec createSymTab (symtab': SymbolTable option) parsedLines =
-            match parsedLines, symtab' with
-            | [], _ -> symtab'
-            | (Ok line) :: rest, Some syms -> 
-                match line.PLabel with
-                | Some lab -> createSymTab (Some (syms.Add lab)) rest
-                | None -> createSymTab symtab' rest
-            | _ :: rest, _ ->  createSymTab symtab' rest
+        // execute an instruction if it corresponds to an EQU instruction
+        let execIfEqu = 
+            function
+            // need to check for EQU instructions
+            | Ok ({PInstr = IMEM (Mem.LabelO (Ok {InstructionType = x}))} as p,syms) when x = Mem.EQU ->
+                // create a dummy datapath
+                let d = 
+                    match initDataPath None None None with
+                    | Ok d -> d
+                    | Error _ -> failwithf "Should never happen."
+                // execute the EQU instruction (datapath is not changed)
+                execParsedLine p d syms 0u
+                // use the updated symbol table and continue
+                |> Result.map (snd)
+                |> Result.map (fun s-> p,s)
+            | i -> i
         // parses each line one by one, updating the symbol table as it goes
-        // tail recursive so it can't return the final symbol table (maybe refactor?)
-        let rec parseLines' lines loadaddr (symtab': SymbolTable option) = 
+        let rec parseLines' lines parsedLines loadaddr (symtab': SymbolTable) = 
             let addLabel p =
                 match p.PLabel, symtab' with
-                | Some lab, Some syms -> p, Some (syms.Add lab)
+                | Some lab, syms -> p, (syms.Add lab)
                 | _ -> p, symtab'
             match lines with
-            // no more lines to parse, return empty
-            | [] -> [] 
+            // no more lines to parse, return (need to reverse list order)
+            | [] -> List.rev parsedLines, symtab' 
+            // otherwise, parse line and update symbol table
             | line :: rest ->
                 parseLine symtab' (WA loadaddr) line
                 |> Result.map addLabel
+                |> execIfEqu
                 |> function
-                    | Ok (p, syms) -> Ok p :: parseLines' rest (loadaddr + p.PSize) syms
+                    | Ok (p, syms) -> parseLines' rest (Ok p :: parsedLines) (loadaddr + p.PSize) syms
                     // not sure how to increment size if error
-                    | Error s -> Error s :: parseLines' rest (loadaddr + 4u) symtab'
-        parseLines' lines 0u symtab
-        |> fun p -> p, createSymTab symtab p
+                    | Error s -> parseLines' rest (Error s :: parsedLines) (loadaddr + 4u) symtab'
+        parseLines' lines [] 0u symtab
 
 
 
@@ -238,12 +255,19 @@ module TopLevel =
         let rec putCodeInMemory lines lineNum cpu' (insMap: Map<WAddr, Parse<Instr> * uint32>) currAddr = 
             match lines with
             | [] -> Ok (cpu', insMap)
-            | Ok {PInstr = BLANKLINE;} :: rest -> putCodeInMemory rest (lineNum+1u) cpu' insMap currAddr
+            // ignore blank lines, but increment line number
+            | Ok {PInstr = BLANKLINE;} :: rest -> 
+                putCodeInMemory rest (lineNum+1u) cpu' insMap currAddr
+            // also ignore EQU instructions,
+            | Ok {PInstr = IMEM (Mem.LabelO (Ok {InstructionType = x}))} :: rest when x = Mem.EQU ->
+                putCodeInMemory rest (lineNum+1u) cpu' insMap currAddr
+            // otherwise, execute instruction as normal
             | Ok line :: rest ->
                 {cpu' with MM = cpu'.MM.Add (WA currAddr, Code line.PInstr) }
                 |> fun c ->
                     insMap.Add (WA currAddr, (line, lineNum))
-                    |> fun iMap -> putCodeInMemory rest (lineNum + 1u) c iMap (currAddr + line.PSize)
+                    |> fun iMap -> 
+                        putCodeInMemory rest (lineNum + 1u) c iMap (currAddr + line.PSize)
             | Error s :: _ -> Error (ERRLINE (s, lineNum))
 
         let setProgCount cpu' = 
@@ -314,7 +338,10 @@ module TopLevel =
                     )
         setProgCount cpuData
         |> fun cpu -> putCodeInMemory parsedLines 0u cpu Map.empty 0u
-        |> Result.bind (fun (cpu', insMap) -> execLines cpu' insMap symtab 0u)
+        |> Result.bind (fun (cpu', insMap) -> 
+            match insMap = Map.empty with
+            | false -> execLines cpu' insMap symtab 0u
+            | true -> Ok (cpu', symtab))
 
 
     /// takes a list of lines as string, a datapath and an optional symbol table
@@ -324,8 +351,8 @@ module TopLevel =
         // first pass of parsing
         parseLines lines symtab
         // second pass of parsing
-        |> snd |> parseLines lines
+        |> snd
+        |> parseLines lines
         // execute
         |> function
-            | parsedLines, Some syms -> execParsedLines parsedLines cpuData syms
-            | parsedLines, None -> execParsedLines parsedLines cpuData Map.empty
+            | parsedLines, syms -> execParsedLines parsedLines cpuData syms
