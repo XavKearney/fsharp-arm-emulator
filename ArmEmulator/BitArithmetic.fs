@@ -7,6 +7,7 @@ module BitArithmetic
     open CommonLex
     open CommonData
     open ParseExpr
+    open System
 
 
 
@@ -285,7 +286,12 @@ module BitArithmetic
 // executing instructions
 
 
-
+// When an Operand2 constant is used with the instructions 
+// MOVS, MVNS, ANDS, ORRS, ORNS, EORS, BICS, TEQ or TST, 
+// the carry flag is updated to bit[31] of the constant, 
+// if the constant is greater than 255 and can be produced 
+// by shifting an 8-bit value. These instructions do not 
+// affect the carry flag if Operand2 is any other constant.
 
 
     let intToBool num = 
@@ -331,20 +337,29 @@ module BitArithmetic
         /// evaluates flexible operator
         /// returns (evaluated operand as a uint32 , carry from flexible operator calculation) 
         let flexEval op =
-            let carry = cpuData.Fl.C 
-            match op with
-            | Literal lit -> lit,false
 
-            | Register reg -> cpuData.Regs.[reg],false  
+            match op with
+            | Literal lit -> lit
+
+            | Register reg -> cpuData.Regs.[reg]
 
             | RegShiftLit (regTarget,shift,lit) ->
-                doShift cpuData.Regs.[regTarget] shift lit
+                doShift cpuData.Regs.[regTarget] shift lit |> fst
 
             | RegShiftReg (regTarget,shift,reg) ->
-                doShift cpuData.Regs.[regTarget] shift cpuData.Regs.[reg]
+                doShift cpuData.Regs.[regTarget] shift cpuData.Regs.[reg] |>  fst
 
             | RegRRX reg -> 
-                doRRX cpuData.Regs.[reg] (System.Convert.ToUInt32(carry)) 
+                doRRX cpuData.Regs.[reg] (System.Convert.ToUInt32(flags.C)) |>  fst 
+
+        let calcFlexCarry flexVal =
+            match  int flexVal > 255 with 
+            | true -> 
+                match flexVal >>> 31 with
+                | 1u -> true
+                | 0u -> false
+                | _ -> failwithf "Bit 31 of evaluated op2 is not 0 or 1: Should not happen"
+            | false -> flags.C     
 
         /// preforms the instruction on the given data
         /// op1 and op2 are both uint32 
@@ -367,20 +382,23 @@ module BitArithmetic
 
         match instr, operands.Dest, operands.Op1, operands.Op2 with    
         | (MOV | MVN | RRX), Some dest, Ok op1, Error ""  -> 
-            let flexVal,flexCarry = flexEval op1 
+            let flexVal = flexEval op1 
+            let flexCarry = calcFlexCarry flexVal
             let totVal,totCarry = doOpCode flexVal 0u flexCarry
             match suffix with
             | S -> Ok {cpuData with Regs = updateRegs dest totVal ;  Fl = updateFlags totVal totCarry}
             | NA -> Ok {cpuData with Regs = updateRegs dest totVal}
 
         | (TST | TEQ), Some dest, Ok op1, Error ""  -> 
-            let flexVal,flexCarry = flexEval op1 
+            let flexVal = flexEval op1 
+            let flexCarry = calcFlexCarry flexVal
             let totVal,totCarry = doOpCode cpuData.Regs.[dest] flexVal flexCarry
             Ok {cpuData with Fl = updateFlags totVal totCarry}
 
 
         | (AND | ORR | EOR | BIC | LSL | LSR | ASR | ROR), Some dest, Ok (Register reg), Ok op2 ->
-            let flexVal,flexCarry = flexEval op2 
+            let flexVal = flexEval op2 
+            let flexCarry = calcFlexCarry flexVal
             let totVal,totCarry = doOpCode cpuData.Regs.[reg] flexVal flexCarry
             match suffix with
             | S -> Ok {cpuData with Regs = updateRegs dest totVal ;  Fl = updateFlags totVal totCarry}
