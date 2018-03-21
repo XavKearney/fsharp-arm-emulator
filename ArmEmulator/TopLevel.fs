@@ -54,6 +54,10 @@ module TopLevel =
             LoadAddr = loadAddr
             SymTab = symtab
         }
+        let removeWhitespace (txt:string) = 
+            txt.Trim()
+            |> fun t -> System.Text.RegularExpressions.Regex.Replace(t, @"\s+", " ");
+
         /// remove comments from string
         let removeComment (txt:string) =
             txt.Split(';')
@@ -94,6 +98,7 @@ module TopLevel =
                 Error (ERRTOPLEVEL
                     (sprintf "Invalid instruction: %s" (String.concat " " words)))
         asmLine
+        |> removeWhitespace
         |> removeComment
         |> splitIntoWords
         |> Array.toList
