@@ -6,6 +6,7 @@ module MemTests
     open FsCheck
     open Mem
     open VisualTest
+    open VisualTest
 
 
     let config = { FsCheckConfig.defaultConfig with maxTest = 10000 }
@@ -123,8 +124,12 @@ module MemTests
                     makeTest "DCD" (ldFunc "labelT" "a") "DCD invalid input" (Error "parseLabelIns: Input to DCD function not valid (No input etc)")
                     makeTest "DCD" (ldFunc "labelT" "1, ,5") "DCD invalid space list input" (Error "parseLabelIns: Input to DCD function not valid (No input etc)")
                     makeTest "DCD" (ldFunc "labelT" "1, a, 5") "DCD invalid list input" (Error "parseLabelIns: Input to DCD function not valid (No input etc)")
+                    makeTest "DCD" (ldFunc "labelT" "\"\"") "DCD quotes only input" (Error "parseLabelIns: Input to DCD function not valid (No input etc)")
+                    makeTest "DCD" (ldFunc "labelT" "+") "DCD + input" (Error "parseLabelIns: Input to DCD function not valid (No input etc)")
+                    makeTest "DCD" (ldFunc "labelT" "null") "DCD null input" (Error "parseLabelIns: Input to DCD function not valid (No input etc)")
 
                 ]
+
 
 
     ///Property-based testing of parseLabelIns function
@@ -140,43 +145,57 @@ module MemTests
             | Ok y -> y
             | Error _ -> failwithf "parseAdrInsTestRandomised: Should never happen"
         let makeLineData wa opcode suffixStr label eQdCfL = 
-            let opCodeStr = 
-                match opcode with
-                | EQU -> "EQU"
-                | FILL -> "FILL"
-                | DCD -> "DCD"
-            let operandStr =
-                match eQdCfL with
-                | Eq x -> x |> string
-                | Fl x -> x |> string
-                | Vl x -> List.reduce (fun a b -> a+", "+b) x
+            let (labelStr, opCodeStr, operandStr) = 
+                match (label, opcode, eQdCfL) with
+                | (Some x, EQU, Eq y) -> (Some x, "EQU", y|>string|>Ok)
+                | (Some x, DCD, Vl []) -> (Some x, "DCD", Error "parseLabelIns: Input to DCD function not valid (No input etc)")
+                | (Some x, DCD, Vl [null]) -> (Some x, "DCD", Error "parseLabelIns: Input to DCD function not valid (No input etc)")
+                | (Some x, DCD, Vl y) -> (Some x, "DCD", (List.reduce (fun a b -> a+", "+b) y)|>Ok)
+                | (x, FILL, Fl y) -> (x, "FILL", (y)|>string|>Ok)
+                | (_, _, _) -> (Some "invalidCombination", "invalidCombination", Error "invalidCombination")
             operandStr
-            |> fun operandStr ->
-            {
-                LoadAddr = wa; 
-                Label = label; 
-                SymTab = None;
-                OpCode = opCodeStr + suffixStr;
-                Operands = operandStr;
-            }
+            |> Result.bind (fun operandStrF ->
+                                Ok {
+                                    LoadAddr = wa; 
+                                    Label = labelStr; 
+                                    SymTab = None;
+                                    OpCode = opCodeStr + suffixStr;
+                                    Operands = operandStrF;
+                                })
         testPropertyWithConfig config "Property Test parseAdrIns" <| 
         fun wa opcode label eQdCfL ->
-            // choose a random root string
-            let rootStr = chooseFromList ["DCD";"FILL";"EQU"]
+            let isNumericList lst =
+                let mapFun a = fst(System.UInt32.TryParse(a))
+                List.filter (mapFun >> not) lst
+            // convert the random root LabelInstrType into a
+            // string
+            let (labelRec, opcodeRec, eQdCfLRec) = 
+                match (label, opcode, eQdCfL) with 
+                | (Some x, EQU, Eq y) -> (Some x, "EQU", Ok (Eq y))
+                | (Some x, DCD, Vl []) -> (Some x, "DCD", Error "parseLabelIns: Input to DCD function not valid (No input etc)")
+                | (Some x, DCD, Vl [""]) -> (Some x, "DCD", Error "parseLabelIns: Input to DCD function not valid (No input etc)")
+                | (Some x, DCD, Vl [null]) -> (Some x, "DCD", Error "parseLabelIns: Input to DCD function not valid (No input etc)")
+                | (Some x, DCD, Vl y) -> 
+                    match isNumericList y with 
+                    | [] -> (Some x, "DCD", Ok (Vl y))
+                    | _ -> (Some x, "DCD", Error "parseLabelIns: Input to DCD function not valid (No input etc)")
+                    
+                | (x, FILL, Fl y) -> 
+                    match checkPosAndDivFour (Ok y) with
+                    | Ok _ -> (x, "FILL", (Fl y)|>Ok)
+                    | Error _ -> (x, "FILL", Error (sprintf "parseLabelIns: Fill expression (%A) <0 or not divisible by four" y))
+                | (_, _, _) -> (Some "invalidCombination", "invalidCombination", Error "invalidCombination")
             // choose a random suffix string, including aliases
             let suffixStr = chooseFromList [""]
             // make the correct input data from random params
             let ld = makeLineData wa opcode suffixStr label eQdCfL
             // determine correct output based on params
             let expected = 
-                // Ok {InstructionType= opcode;
-                //     DestReg= rD;
-                //     SecondOp= secondOp;}
-                Ok {InstructionType = opcode; 
-                    Name = label;
-                    EquDcdFill = eQdCfL}
-
-            let res = parseLabelIns rootStr ld
+                Result.bind (fun c -> Ok {
+                    InstructionType = opcode; 
+                    Name = labelRec;
+                    EquDcdFill = c}) eQdCfLRec
+            let res = Result.bind (parseLabelIns opcodeRec) ld
             Expect.equal res expected "message"
 
 

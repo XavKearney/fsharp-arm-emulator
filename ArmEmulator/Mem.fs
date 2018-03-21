@@ -313,18 +313,15 @@ module Mem
     /// needed to execute an LDR or STR instruction.
     let parseLabelIns root ls =
         let evalExprHandler ops symT labels =
-            match (labels, symT) with 
-            | (true, None) -> Error (sprintf "parseLabelIns: ls.SymTab = None
-                              \nroot: %A\nls: %A" root ls)
-            | (false, None) -> (evalExpression ops ([] |> Map.ofList) false)
-            | (_, Some x) -> (evalExpression ops x labels)
+            match symT with 
+            | None -> (evalExpression ops ([] |> Map.ofList) false)
+            | Some x -> (evalExpression ops x labels)
         let instTypeTmp = 
             match root with
             | "EQU"  -> Ok EQU 
             | "FILL" -> Ok FILL
             | "DCD"  -> Ok DCD
-            | _      -> Error (sprintf "parseLabelIns: root (%A) was 
-                        not EQU, FILL or DCD" root) 
+            | _      -> Error (sprintf "parseLabelIns: root (%A) was not EQU, FILL or DCD" root) 
         let insSpecificReturn =
             match instTypeTmp with
             | Ok EQU  -> 
@@ -361,8 +358,7 @@ module Mem
         let nameOut = 
             match ls.Label with
             | None -> if ((instTypeTmp = Ok EQU)||(instTypeTmp = Ok DCD))
-                      then Error (sprintf "parseLabelIns: EQU and DCD 
-                           instructions (%A) must have a label\nls: %A" root ls)
+                      then Error (sprintf "parseLabelIns: EQU and DCD instructions (%A) must have a label\nls: %A" root ls)
                       else Ok None
             | Some _ -> Ok ls.Label
         let defaultReturn = 
