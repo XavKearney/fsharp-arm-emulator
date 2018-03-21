@@ -10,6 +10,7 @@ module MemTests
     open System.Transactions
     open System.Transactions
     open System.Transactions
+    open System.Runtime.CompilerServices
 
 
     let config = { FsCheckConfig.defaultConfig with maxTest = 10000 }
@@ -161,7 +162,7 @@ module MemTests
                                     OpCode = opCodeStr + suffixStr;
                                     Operands = operandStrF;
                                 })
-        testPropertyWithConfig config "Property Test parseAdrIns" <| 
+        testPropertyWithConfig config "Property Test parseLabelIns" <| 
         fun wa opcode label eQdCfL ->
             let isNumericList lst =
                 let mapFun a = fst(System.UInt32.TryParse(a))
@@ -325,6 +326,20 @@ module MemTests
                                                                     PreOrPostIndRb= Pre; 
                                                                     ExtraAddressReg= None;
                                                                     ShiftExtraRegBy= None;})
+                    makeTest "LDR" "" (ldFunc "R0, [R1], #-1") "LDR negative Post" (Ok {InstructionType= LDR;
+                                                                    DestSourceReg= R0; AddressReg= R1;
+                                                                    BytesNotWords= false; IncrementValue= -1;
+                                                                    PreOrPostIndRb= Post; 
+                                                                    ExtraAddressReg= None;
+                                                                    ShiftExtraRegBy= None;})
+                    makeTest "LDR" "" (ldFunc "R0, [R1, #-1]!") "LDR negative Pre" (Ok {InstructionType= LDR;
+                                                                    DestSourceReg= R0; AddressReg= R1;
+                                                                    BytesNotWords= false; IncrementValue= -1;
+                                                                    PreOrPostIndRb= Pre; 
+                                                                    ExtraAddressReg= None;
+                                                                    ShiftExtraRegBy= None;})
+
+
 
 
                 
@@ -453,30 +468,36 @@ module MemTests
 
                 ]
 
+    type TestT = 
+        {ivr: int; 
+        ppr: PreOrPostIndex; 
+        rcr: RName option; 
+        sr: int option}
+
+
     ///Property-based testing of parseLabelIns function
-    /// for randomly generated DCD, EQU and FILL 
-    /// instructions
-    ///Note: this does not test:
-    ///     - Expressions
-    ///     - Hex or binary inputs
+    /// for randomly generated LDR and STR instructions
     [<Tests>]
     let parseMemInsTestRandomised =
         let removeResult x =
             match x with
             | Ok y -> y
             | Error _ -> failwithf "parseMemInsTestRandomised: Should never happen"
-        let makeLineData wa opcode suffixStr label symTab rA rB incVal pre post rC shft = 
-            let opCodeStr = 
-                match opcode with 
-                | LDR -> "LDR"
-                | STR -> "STR"    
+        let makeLineData wa opCodeStr suffixStr label symTab rA rB incVal prePost rC shft = 
             let operandStr = 
-                match incVal, pre, post, rC, shft with 
-                | 0u, false, false, None, None -> regStrings.[rA]+", ["+regStrings.[rB]+"]"
-                | x, false, false, None, None -> regStrings.[rA]+", ["+regStrings.[rB]+", #"+(x|>string)+"]"
+                match incVal, prePost, rC, shft with 
+                | 0, Neither, None, None -> Ok (regStrings.[rA]+", ["+regStrings.[rB]+"]")
+                | x, Neither, None, None -> Ok (regStrings.[rA]+", ["+regStrings.[rB]+", #"+(x|>string)+"]")
+                | x, Post, None, None -> Ok (regStrings.[rA]+", ["+regStrings.[rB]+"], #"+(x|>string))
+                | x, Pre, None, None -> Ok (regStrings.[rA]+", ["+regStrings.[rB]+", #"+(x|>string)+"]!")
+                | _, Neither, Some y, None -> Ok (regStrings.[rA]+", ["+regStrings.[rB]+", "+regStrings.[y]+"]")
+                | _, Pre, Some y, None -> Ok (regStrings.[rA]+", ["+regStrings.[rB]+", "+regStrings.[y]+"]!")
+                | _, Neither, Some y, Some z -> Ok (regStrings.[rA]+", ["+regStrings.[rB]+", "+regStrings.[y]+", LSL #"+(z|>string)+"]")
+                | _, Pre, Some y, Some z -> Ok (regStrings.[rA]+", ["+regStrings.[rB]+", "+regStrings.[y]+", LSL #"+(z|>string)+"]!")
+                | _, _, _, _ -> Error "unexpected Input combination"
 
             operandStr
-            |> (fun operandStrF ->
+            |> Result.bind (fun operandStrF ->
                     Ok {
                         LoadAddr = wa; 
                         Label = label; 
@@ -484,45 +505,65 @@ module MemTests
                         OpCode = opCodeStr + suffixStr;
                         Operands = operandStrF;
                     })
-        testPropertyWithConfig config "Property Test parseAdrIns" <| 
-        fun wa opcode label symTab rA rB incVal pre post rC shft ->
+        testPropertyWithConfig config "Property Test parseMemIns" <| 
+        fun wa opcode label symTab rA rB incVal prePost rC shft ->
             let isNumericList lst =
                 let mapFun a = fst(System.UInt32.TryParse(a))
                 List.filter (mapFun >> not) lst
             // convert the random root LabelInstrType into a
             // string
-            let (labelRec, opcodeRec, eQdCfLRec) = 
-                match (label, opcode, eQdCfL) with 
-                | (Some x, EQU, Eq y) -> (Some x, "EQU", Ok (Eq y))
-                | (Some x, DCD, Vl []) -> (Some x, "DCD", Error "parseLabelIns: Input to DCD function not valid (No input etc)")
-                | (Some x, DCD, Vl [null]) -> (Some x, "DCD", Error "parseLabelIns: Input to DCD function not valid (No input etc)")
-                | (Some x, DCD, Vl y) -> 
-                    match isNumericList y with 
-                    | [] -> (Some x, "DCD", Ok (Vl y))
-                    | _ -> (Some x, "DCD", Error "parseLabelIns: Input to DCD function not valid (No input etc)")
-                | (x, FILL, Fl y) -> 
-                    match checkPosAndDivFour (Ok y) with
-                    | Ok _ -> (x, "FILL", (Fl y)|>Ok)
-                    | Error _ -> (x, "FILL", Error (sprintf "parseLabelIns: Fill expression (%A) <0 or not divisible by four" y))
-                | (_, _, _) -> (Some "invalidCombination", "invalidCombination", Error "invalidCombination")
+            let opcodeStr = 
+                match opcode with 
+                | LDR -> "LDR"
+                | STR -> "STR"
             // choose a random suffix string, including aliases
-            let suffixStr = chooseFromList [""]
+            let suffixStr = chooseFromList [""; "B"]
+            let bytes = 
+                match suffixStr with 
+                | "" -> false
+                | "B" -> true
+                | _ -> failwithf "Should never happen"
             // make the correct input data from random params
-            let ld = makeLineData wa opcode suffixStr label symTab rA rB incVal pre post rC shft
+            let ld = makeLineData wa opcodeStr suffixStr label symTab rA rB incVal prePost rC shft
             // determine correct output based on params
-            let expected = 
-                Result.bind (fun c -> Ok {
-                    InstructionType = opcode; 
-                    Name = labelRec;
-                    EquDcdFill = c}) eQdCfLRec
-                    // Ok {InstructionType= Ok STR;
-                    //     DestSourceReg= Ok R0; AddressReg= Ok R11;
-                    //     BytesNotWords= Ok true; IncrementValue= 0;
-                    //     PreIndexRb= true; PostIndexRb= false; 
-                    //     ExtraAddressReg= None;
-                    //     ShiftExtraRegBy= None;}
-            let res = Result.bind (parseMemIns opcodeRec) ld
-            Expect.equal res expected "message"
+            let all =
+                let (incValRes, prePostRes, rCRes, shftRes) =
+                    match incVal, prePost, rC, shft with 
+                    | 0, Neither, None, None -> (Ok 0, Ok Neither, Ok None, Ok None) //Base Case
+                    | x, Neither, None, None -> (Ok x, Ok Neither, Ok None, Ok None) //Num Increment
+                    | x, Post, None, None -> (Ok x, Ok Post, Ok None, Ok None) //Post Increment
+                    | x, Pre, None, None -> (Ok x, Ok Pre, Ok None, Ok None) //Pre Increment
+                    | _, Neither, Some y, None -> (Ok 0, Ok Neither, Ok (Some y), Ok None)//Adding Registers
+                    | _, Pre, Some y, None -> (Ok 0, Ok Pre, Ok (Some y), Ok None) //Pre - Adding Registers
+                    | _, Neither, Some y, Some z -> 
+                        match intIsPos z with
+                        | -1 -> (Ok 0, Ok Neither, Ok (None), Ok (None)) //Adding Negative Shifted Registers
+                        | z -> (Ok 0, Ok Neither, Ok (Some y), Ok (Some z)) //Adding Shifted Registers
+                    | _, Pre, Some y, Some z -> 
+                        match intIsPos z with
+                        | -1 -> (Ok 0, Ok Pre, Ok (None), Ok (None)) //Pre - Adding Negative Shifted Registers
+                        | z -> (Ok 0, Ok Pre, Ok (Some y), Ok (Some z)) //Pre - Adding Shifted Registers
+                    | _, _, _, _ -> (Error "unexpected Input combination", Error "unexpected Input combination", Error "unexpected Input combination", Error "unexpected Input combination")
+                let defaultRec:TestT = {ivr = 0; ppr = Neither; rcr = Some R0; sr = Some 0}
+                Result.map (fun i -> {defaultRec with ivr = i}) incValRes
+                |> resultDotBindTwoInp (fun i r -> {r with ppr = i}) prePostRes
+                |> resultDotBindTwoInp (fun i r -> {r with rcr = i}) rCRes
+                |> resultDotBindTwoInp (fun i r -> {r with sr = i}) shftRes
+
+            let expected x = 
+                Ok {
+                    InstructionType= opcode;
+                    DestSourceReg= rA; 
+                    AddressReg= rB;
+                    BytesNotWords= bytes; 
+                    IncrementValue= x.ivr;
+                    PreOrPostIndRb= x.ppr; 
+                    ExtraAddressReg= x.rcr;
+                    ShiftExtraRegBy= x.sr}
+            let res = Result.bind (parseMemIns opcodeStr suffixStr) ld
+            match all with
+            | Ok x -> Expect.equal res (expected x) "message"
+            | _ -> ()
 
 
 
