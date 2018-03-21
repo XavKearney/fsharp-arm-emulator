@@ -208,8 +208,9 @@ module TopLevel =
     /// returns a list of Ok parsed instructions, or errors
     /// plus the completed symbol table, if given
     let parseLines lines symtab = 
-        let execIfEqu i = 
-            match i with
+        // execute an instruction if it corresponds to an EQU instruction
+        let execIfEqu = 
+            function
             // need to check for EQU instructions
             | Ok ({PInstr = IMEM (Mem.LabelO (Ok {InstructionType = x}))} as p,syms) when x = Mem.EQU ->
                 // create a dummy datapath
@@ -222,43 +223,16 @@ module TopLevel =
                 // use the updated symbol table and continue
                 |> Result.map (snd)
                 |> Result.map (fun s-> p,s)
-            | _ -> i
-
-        // adds all labels in the parsed lines to the symbol table
-        let rec createSymTab (symtab': SymbolTable) parsedLines =
-            match parsedLines, symtab' with
-            // if no more left to parse, return complete symbol table
-            | [], _ -> Ok symtab'
-            // otherwise, check if next line has a label and add to symbol table
-            | (Ok line) :: rest, syms -> 
-                match line with
-                // need to check for EQU instructions
-                | {PInstr = IMEM (Mem.LabelO (Ok {InstructionType = x}))} when x = Mem.EQU ->
-                    // create a dummy datapath
-                    let d = 
-                        match initDataPath None None None with
-                        | Ok d -> d
-                        | Error _ -> failwithf "Should never happen."
-                    // execute the EQU instruction (datapath is not changed)
-                    execParsedLine line d syms 0u
-                    // use the updated symbol table and continue
-                    |> Result.bind (fun (_,s) -> createSymTab s rest)
-                // if not EQU, then just add a label if it exists
-                | _ ->
-                    match line.PLabel with
-                    | Some lab -> createSymTab (syms.Add lab) rest
-                    | None -> createSymTab symtab' rest
-            | _ :: rest, _ ->  createSymTab symtab' rest
+            | i -> i
         // parses each line one by one, updating the symbol table as it goes
-        // recursion method means it can't return the complete symbol table (done after instead)
         let rec parseLines' lines parsedLines loadaddr (symtab': SymbolTable) = 
             let addLabel p =
                 match p.PLabel, symtab' with
                 | Some lab, syms -> p, (syms.Add lab)
                 | _ -> p, symtab'
             match lines with
-            // no more lines to parse, return
-            | [] -> parsedLines, symtab' 
+            // no more lines to parse, return (need to reverse list order)
+            | [] -> List.rev parsedLines, symtab' 
             // otherwise, parse line and update symbol table
             | line :: rest ->
                 parseLine symtab' (WA loadaddr) line
@@ -269,8 +243,6 @@ module TopLevel =
                     // not sure how to increment size if error
                     | Error s -> parseLines' rest (Error s :: parsedLines) (loadaddr + 4u) symtab'
         parseLines' lines [] 0u symtab
-        // |> fun p -> 
-        //     Result.map (fun s -> p,s) (createSymTab symtab p)
 
 
 
