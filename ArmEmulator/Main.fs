@@ -56,7 +56,7 @@ let runFile filePath flags regs =
     readLines filePath
     |> List.ofSeq
     |> List.filter (fun x -> x <> "")
-    |> fun lines -> lines, cpu, Some(Map.empty)
+    |> fun lines -> lines, cpu, Map.empty
     |||> parseThenExecLines
     |> function
         | Ok (cpu, _) -> 
