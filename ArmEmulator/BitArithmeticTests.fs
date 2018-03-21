@@ -7,6 +7,7 @@ module BitArithmeticTests
     open Expecto
     open VisualTest.VCommon
     open VisualTest
+    open VisualTest
 
 
     let config = { FsCheckConfig.defaultConfig with maxTest = 10000 }
@@ -15,6 +16,9 @@ module BitArithmeticTests
         let rnd = System.Random()
         List.init count (fun _ -> rnd.Next (min, max))
         |> List.map uint32
+
+    let getRandomItem lst = 
+        List.item (System.Random().Next(0 , List.length lst)) lst     
 
     let testSymTab = [("testLab", 37u); ("otherLab", 94u)] |> Map.ofList
 
@@ -79,7 +83,7 @@ module BitArithmeticTests
     /// used to test corner cases
     [<Tests>]
     let testLit = 
-        makeUnitTestListLit toLit (fun x -> x) "Literal tests" 
+        makeUnitTestListLit toLit id "Literal tests" 
             [
                 // positives
                 "#0", Ok 0u
@@ -313,98 +317,597 @@ module BitArithmeticTests
 
 
     [<Tests>]
-    // tests property that ROR by integer multiple of 32 is equal to its selft
-    let testParseRandomised = 
-        testPropertyWithConfig config  "Property Test Parse" <| 
-        fun wa root suff dest op1 op2 ->
+    // parsing mov functions (no second opperand)
+    let testMOVsRandomised = 
+        testPropertyWithConfig config  "Property Test Parse of MOVs" <| 
+        fun wa suff dest op1 ->
+            let root = getRandomItem [MOV ; MVN]
+            let rootStr r = 
+                match r with
+                | MOV -> "MOV"
+                | MVN -> "MVN"
+                | _ -> failwithf "Should not happen"        
+            let shifterToStr s =
+                match s with
+                | Lsl -> "LSL"
+                | Lsr -> "LSR"
+                | Asr -> "ASR"
+                | Ror -> "ROR"
+            let suffStr = 
+                match suff with
+                | S -> "S"
+                | NA -> ""
+            let destStr = regStrings.[dest]  
+            let flexOpToStr op = 
+                match op with
+                | Ok (Literal i) -> sprintf "#%d" i
+                | Ok (Register r) -> regStrings.[r]
+                | Ok (RegShiftReg (r1, s, r2)) -> 
+                    regStrings.[r1] + "," + (shifterToStr s) + " " + regStrings.[r2]
+                | Ok (RegShiftLit (r1, s, i)) -> 
+                    regStrings.[r1] + "," + (shifterToStr s) + (sprintf " #%d" i)
+                | Ok (RegRRX (r)) -> 
+                    regStrings.[r] + ", RRX"
+                | _ -> ""
+            let op1Str = flexOpToStr (Ok op1)                      
             let lineData = 
-                let rootStr r = 
-                    match r with
-                    | MOV -> "MOV"
-                    | MVN -> "MVN"
-                    | AND -> "AND"
-                    | ORR -> "ORR"
-                    | EOR -> "EOR"
-                    | BIC -> "BIC"
-                    | LSL -> "LSL"
-                    | LSR -> "LSR"
-                    | ASR -> "ASR"
-                    | ROR -> "ROR"
-                    | RRX -> "RRX"
-                    | TST -> "TST"
-                    | TEQ -> "TEQ"
-                let shifterToStr s =
-                    match s with
-                    | Lsl -> "LSL"
-                    | Lsr -> "LSR"
-                    | Asr -> "ASR"
-                    | Ror -> "ROR"
-                let suffStr = 
-                    match suff with
-                    | S -> "S"
-                    | NA -> ""
-                let destStr = regStrings.[dest]
-                let flexOpToStr op = 
-                    match op with
-                    | Literal i -> sprintf "%d" i
-                    | Register r -> regStrings.[r]
-                    | RegShiftReg (r1, s, r2) -> 
-                        regStrings.[r1] + "," + (shifterToStr s) + " " + regStrings.[r2]
-                    | RegShiftLit (r1, s, i) -> 
-                        regStrings.[r1] + "," + (shifterToStr s) + (sprintf " %d" i)
-                    | RegRRX (r) -> 
-                        regStrings.[r] + ", RRX"
-                let op1Str = flexOpToStr op1
-                let op2Str = flexOpToStr op2
                 {
                     LoadAddr = wa; 
                     Label = None; 
-                    SymTab = None;
+                    SymTab = Some Map.empty;
                     OpCode = (rootStr root) + suffStr;
-                    Operands = (destStr + "," + op1Str + "," + op2Str);
+                    Operands = (destStr + ", " + op1Str);
                 }
             let instr = {
                 Instruction = root;
                 Suff = suff;
                 Dest = Some (dest);
-                Op1 = Ok(op1);
-                Op2 = Ok(op2);
+                Op1 = Ok (op1);
+                Op2 = Error "";
             }
             let expected = 
-                match root, suff, dest, op1, op2 with
-                | _ ->
                     Some ( Ok {
                         PInstr = instr;
                         PLabel = None; PSize = 4u; PCond = Cal;
                     })
             let res = parse lineData
-            Expect.equal res expected "property test parse"
+            Expect.equal res expected "property test parse of MOVs"
 
-    // type InstRoots =  MOV | MVN | AND | ORR | EOR | BIC 
-    //                 | LSL | LSR | ASR | ROR | RRX 
-    //                 | TST | TEQ 
 
-    // // type Shifter = Lsl | Lsr | Asr | Ror
 
-    // type Suffix = S | NA
 
-    // /// parse error
-    // type ErrInstr = string
 
-    // /// Flexible opperator
-    // /// either a number or a register with an optional shift
-    // type FlexOp = 
-    //     | Literal of uint32
-    //     | Register of RName
-    //     | RegShiftReg of RName*Shifter*RName
-    //     | RegShiftLit of RName*Shifter*uint32
-    //     | RegRRX of RName
+    [<Tests>]
+    // parsing bit arithmetic functions
+    let testBitArithRandomised = 
+        testPropertyWithConfig config  "Property Test Parse of bit arithmetic instructions" <| 
+        fun wa suff op2 ->
+            let root = getRandomItem [AND ; ORR ; EOR ; BIC]
+            let destReg = getRandomItem [R1 ; R2 ; R3 ; R4 ; R5 ; R6 ; R7 ; R8 ; R9 ; R10 ; R11 ; R12; R14]
+            let op1Reg = getRandomItem [R1 ; R2 ; R3 ; R4 ; R5 ; R6 ; R7 ; R8 ; R9 ; R10 ; R11 ; R12; R14]
+            let rootStr r = 
+                match r with
+                | AND -> "AND"
+                | ORR -> "ORR"
+                | EOR -> "EOR"
+                | BIC -> "BIC"
+                | _ -> failwithf "Should not happen"        
+            let shifterToStr s =
+                match s with
+                | Lsl -> "LSL"
+                | Lsr -> "LSR"
+                | Asr -> "ASR"
+                | Ror -> "ROR"
+            let suffStr = 
+                match suff with
+                | S -> "S"
+                | NA -> ""
+            let destStr = regStrings.[destReg]  
+            let op1Str = regStrings.[op1Reg] 
+            let flexOpToStr op = 
+                match op with
+                | Ok (Literal i) -> sprintf "#%d" i
+                | Ok (Register r) -> regStrings.[r]
+                | Ok (RegShiftReg (r1, s, r2)) -> 
+                    regStrings.[r1] + "," + (shifterToStr s) + " " + regStrings.[r2]
+                | Ok (RegShiftLit (r1, s, i)) -> 
+                    regStrings.[r1] + "," + (shifterToStr s) + (sprintf " #%d" i)
+                | Ok (RegRRX (r)) -> 
+                    regStrings.[r] + ", RRX"
+                | _ -> ""
+            let op2Str = flexOpToStr (Ok op2)                      
+            let lineData = 
+                {
+                    LoadAddr = wa; 
+                    Label = None; 
+                    SymTab = Some Map.empty;
+                    OpCode = (rootStr root) + suffStr;
+                    Operands = (destStr + ", " + op1Str + ", " + op2Str);
+                }
+            let instr = {
+                Instruction = root;
+                Suff = suff;
+                Dest = Some (destReg);
+                Op1 = Ok (Register op1Reg);
+                Op2 = Ok (op2);
+            }
+            let expected =  
+                match op2 with 
+                | RegShiftReg (R13,_,_) -> 
+                    Some ( Ok {
+                        PInstr = {instr with Op2 = Error "Cannot use R13 with this instruction"};
+                        PLabel = None; PSize = 4u; PCond = Cal;
+                    }) 
+                | RegShiftReg (_,_,R13) -> 
+                    Some ( Ok {
+                        PInstr = {instr with Op2 = Error "Cannot use R13 with this instruction"};
+                        PLabel = None; PSize = 4u; PCond = Cal;
+                    })                             
+                | RegShiftReg (R15,_,_) -> 
+                    Some ( Ok {
+                        PInstr = {instr with Op2 = Error "Cannot use R15 with this instruction"};
+                        PLabel = None; PSize = 4u; PCond = Cal;
+                    })                    
+                | RegShiftReg (_,_,R15) -> 
+                    Some ( Ok {
+                        PInstr = {instr with Op2 = Error "Cannot use R15 with this instruction"};
+                        PLabel = None; PSize = 4u; PCond = Cal;
+                    })    
+                | RegShiftLit (R13,_,_) -> 
+                    Some ( Ok {
+                        PInstr = {instr with Op2 = Error "Cannot use R13 with this instruction"};
+                        PLabel = None; PSize = 4u; PCond = Cal;
+                    })       
+                | RegShiftLit (R15,_,_) -> 
+                    Some ( Ok {
+                        PInstr = {instr with Op2 = Error "Cannot use R15 with this instruction"};
+                        PLabel = None; PSize = 4u; PCond = Cal;
+                    })                    
+                | Register R13 ->  
+                    Some ( Ok {
+                        PInstr = {instr with Op2 = Error "Cannot use R13 with this instruction"};
+                        PLabel = None; PSize = 4u; PCond = Cal;
+                    })                       
+                | Register R15 ->  
+                    Some ( Ok {
+                        PInstr = {instr with Op2 = Error "Cannot use R15 with this instruction"};
+                        PLabel = None; PSize = 4u; PCond = Cal;
+                    })                                                                          
+                | _ ->
+                    Some ( Ok {
+                        PInstr = instr
+                        PLabel = None; PSize = 4u; PCond = Cal;
+                    })                                       
+            let res = parse lineData
+            printfn "%A " lineData
+            Expect.equal res expected "Property Test Parse of bit arithmetic instructions"
 
-    // /// Infromation needed for instruction execution
-    // /// Part of the return from parse
-    // type InstDecomp = { Instruction: InstRoots
-    //                     Suff: Suffix
-    //                     Dest: RName Option
-    //                     Op1: Result<FlexOp,string>
-    //                     Op2: Result<FlexOp,string>
-    //                     }
+
+
+
+
+
+
+    [<Tests>]
+    // parsing shift functions tests
+    let testShiftsRandomised = 
+        testPropertyWithConfig config  "Property Test Parse of shift instructions" <| 
+        fun wa suff lit ->
+            let root = getRandomItem [LSL ; LSR ; ASR ; ROR]
+            let destReg = getRandomItem [R1 ; R2 ; R3 ; R4 ; R5 ; R6 ; R7 ; R8 ; R9 ; R10 ; R11 ; R12; R14]
+            let op1Reg = getRandomItem [R1 ; R2 ; R3 ; R4 ; R5 ; R6 ; R7 ; R8 ; R9 ; R10 ; R11 ; R12; R14]
+            let op2Reg = getRandomItem [R1 ; R2 ; R3 ; R4 ; R5 ; R6 ; R7 ; R8 ; R9 ; R10 ; R11 ; R12; R14]
+            let op2 = getRandomItem [Register op2Reg; Literal lit]
+            let rootStr r = 
+                match r with
+                | LSL -> "LSL"
+                | LSR -> "LSR"
+                | ASR -> "ASR"
+                | ROR -> "ROR"
+                | _ -> failwithf "Should not happen"        
+            let suffStr = 
+                match suff with
+                | S -> "S"
+                | NA -> ""
+            let destStr = regStrings.[destReg]  
+            let op1Str = regStrings.[op1Reg] 
+            let flexOpToStr op = 
+                match op with
+                | Literal i -> sprintf "#%d" i
+                | Register r -> regStrings.[r]
+                | _ -> failwith "Should not happen"
+            let op2Str = flexOpToStr op2                     
+            let lineData = 
+                {
+                    LoadAddr = wa; 
+                    Label = None; 
+                    SymTab = Some Map.empty;
+                    OpCode = (rootStr root) + suffStr;
+                    Operands = (destStr + ", " + op1Str + ", " + op2Str);
+                }
+            let instr = {
+                Instruction = root;
+                Suff = suff;
+                Dest = Some (destReg);
+                Op1 = Ok (Register op1Reg);
+                Op2 = Ok (op2);
+            }
+            let expected =                                                                        
+                Some ( Ok {
+                    PInstr = instr
+                    PLabel = None; PSize = 4u; PCond = Cal;
+                })                                       
+            let res = parse lineData
+            Expect.equal res expected "Property Test Parse of shift instructions"
+
+
+
+
+
+
+
+
+
+
+
+
+    [<Tests>]
+    // parsing mov functions (no second opperand)
+    let testTSTandTEQRandomised = 
+        testPropertyWithConfig config  "Property Test Parse of TST and TEQ" <| 
+        fun wa suff op1 ->
+            let dest = getRandomItem [R1 ; R2 ; R3 ; R4 ; R5 ; R6 ; R7 ; R8 ; R9 ; R10 ; R11 ; R12; R14]
+            let root = getRandomItem [TST ; TEQ]
+            let rootStr r = 
+                match r with
+                | TST -> "TST"
+                | TEQ -> "TEQ"
+                | _ -> failwithf "Should not happen"        
+            let shifterToStr s =
+                match s with
+                | Lsl -> "LSL"
+                | Lsr -> "LSR"
+                | Asr -> "ASR"
+                | Ror -> "ROR"
+            let suffStr = 
+                match suff with
+                | S -> "S"
+                | NA -> ""
+            let destStr = regStrings.[dest]  
+            let flexOpToStr op = 
+                match op with
+                | Literal i -> sprintf "#%d" i
+                | Register r -> regStrings.[r]
+                | RegShiftReg (r1, s, r2) -> 
+                    regStrings.[r1] + "," + (shifterToStr s) + " " + regStrings.[r2]
+                | RegShiftLit (r1, s, i) -> 
+                    regStrings.[r1] + "," + (shifterToStr s) + (sprintf " #%d" i)
+                | RegRRX r -> 
+                    regStrings.[r] + ", RRX"
+            let op1Str = flexOpToStr op1                      
+            let lineData = 
+                {
+                    LoadAddr = wa; 
+                    Label = None; 
+                    SymTab = Some Map.empty;
+                    OpCode = (rootStr root) + suffStr;
+                    Operands = (destStr + ", " + op1Str);
+                }
+            let instr = {
+                Instruction = root;
+                Suff = suff;
+                Dest = Some (dest);
+                Op1 = Ok (op1);
+                Op2 = Error "";
+            }
+            let expected =  
+                match op1 with 
+                | RegShiftReg (R13,_,_) -> 
+                    Some ( Ok {
+                        PInstr = {instr with Op1 = Error "Cannot use R13 with this instruction"};
+                        PLabel = None; PSize = 4u; PCond = Cal;
+                    }) 
+                | RegShiftReg (_,_,R13) -> 
+                    Some ( Ok {
+                        PInstr = {instr with Op1 = Error "Cannot use R13 with this instruction"};
+                        PLabel = None; PSize = 4u; PCond = Cal;
+                    })                             
+                | RegShiftReg (R15,_,_) -> 
+                    Some ( Ok {
+                        PInstr = {instr with Op1 = Error "Cannot use R15 with this instruction"};
+                        PLabel = None; PSize = 4u; PCond = Cal;
+                    })                    
+                | RegShiftReg (_,_,R15) -> 
+                    Some ( Ok {
+                        PInstr = {instr with Op1 = Error "Cannot use R15 with this instruction"};
+                        PLabel = None; PSize = 4u; PCond = Cal;
+                    })    
+                | RegShiftLit (R13,_,_) -> 
+                    Some ( Ok {
+                        PInstr = {instr with Op1 = Error "Cannot use R13 with this instruction"};
+                        PLabel = None; PSize = 4u; PCond = Cal;
+                    })       
+                | RegShiftLit (R15,_,_) -> 
+                    Some ( Ok {
+                        PInstr = {instr with Op1 = Error "Cannot use R15 with this instruction"};
+                        PLabel = None; PSize = 4u; PCond = Cal;
+                    })                    
+                | Register R13 ->  
+                    Some ( Ok {
+                        PInstr = {instr with Op1 = Error "Cannot use R13 with this instruction"};
+                        PLabel = None; PSize = 4u; PCond = Cal;
+                    })                       
+                | Register R15 ->  
+                    Some ( Ok {
+                        PInstr = {instr with Op1 = Error "Cannot use R15 with this instruction"};
+                        PLabel = None; PSize = 4u; PCond = Cal;
+                    })                                                                          
+                | _ ->
+                    Some ( Ok {
+                        PInstr = instr
+                        PLabel = None; PSize = 4u; PCond = Cal;
+                    })   
+            let res = parse lineData
+            Expect.equal res expected "property test parse of TEQ and TST"
+
+
+
+    [<Tests>]
+    let tests = 
+        testList "Minimal Visual Unit Tests"
+            [
+            // MOV tests with decimals
+            vTest "MOV test 1" "MOV R0, #1" "0000" [R 0, 1]
+            vTest "MOV test 2" "MOVS R1, #0" "0100" [R 1, 0]
+            vTest "MOV test 3" "MOV R2, #137" "0000" [R 2, 137]
+            vTest "MOV test 4" "MOV R3, #4080" "0000" [R 3, 4080]
+            // MOV tests with hex numbers
+            vTest "MOV test 5" "MOV R4, #0x0" "0000" [R 4, 0]
+            vTest "MOV tes 6" "MOV R5, #0xA" "0000" [R 5, 10]
+            vTest "MOV test 7" "MOV R6, #0x2300" "0000" [R 6, 8960]
+            // MOV tests with hex binary
+            vTest "MOV test 8" "MOV R4, #0b0" "0000" [R 4, 0]
+            vTest "MOV test 9" "MOV R0, #0b1010" "0000" [R 0, 10]
+            vTest "MOV test 10" "MOV R0, #0b10001100000000" "0000" [R 0, 8960]
+
+            // AND tests with decimals
+            vTest "AND test 1" "AND R2, R1, R0" "0000" [R 0, 0]
+            vTest "AND test 2" "AND R3, R2, R0" "0000" [R 0, 0]
+            vTest "AND test 3" "AND R2, R2, R0" "0000" [R 2, 0]
+            vTest "AND test 4" "AND R3, R3, R3" "0000" [R 3, 30]  
+            ]
+
+
+
+
+
+
+
+
+// testing execute function (exeInstr)  
+
+
+
+
+
+    let flags = {N=false; C=false; Z=false; V=false}
+    let regMap = 
+        [R0,0u ; R1,10u ; R2,20u ; R3,30u ; R4,40u ; R5,50u ; R6,60u
+         R7,70u ; R8,80u ; R9,90u ; R10,100u ; R11,110u ; R12,120u ; R13,130u
+         R14,140u ; R15,80u] |> Map.ofList
+       
+    let CPUDATA = {Fl = flags ; Regs = regMap ; MM = Map.empty} 
+     
+
+
+    /// takes the output form execute instructions and changes it into a form that can be compared to visual testing
+    /// needs the register of intrest to be specified to check the destination
+    let convExe rName exeOut =
+
+        let boolToStrInt = function
+        | true -> "1"
+        | false -> "0"
+
+        match exeOut with 
+            | Ok instExe ->
+                // The flags after execution in visual testing form i.e "0100" (NZCV)
+                let flgs = 
+                    List.map boolToStrInt [instExe.Fl.N;instExe.Fl.Z;instExe.Fl.C;instExe.Fl.V]
+                    |> List.reduce (+)
+
+                // obtains the register contents in the specified destination register               
+                let specRegConts = 
+                    instExe.Regs.[rName]
+                    |> int32
+
+                flgs, [R rName.RegNum, specRegConts]
+            | _ -> failwithf "exeOut is an error: Shoud not happen"             
+
+    let parseThenExe destReg = 
+        let checkOk =
+            function
+            | Some (Ok exeData) -> exeData 
+            | _ -> failwithf "output from parse is an error: Should not happen"
+        parse >> checkOk >> exeInstr CPUDATA testSymTab >> convExe destReg
+
+
+    
+
+    [<Tests>]
+    let testsExeMOV = 
+        testList "Execution MOV tests"
+            [
+
+            // valid input tests (suffix not set)
+
+            // MOV tests
+
+            vTest "MOV test 1" "MOV R0, #1" <|| parseThenExe R0 {ld with OpCode = "MOV" ; Operands = "R0, #1"}
+            vTest "MOV test 2" "MOV R0, #-1" <|| parseThenExe R0 {ld with OpCode = "MOV" ; Operands = "R0, #-1"}
+            vTest "MOV test 3" "MOV R0, #97" <|| parseThenExe R0 {ld with OpCode = "MOV" ; Operands = "R0, #97"}
+            vTest "MOV test 4" "MOV R0, #255" <|| parseThenExe R0 {ld with OpCode = "MOV" ; Operands = "R0, #255"}
+            vTest "MOV test 5" "MOV R0, #256" <|| parseThenExe R0 {ld with OpCode = "MOV" ; Operands = "R0, #256"}
+            vTest "MOV test 6" "MOV R0, #4080" <|| parseThenExe R0 {ld with OpCode = "MOV" ; Operands = "R0, #4080"}
+            vTest "MOV test 7" "MOV R0, #-4081" <|| parseThenExe R0 {ld with OpCode = "MOV" ; Operands = "R0, #-4081"}
+            vTest "MOV test 8" "MOV R0, #0" <|| parseThenExe R0 {ld with OpCode = "MOV" ; Operands = "R0, #0"}
+            vTest "MOV test 9" "MOV R0, #-97" <|| parseThenExe R0 {ld with OpCode = "MOV" ; Operands = "R0, #-97"}
+            vTest "MOV test 10" "MOV R0, #-0x1" <|| parseThenExe R0 {ld with OpCode = "MOV" ; Operands = "R0, #-0x1"}
+
+            vTest "MOV test 11" "MOV R0, #4*6+7" <|| parseThenExe R0 {ld with OpCode = "MOV" ; Operands = "R0, #4*6+7"}
+            vTest "MOV test 12" "MOV R0, R0" <|| parseThenExe R0 {ld with OpCode = "MOV" ; Operands = "R0, R0"}
+            vTest "MOV test 13" "MOV R0, R1" <|| parseThenExe R0 {ld with OpCode = "MOV" ; Operands = "R0, R1"}
+            vTest "MOV test 14" "MOV R0, R7" <|| parseThenExe R0 {ld with OpCode = "MOV" ; Operands = "R0, R7"}
+            vTest "MOV test 15" "MOV R0, #30*4" <|| parseThenExe R0 {ld with OpCode = "MOV" ; Operands = "R0, #30*4"}
+            vTest "MOV test 16" "MOV R0, #0b10101" <|| parseThenExe R0 {ld with OpCode = "MOV" ; Operands = "R0, #0b10101"}
+            vTest "MOV test 17" "MOV R0, #-0b1" <|| parseThenExe R0 {ld with OpCode = "MOV" ; Operands = "R0, #-0b1"}
+            vTest "MOV test 18" "MOV R0, #0xFF" <|| parseThenExe R0 {ld with OpCode = "MOV" ; Operands = "R0, #0xFF"}
+            vTest "MOV test 19" "MOV R0, #0x0" <|| parseThenExe R0 {ld with OpCode = "MOV" ; Operands = "R0, #0x0"}            
+            vTest "MOV test 20" "MOV R0, #0xA" <|| parseThenExe R0 {ld with OpCode = "MOV" ; Operands = "R0, #10"}
+
+            vTest "MOV test 21" "MOV R0, R7, LSL #5" <|| parseThenExe R0 {ld with OpCode = "MOV" ; Operands = "R0, R7, LSL #5"}
+            vTest "MOV test 22" "MOV R0, R8, LSR R6" <|| parseThenExe R0 {ld with OpCode = "MOV" ; Operands = "R0, R8, LSR R6"}
+            vTest "MOV test 23" "MOV R0, R2, ROR #6" <|| parseThenExe R0 {ld with OpCode = "MOV" ; Operands = "R0, R2, ROR #6"}
+            vTest "MOV test 24" "MOV R0, R3, RRX" <|| parseThenExe R0 {ld with OpCode = "MOV" ; Operands = "R0, R3, RRX"}
+            vTest "MOV test 25" "MOV R0, R1, ASR #30*4" <|| parseThenExe R0 {ld with OpCode = "MOV" ; Operands = "R0, R1, ASR #30*4"}
+            vTest "MOV test 26" "MOV R0, R2, LSL #0b10101" <|| parseThenExe R0 {ld with OpCode = "MOV" ; Operands = "R0, R2, LSL #0b10101"}
+            vTest "MOV test 27" "MOV R0, R5, LSL #0x1" <|| parseThenExe R0 {ld with OpCode = "MOV" ; Operands = "R0, R5, LSL #0x1"}
+            vTest "MOV test 28" "MOV R0, R2, LSL #0xFF" <|| parseThenExe R0 {ld with OpCode = "MOV" ; Operands = "R0, R2, LSL #0xFF"}
+            vTest "MOV test 29" "MOV R0, R6, ASR #8" <|| parseThenExe R0 {ld with OpCode = "MOV" ; Operands = "R0, R6, ASR #8"}            
+            vTest "MOV test 30" "MOV R0, R1, RRX" <|| parseThenExe R0 {ld with OpCode = "MOV" ; Operands = "R0, R1, RRX"}           
+            ]
+
+
+
+    [<Tests>]
+    let testsExeMOVS = 
+        testList "Execution MOVS tests"
+            [
+
+            // valid input tests (suffix set)
+
+            // MOVS tests
+
+            vTest "MOVS test 1" "MOVS R0, #1" <|| parseThenExe R0 {ld with OpCode = "MOVS" ; Operands = "R0, #1"}
+            vTest "MOVS test 2" "MOVS R0, #-1" <|| parseThenExe R0 {ld with OpCode = "MOVS" ; Operands = "R0, #-1"}
+            vTest "MOVS test 3" "MOVS R0, #97" <|| parseThenExe R0 {ld with OpCode = "MOVS" ; Operands = "R0, #97"}
+            vTest "MOVS test 4" "MOVS R0, #255" <|| parseThenExe R0 {ld with OpCode = "MOVS" ; Operands = "R0, #255"}
+            vTest "MOVS test 5" "MOVS R0, #256" <|| parseThenExe R0 {ld with OpCode = "MOVS" ; Operands = "R0, #256"}
+            vTest "MOVS test 6" "MOVS R0, #4080" <|| parseThenExe R0 {ld with OpCode = "MOVS" ; Operands = "R0, #4080"}
+            vTest "MOVS test 7" "MOVS R0, #-4081" <|| parseThenExe R0 {ld with OpCode = "MOVS" ; Operands = "R0, #-4081"}
+            vTest "MOVS test 8" "MOVS R0, #0" <|| parseThenExe R0 {ld with OpCode = "MOVS" ; Operands = "R0, #0"}
+            vTest "MOVS test 9" "MOVS R0, #-97" <|| parseThenExe R0 {ld with OpCode = "MOVS" ; Operands = "R0, #-97"}
+            vTest "MOVS test 10" "MOVS R0, #-0x1" <|| parseThenExe R0 {ld with OpCode = "MOVS" ; Operands = "R0, #-0x1"}
+
+            vTest "MOVS test 11" "MOVS R0, #4*6+7" <|| parseThenExe R0 {ld with OpCode = "MOVS" ; Operands = "R0, #4*6+7"}
+            vTest "MOVS test 12" "MOVS R0, R0" <|| parseThenExe R0 {ld with OpCode = "MOVS" ; Operands = "R0, R0"}
+            vTest "MOVS test 13" "MOVS R0, R1" <|| parseThenExe R0 {ld with OpCode = "MOVS" ; Operands = "R0, R1"}
+            vTest "MOVS test 14" "MOVS R0, R7" <|| parseThenExe R0 {ld with OpCode = "MOVS" ; Operands = "R0, R7"}
+            vTest "MOVS test 15" "MOVS R0, #30*4" <|| parseThenExe R0 {ld with OpCode = "MOVS" ; Operands = "R0, #30*4"}
+            vTest "MOVS test 16" "MOVS R0, #0b10101" <|| parseThenExe R0 {ld with OpCode = "MOVS" ; Operands = "R0, #0b10101"}
+            vTest "MOVS test 17" "MOVS R0, #-0b1" <|| parseThenExe R0 {ld with OpCode = "MOVS" ; Operands = "R0, #-0b1"}
+            vTest "MOVS test 18" "MOVS R0, #0xFF" <|| parseThenExe R0 {ld with OpCode = "MOVS" ; Operands = "R0, #0xFF"}
+            vTest "MOVS test 19" "MOVS R0, #0x0" <|| parseThenExe R0 {ld with OpCode = "MOVS" ; Operands = "R0, #0x0"}            
+            vTest "MOVS test 20" "MOVS R0, #0xA" <|| parseThenExe R0 {ld with OpCode = "MOVS" ; Operands = "R0, #10"}
+
+            vTest "MOVS test 21" "MOVS R0, R7, LSL #5" <|| parseThenExe R0 {ld with OpCode = "MOVS" ; Operands = "R0, R7, LSL #5"}
+            vTest "MOVS test 22" "MOVS R0, R8, LSR R6" <|| parseThenExe R0 {ld with OpCode = "MOVS" ; Operands = "R0, R8, LSR R6"}
+            vTest "MOVS test 23" "MOVS R0, R2, ROR #6" <|| parseThenExe R0 {ld with OpCode = "MOVS" ; Operands = "R0, R2, ROR #6"}
+            vTest "MOVS test 24" "MOVS R0, R3, RRX" <|| parseThenExe R0 {ld with OpCode = "MOVS" ; Operands = "R0, R3, RRX"}
+            vTest "MOVS test 25" "MOVS R0, R1, ASR #30*4" <|| parseThenExe R0 {ld with OpCode = "MOVS" ; Operands = "R0, R1, ASR #30*4"}
+            vTest "MOVS test 26" "MOVS R0, R2, LSL #0b10101" <|| parseThenExe R0 {ld with OpCode = "MOVS" ; Operands = "R0, R2, LSL #0b10101"}
+            vTest "MOVS test 27" "MOVS R0, R5, LSL #0x1" <|| parseThenExe R0 {ld with OpCode = "MOVS" ; Operands = "R0, R5, LSL #0x1"}
+            vTest "MOVS test 28" "MOVS R0, R2, LSL #0xFF" <|| parseThenExe R0 {ld with OpCode = "MOVS" ; Operands = "R0, R2, LSL #0xFF"}
+            vTest "MOVS test 29" "MOVS R0, R6, ASR #8" <|| parseThenExe R0 {ld with OpCode = "MOVS" ; Operands = "R0, R6, ASR #8"}            
+            vTest "MOVS test 30" "MOVS R0, R1, RRX" <|| parseThenExe R0 {ld with OpCode = "MOVS" ; Operands = "R0, R1, RRX"}           
+            ]    
+
+
+
+
+    [<Tests>]
+    let testsExeMVNS = 
+        testList "Execution MVNS tests"
+            [
+
+            // valid input tests (suffix not set)
+
+            // MVNS tests
+
+            vTest "MVNS test 1" "MVNS R0, #1" <|| parseThenExe R0 {ld with OpCode = "MVNS" ; Operands = "R0, #1"}
+            vTest "MVNS test 2" "MVNS R0, #-1" <|| parseThenExe R0 {ld with OpCode = "MVNS" ; Operands = "R0, #-1"}
+            vTest "MVNS test 3" "MVNS R0, #97" <|| parseThenExe R0 {ld with OpCode = "MVNS" ; Operands = "R0, #97"}
+            vTest "MVNS test 4" "MVNS R0, #255" <|| parseThenExe R0 {ld with OpCode = "MVNS" ; Operands = "R0, #255"}
+            vTest "MVNS test 5" "MVNS R0, #256" <|| parseThenExe R0 {ld with OpCode = "MVNS" ; Operands = "R0, #256"}
+            vTest "MVNS test 6" "MVNS R0, #4080" <|| parseThenExe R0 {ld with OpCode = "MVNS" ; Operands = "R0, #4080"}
+            vTest "MVNS test 7" "MVNS R0, #-4081" <|| parseThenExe R0 {ld with OpCode = "MVNS" ; Operands = "R0, #-4081"}
+            vTest "MVNS test 8" "MVNS R0, #0" <|| parseThenExe R0 {ld with OpCode = "MVNS" ; Operands = "R0, #0"}
+            vTest "MVNS test 9" "MVNS R0, #-97" <|| parseThenExe R0 {ld with OpCode = "MVNS" ; Operands = "R0, #-97"}
+            vTest "MVNS test 10" "MVNS R0, #-0x1" <|| parseThenExe R0 {ld with OpCode = "MVNS" ; Operands = "R0, #-0x1"}
+
+            vTest "MVNS test 11" "MVNS R0, #4*6+7" <|| parseThenExe R0 {ld with OpCode = "MVNS" ; Operands = "R0, #4*6+7"}
+            vTest "MVNS test 12" "MVNS R0, R0" <|| parseThenExe R0 {ld with OpCode = "MVNS" ; Operands = "R0, R0"}
+            vTest "MVNS test 13" "MVNS R0, R1" <|| parseThenExe R0 {ld with OpCode = "MVNS" ; Operands = "R0, R1"}
+            vTest "MVNS test 14" "MVNS R0, R7" <|| parseThenExe R0 {ld with OpCode = "MVNS" ; Operands = "R0, R7"}
+            vTest "MVNS test 15" "MVNS R0, #30*4" <|| parseThenExe R0 {ld with OpCode = "MVNS" ; Operands = "R0, #30*4"}
+            vTest "MVNS test 16" "MVNS R0, #0b10101" <|| parseThenExe R0 {ld with OpCode = "MVNS" ; Operands = "R0, #0b10101"}
+            vTest "MVNS test 17" "MVNS R0, #-0b1" <|| parseThenExe R0 {ld with OpCode = "MVNS" ; Operands = "R0, #-0b1"}
+            vTest "MVNS test 18" "MVNS R0, #0xFF" <|| parseThenExe R0 {ld with OpCode = "MVNS" ; Operands = "R0, #0xFF"}
+            vTest "MVNS test 19" "MVNS R0, #0x0" <|| parseThenExe R0 {ld with OpCode = "MVNS" ; Operands = "R0, #0x0"}            
+            vTest "MVNS test 20" "MVNS R0, #0xA" <|| parseThenExe R0 {ld with OpCode = "MVNS" ; Operands = "R0, #10"}
+
+            vTest "MVNS test 21" "MVNS R0, R7, LSL #5" <|| parseThenExe R0 {ld with OpCode = "MVNS" ; Operands = "R0, R7, LSL #5"}
+            vTest "MVNS test 22" "MVNS R0, R8, LSR R6" <|| parseThenExe R0 {ld with OpCode = "MVNS" ; Operands = "R0, R8, LSR R6"}
+            vTest "MVNS test 23" "MVNS R0, R2, ROR #6" <|| parseThenExe R0 {ld with OpCode = "MVNS" ; Operands = "R0, R2, ROR #6"}
+            vTest "MVNS test 24" "MVNS R0, R3, RRX" <|| parseThenExe R0 {ld with OpCode = "MVNS" ; Operands = "R0, R3, RRX"}
+            vTest "MVNS test 25" "MVNS R0, R1, ASR #30*4" <|| parseThenExe R0 {ld with OpCode = "MVNS" ; Operands = "R0, R1, ASR #30*4"}
+            vTest "MVNS test 26" "MVNS R0, R2, LSL #0b10101" <|| parseThenExe R0 {ld with OpCode = "MVNS" ; Operands = "R0, R2, LSL #0b10101"}
+            vTest "MVNS test 27" "MVNS R0, R5, LSL #0x1" <|| parseThenExe R0 {ld with OpCode = "MVNS" ; Operands = "R0, R5, LSL #0x1"}
+            vTest "MVNS test 28" "MVNS R0, R2, LSL #0xFF" <|| parseThenExe R0 {ld with OpCode = "MVNS" ; Operands = "R0, R2, LSL #0xFF"}
+            vTest "MVNS test 29" "MVNS R0, R6, ASR #8" <|| parseThenExe R0 {ld with OpCode = "MVNS" ; Operands = "R0, R6, ASR #8"}            
+            vTest "MVNS test 30" "MVNS R0, R1, RRX" <|| parseThenExe R0 {ld with OpCode = "MVNS" ; Operands = "R0, R1, RRX"}           
+            ]            
+
+
+
+    [<Tests>]
+    let testsExeANDS = 
+        testList "Execution ANDS tests"
+            [
+
+            // valid input tests (suffix not set)
+
+            // ANDS tests
+
+            vTest "ANDS test 1" "ANDS R0, R0, #0" <|| parseThenExe R0 {ld with OpCode = "ANDS" ; Operands = "R0, R0, #0"}
+            vTest "ANDS test 2" "ANDS R0, R1, #1" <|| parseThenExe R0 {ld with OpCode = "ANDS" ; Operands = "R0, R1, #1"}
+            vTest "ANDS test 3" "ANDS R0, R9, #97" <|| parseThenExe R0 {ld with OpCode = "ANDS" ; Operands = "R0, R9, #97"}
+            vTest "ANDS test 4" "ANDS R0, R7, #255" <|| parseThenExe R0 {ld with OpCode = "ANDS" ; Operands = "R0, R7, #255"}
+            vTest "ANDS test 5" "ANDS R0, R2, #256" <|| parseThenExe R0 {ld with OpCode = "ANDS" ; Operands = "R0, R2, #256"}
+            // vTest "ANDS test 6" "ANDS R0, R7, #4080" <|| parseThenExe R0 {ld with OpCode = "ANDS" ; Operands = "R0, R7, #4080"}
+            // vTest "ANDS test 7" "ANDS R0, R7, #-4081" <|| parseThenExe R0 {ld with OpCode = "ANDS" ; Operands = "R0, R7, #-4081"}
+            // vTest "ANDS test 8" "ANDS R0, R13, #-1" <|| parseThenExe R0 {ld with OpCode = "ANDS" ; Operands = "R0, R13, #-1"}
+            // vTest "ANDS test 9" "ANDS R0, R7, #-3" <|| parseThenExe R0 {ld with OpCode = "ANDS" ; Operands = "R0, R7, #-3"}
+            // // vTest "ANDS test 10" "ANDS R0, R13, #-0x1" <|| parseThenExe R0 {ld with OpCode = "ANDS" ; Operands = "R0, R13, #-0x1"}
+
+            // vTest "ANDS test 11" "ANDS R0, #4*6+7" <|| parseThenExe R0 {ld with OpCode = "ANDS" ; Operands = "R0, #4*6+7"}
+            // vTest "ANDS test 12" "ANDS R0, R0" <|| parseThenExe R0 {ld with OpCode = "ANDS" ; Operands = "R0, R0"}
+            // vTest "ANDS test 13" "ANDS R0, R1" <|| parseThenExe R0 {ld with OpCode = "ANDS" ; Operands = "R0, R1"}
+            // vTest "ANDS test 14" "ANDS R0, R7" <|| parseThenExe R0 {ld with OpCode = "ANDS" ; Operands = "R0, R7"}
+            // vTest "ANDS test 15" "ANDS R0, #30*4" <|| parseThenExe R0 {ld with OpCode = "ANDS" ; Operands = "R0, #30*4"}
+            // vTest "ANDS test 16" "ANDS R0, #0b10101" <|| parseThenExe R0 {ld with OpCode = "ANDS" ; Operands = "R0, #0b10101"}
+            // vTest "ANDS test 17" "ANDS R0, #-0b1" <|| parseThenExe R0 {ld with OpCode = "ANDS" ; Operands = "R0, #-0b1"}
+            // vTest "ANDS test 18" "ANDS R0, #0xFF" <|| parseThenExe R0 {ld with OpCode = "ANDS" ; Operands = "R0, #0xFF"}
+            // vTest "ANDS test 19" "ANDS R0, #0x0" <|| parseThenExe R0 {ld with OpCode = "ANDS" ; Operands = "R0, #0x0"}            
+            // vTest "ANDS test 20" "ANDS R0, #0xA" <|| parseThenExe R0 {ld with OpCode = "ANDS" ; Operands = "R0, #10"}
+
+            // vTest "ANDS test 21" "ANDS R0, R7, LSL #5" <|| parseThenExe R0 {ld with OpCode = "ANDS" ; Operands = "R0, R7, LSL #5"}
+            // vTest "ANDS test 22" "ANDS R0, R8, LSR R6" <|| parseThenExe R0 {ld with OpCode = "ANDS" ; Operands = "R0, R8, LSR R6"}
+            // vTest "ANDS test 23" "ANDS R0, R2, ROR #6" <|| parseThenExe R0 {ld with OpCode = "ANDS" ; Operands = "R0, R2, ROR #6"}
+            // vTest "ANDS test 24" "ANDS R0, R3, RRX" <|| parseThenExe R0 {ld with OpCode = "ANDS" ; Operands = "R0, R3, RRX"}
+            // vTest "ANDS test 25" "ANDS R0, R1, ASR #30*4" <|| parseThenExe R0 {ld with OpCode = "ANDS" ; Operands = "R0, R1, ASR #30*4"}
+            // vTest "ANDS test 26" "ANDS R0, R2, LSL #0b10101" <|| parseThenExe R0 {ld with OpCode = "ANDS" ; Operands = "R0, R2, LSL #0b10101"}
+            // vTest "ANDS test 27" "ANDS R0, R5, LSL #0x1" <|| parseThenExe R0 {ld with OpCode = "ANDS" ; Operands = "R0, R5, LSL #0x1"}
+            // vTest "ANDS test 28" "ANDS R0, R2, LSL #0xFF" <|| parseThenExe R0 {ld with OpCode = "ANDS" ; Operands = "R0, R2, LSL #0xFF"}
+            // vTest "ANDS test 29" "ANDS R0, R6, ASR #8" <|| parseThenExe R0 {ld with OpCode = "ANDS" ; Operands = "R0, R6, ASR #8"}            
+            // vTest "ANDS test 30" "ANDS R0, R1, RRX" <|| parseThenExe R0 {ld with OpCode = "ANDS" ; Operands = "R0, R1, RRX"}           
+            ]              
