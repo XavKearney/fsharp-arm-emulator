@@ -295,6 +295,9 @@ module TopLevel =
         let checkBranch p = 
             match p with
             | {PInstr=IMULTMEM (BranchI _)} -> true
+            | {PInstr=IBITARITH {Instruction = i; Dest = d}} 
+                when (i = BitArithmetic.MOV || i = BitArithmetic.MVN)
+                    && d = Some R15 -> true
             | _ -> false
 
 
@@ -328,7 +331,8 @@ module TopLevel =
                             checkStop nextCpu insMap 
                             |> function
                                 // if so, return
-                                | true -> Ok (newCpu, newSymTab)
+                                | true -> 
+                                    Ok (newCpu, newSymTab)
                                 // if not, increment PC and continue exection
                                 | false -> execLines nextCpu insMap newSymTab newBranchCount
                     )

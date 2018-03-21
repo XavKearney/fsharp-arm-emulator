@@ -353,6 +353,54 @@ module TopLevelTests
                                 (Code (IMULTMEM (BranchI {BranchAddr = 12u; LinkAddr=None})))
                     }, symtab.Add ("start", 4u))
 
+            ["ADD R0, R0, #3"; "start ADD R3,R3,#1"; "SUBS R0,R0,#1"; "MOVNE R15, #start+8"], 
+            Ok ({cpuData with 
+                    Regs = cpuData.Regs
+                        |> Map.add R3 3u
+                        |> Map.add R15 20u
+                    Fl = {N = false; C = true; Z = true; V = false;}
+                    MM = cpuData.MM
+                        |> Map.add (WA 0u) 
+                            (Code (IARITH (ArithI {InstrType = Some ADD;
+                                        SuffixSet = false;
+                                        Target = R0;
+                                        Op1 = R0;
+                                        Op2 = Literal 3u;})))
+                        |> Map.add (WA 4u) 
+                            (Code (IARITH (ArithI {InstrType = Some ADD;
+                                        SuffixSet = false;
+                                        Target = R3;
+                                        Op1 = R3;
+                                        Op2 = Literal 1u;})))
+                        |> Map.add (WA 8u) 
+                            (Code (IARITH (ArithI {InstrType = Some SUB;
+                                        SuffixSet = true;
+                                        Target = R0;
+                                        Op1 = R0;
+                                        Op2 = Literal 1u;})))
+                        |> Map.add (WA 12u) 
+                            (Code (IBITARITH ({Instruction = BitArithmetic.MOV;
+                                        Dest = Some R15;
+                                        Suff = BitArithmetic.NA;
+                                        Op1 = Ok(BitArithmetic.Literal 12u);
+                                        Op2 = Error ""
+                                        })))
+                }, symtab.Add ("start", 4u))
+
+            ["MVNNE R15, #12"], 
+            Ok ({cpuData with 
+                    Regs = cpuData.Regs
+                        |> Map.add R15 (~~~12u)
+                    MM = cpuData.MM
+                        |> Map.add (WA 0u) 
+                            (Code (IBITARITH ({Instruction = BitArithmetic.MVN;
+                                        Dest = Some R15;
+                                        Suff = BitArithmetic.NA;
+                                        Op1 = Ok(BitArithmetic.Literal 12u);
+                                        Op2 = Error ""
+                                        })))
+                }, symtab)
+
             // test branch with blank lines
             [""; "ADD R0, R0, #3"; "; some comment"; "start ADD R3,R3,#1"; ""; "SUBS R0,R0,#1"; "BNE start"], 
                 Ok ({cpuData with 
