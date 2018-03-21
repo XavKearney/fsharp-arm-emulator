@@ -5,7 +5,6 @@
 module ParseExpr
     open CommonLex
     open System.Text.RegularExpressions
-    open System.IO
 
     /// ----------- ACTIVE PATTERNS ---------------
     /// Some of these are used in this module, some are used elsewhere

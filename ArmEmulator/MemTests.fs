@@ -471,23 +471,26 @@ module MemTests
 
     ///Property-based testing of parseLabelIns function
     /// for randomly generated LDR and STR instructions
+    ///NOTE: Does not test:
+    ///     - Invalid combinations of record parameters.
+    ///       Will implement this later if we have time,
+    ///       but atm it is quite difficult as you need
+    ///       to predict what all 16 of the 24 possible
+    ///       combinations would look like as an input 
+    ///       line.
     [<Tests>]
     let parseMemInsTestRandomised =
-        let removeResult x =
-            match x with
-            | Ok y -> y
-            | Error _ -> failwithf "parseMemInsTestRandomised: Should never happen"
         let makeLineData wa opCodeStr suffixStr label symTab rA rB incVal prePost rC shft = 
             let operandStr = 
                 match incVal, prePost, rC, shft with 
-                | 0, Neither, None, None -> Ok (regStrings.[rA]+", ["+regStrings.[rB]+"]")
-                | x, Neither, None, None -> Ok (regStrings.[rA]+", ["+regStrings.[rB]+", #"+(x|>string)+"]")
-                | x, Post, None, None -> Ok (regStrings.[rA]+", ["+regStrings.[rB]+"], #"+(x|>string))
-                | x, Pre, None, None -> Ok (regStrings.[rA]+", ["+regStrings.[rB]+", #"+(x|>string)+"]!")
-                | _, Neither, Some y, None -> Ok (regStrings.[rA]+", ["+regStrings.[rB]+", "+regStrings.[y]+"]")
-                | _, Pre, Some y, None -> Ok (regStrings.[rA]+", ["+regStrings.[rB]+", "+regStrings.[y]+"]!")
+                | 0, Neither, None, None     -> Ok (regStrings.[rA]+", ["+regStrings.[rB]+"]")
+                | x, Neither, None, None     -> Ok (regStrings.[rA]+", ["+regStrings.[rB]+", #"+(x|>string)+"]")
+                | x, Post, None, None        -> Ok (regStrings.[rA]+", ["+regStrings.[rB]+"], #"+(x|>string))
+                | x, Pre, None, None         -> Ok (regStrings.[rA]+", ["+regStrings.[rB]+", #"+(x|>string)+"]!")
+                | _, Neither, Some y, None   -> Ok (regStrings.[rA]+", ["+regStrings.[rB]+", "+regStrings.[y]+"]")
+                | _, Pre, Some y, None       -> Ok (regStrings.[rA]+", ["+regStrings.[rB]+", "+regStrings.[y]+"]!")
                 | _, Neither, Some y, Some z -> Ok (regStrings.[rA]+", ["+regStrings.[rB]+", "+regStrings.[y]+", LSL #"+(z|>string)+"]")
-                | _, Pre, Some y, Some z -> Ok (regStrings.[rA]+", ["+regStrings.[rB]+", "+regStrings.[y]+", LSL #"+(z|>string)+"]!")
+                | _, Pre, Some y, Some z     -> Ok (regStrings.[rA]+", ["+regStrings.[rB]+", "+regStrings.[y]+", LSL #"+(z|>string)+"]!")
                 | _, _, _, _ -> Error "unexpected Input combination"
 
             operandStr
@@ -544,8 +547,8 @@ module MemTests
                 |> resultDotBindTwoInp (fun i r -> {r with rcr = i}) rCRes
                 |> resultDotBindTwoInp (fun i r -> {r with sr = i}) shftRes
 
-            let expected x = 
-                Ok {
+            let expected y = 
+                Result.bind (fun x -> Ok {
                     InstructionType= opcode;
                     DestSourceReg= rA; 
                     AddressReg= rB;
@@ -553,11 +556,9 @@ module MemTests
                     IncrementValue= x.ivr;
                     PreOrPostIndRb= x.ppr; 
                     ExtraAddressReg= x.rcr;
-                    ShiftExtraRegBy= x.sr}
+                    ShiftExtraRegBy= x.sr}) y
             let res = Result.bind (parseMemIns opcodeStr suffixStr) ld
-            match all with
-            | Ok x -> Expect.equal res (expected x) "message"
-            | _ -> ()
+            Expect.equal res (expected all) "Randomised parseMemIns Test"
 
 
 
