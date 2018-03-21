@@ -406,6 +406,103 @@ module TopLevelTests
                                         Op1 = R0;
                                         Op2 = Literal 3u;})))
                 }, symtab.Add ("test3", 4u))
+            ["ADDS R0, R0, #test1"; "test1 LSL R0, R0, #3"], 
+            Ok ({cpuData with 
+                    Regs = cpuData.Regs
+                        |> Map.add R0 32u
+                        |> Map.add R15 12u
+                    MM = cpuData.MM
+                        |> Map.add (WA 0u) 
+                            (Code (IARITH (ArithI {InstrType = Some ADD;
+                                        SuffixSet = true;
+                                        Target = R0;
+                                        Op1 = R0;
+                                        Op2 = Literal 4u;})))
+                        |> Map.add (WA 4u) 
+                            (Code (IBITARITH {Instruction = BitArithmetic.LSL;
+                                        Suff = BitArithmetic.NA;
+                                        Dest = Some R0;
+                                        Op1 = Ok (BitArithmetic.Register R0);
+                                        Op2 = Ok (BitArithmetic.Literal 3u);}))
+                }, symtab.Add ("test1", 4u))
+
+            ["ADDS R0, R0, #test1"; "test1 LSL R0, R0, #3"; "STR R0, [R0]"; "LDR R4, [R0]"], 
+            Ok ({cpuData with 
+                    Regs = cpuData.Regs
+                        |> Map.add R0 32u
+                        |> Map.add R4 32u
+                        |> Map.add R15 20u
+                    MM = cpuData.MM
+                        |> Map.add (WA 0u) 
+                            (Code (IARITH (ArithI {InstrType = Some ADD;
+                                        SuffixSet = true;
+                                        Target = R0;
+                                        Op1 = R0;
+                                        Op2 = Literal 4u;})))
+                        |> Map.add (WA 4u) 
+                            (Code (IBITARITH {Instruction = BitArithmetic.LSL;
+                                        Suff = BitArithmetic.NA;
+                                        Dest = Some R0;
+                                        Op1 = Ok (BitArithmetic.Register R0);
+                                        Op2 = Ok (BitArithmetic.Literal 3u);}))
+                        |> Map.add (WA 8u) 
+                            (Code (IMEM (MemO (Ok {InstructionType = Ok STR;
+                                      DestSourceReg = Ok R0;
+                                      AddressReg = Ok R0;
+                                      BytesNotWords = Ok false;
+                                      IncrementValue = 0;
+                                      PreIndexRb = false;
+                                      PostIndexRb = false;
+                                      ExtraAddressReg = None;
+                                      ShiftExtraRegBy = None;}))))
+                        |> Map.add (WA 12u) 
+                            (Code (IMEM (MemO (Ok {InstructionType = Ok LDR;
+                                       DestSourceReg = Ok R4;
+                                       AddressReg = Ok R0;
+                                       BytesNotWords = Ok false;
+                                       IncrementValue = 0;
+                                       PreIndexRb = false;
+                                       PostIndexRb = false;
+                                       ExtraAddressReg = None;
+                                       ShiftExtraRegBy = None;}))))
+                        |> Map.add (WA 32u) (DataLoc 32u)
+                }, symtab.Add ("test1", 4u))
+
+            ["MOV R0, #0xAA"; "MOV R1, #0b111011"; "MOV R2, #0xA9"; "STM R0, {R1,R2}"], 
+            Ok ({cpuData with 
+                    Regs = cpuData.Regs
+                        |> Map.add R0 170u
+                        |> Map.add R1 59u
+                        |> Map.add R2 169u
+                        |> Map.add R15 20u
+                    MM = cpuData.MM
+                        |> Map.add (WA 0u) 
+                            (Code (IBITARITH {Instruction = BitArithmetic.MOV;
+                                 Suff = BitArithmetic.NA;
+                                 Dest = Some R0;
+                                 Op1 = Ok (BitArithmetic.Literal 170u);
+                                 Op2 = Error "";}))
+                        |> Map.add (WA 4u) 
+                            (Code (IBITARITH {Instruction = BitArithmetic.MOV;
+                                 Suff = BitArithmetic.NA;
+                                 Dest = Some R1;
+                                 Op1 = Ok (BitArithmetic.Literal 59u);
+                                 Op2 = Error "";}))
+                        |> Map.add (WA 8u) 
+                            (Code (IBITARITH {Instruction = BitArithmetic.MOV;
+                                 Suff = BitArithmetic.NA;
+                                 Dest = Some R2;
+                                 Op1 = Ok (BitArithmetic.Literal 169u);
+                                 Op2 = Error "";}))
+                        |> Map.add (WA 12u) 
+                            (Code (IMULTMEM (MemI {InsType = Some STM;
+                                       Direction = Some EA;
+                                       Target = R0;
+                                       WriteBack = false;
+                                       RegList = [R1; R2];})))
+                        |> Map.add (WA 170u) (DataLoc 59u)
+                        |> Map.add (WA 174u) (DataLoc 169u)
+                }, symtab)
 
             ["ADD R0, R0, #0xFF"; "ADD R1, R1, #0xA9"; "ADD R2, R2, #0xD3";
                 "STM R0!, {R1,R2}"], 
