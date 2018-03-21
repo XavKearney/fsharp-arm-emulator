@@ -51,9 +51,9 @@ module TopLevelTests
                              Target = R0; Op1 = R0; Op2 = Literal 5u;});
                 PLabel = None; PSize = 4u; PCond = Cal;}
             "ADR R0, 4", 
-                Ok {PInstr = IMEM (AdrO (Ok {InstructionType = Ok ADRm;
-                                                 DestReg = Ok R0;
-                                                 SecondOp = Ok 4u;}));
+                Ok {PInstr = IMEM (AdrO (Ok {InstructionType = ADRm;
+                                                 DestReg = R0;
+                                                 SecondOp = 4u;}));
                     PLabel = None;PSize = 4u;PCond = Cal;}
                 
             // TODO: add all instructions here
