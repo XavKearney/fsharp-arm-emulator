@@ -35,6 +35,7 @@ module Mem
 //----------MEMORY INSTRUCTION DEFINITION AND PARSING-------------------------------------------------
 
     type MemInstrType = LDR | STR 
+    type PreOrPostIndex = Pre | Post | Neither
 
 
     ///The Record type which encapsulates all the 
@@ -42,13 +43,12 @@ module Mem
     /// instruction
     type MemInstr =
         {
-            InstructionType: Result<MemInstrType,String>;
-            DestSourceReg: Result<RName,String>;
-            AddressReg: Result<RName,String>;
-            BytesNotWords: Result<bool,String>;
+            InstructionType: MemInstrType;
+            DestSourceReg: RName;
+            AddressReg: RName;
+            BytesNotWords: bool;
             IncrementValue: int;
-            PreIndexRb: bool;
-            PostIndexRb: bool;
+            PreOrPostIndRb: PreOrPostIndex;
             ExtraAddressReg: RName option;
             ShiftExtraRegBy: int option;
         }
@@ -126,8 +126,6 @@ module Mem
             | ""  -> Ok false
             | "B" -> Ok true
             | _   -> Error (sprintf "parseMemIns: Unexpected suffix (%A)\nls: %A" suffix ls)
-        let pre = ((ls.Operands).Trim()).LastIndexOf("!") = (((ls.Operands).Trim()).Length-1)
-        let errorMessage1 = resultDotBindTwoInp selectFirst instTypeTmp bytes 
         let defaultRecord ra rb = {Ra= regNamesTryFindMonad ra; Rb=regNamesTryFindMonad rb; IncrVal=0; Post= false; Rc= None; Shift= None;}
         let parseOps ops =
             match ops with
@@ -144,16 +142,30 @@ module Mem
                 Ok {(defaultRecord rA rB) with Rc= rC; Shift= shft;}
             | _ -> 
                 Error (sprintf "ops didn't match anything, ops: %A" ops)
-
-        let makeOutFromParseOps _ (x: FromOps) =
-            {InstructionType= instTypeTmp;
-                DestSourceReg= x.Ra; AddressReg= x.Rb;
-                BytesNotWords= bytes; IncrementValue= x.IncrVal;
-                PreIndexRb= pre; PostIndexRb= x.Post; 
-                ExtraAddressReg= x.Rc;
-                ShiftExtraRegBy= x.Shift;}
+        let pre (z: FromOps) = 
+            match (((ls.Operands).Trim()).LastIndexOf("!") = (((ls.Operands).Trim()).Length-1), z.Post) with
+            | (true, false) -> Ok Pre
+            | (false, true) -> Ok Post
+            | (false, false) -> Ok Neither
+            | (true, true) -> Error "parseMemIns: Both Pre and Post indexing"
+        let defaultRecord = Ok {InstructionType= LDR;
+                DestSourceReg= R0; AddressReg= R1;
+                BytesNotWords= true; IncrementValue= 0;
+                PreOrPostIndRb= Neither; 
+                ExtraAddressReg= Some R0;
+                ShiftExtraRegBy= Some 0;}
+        let testOut (z: FromOps) =
+            defaultRecord
+            |> resultDotBindTwoInp (fun y x -> {x with InstructionType = y}) instTypeTmp
+            |> resultDotBindTwoInp (fun y x -> {x with DestSourceReg = y}) z.Ra
+            |> resultDotBindTwoInp (fun y x -> {x with AddressReg = y}) z.Rb
+            |> resultDotBindTwoInp (fun y x -> {x with BytesNotWords = y}) bytes 
+            |> resultDotBindTwoInp (fun y x -> {x with IncrementValue = y}) (Ok z.IncrVal)
+            |> resultDotBindTwoInp (fun y x -> {x with PreOrPostIndRb = y}) (pre z)
+            |> resultDotBindTwoInp (fun y x -> {x with ExtraAddressReg = y}) (Ok z.Rc)
+            |> resultDotBindTwoInp (fun y x -> {x with ShiftExtraRegBy = y}) (Ok z.Shift)
         parseOps ((ls.Operands).Trim())
-        |> resultDotBindTwoInp makeOutFromParseOps errorMessage1
+        |> Result.bind testOut
         
 
 
@@ -494,63 +506,53 @@ module Mem
         let getOrigVal inputRecord (dP: DataPath<'INS>) = 
             let getOriginalRegisterVals (Ra: RName) (Rb: RName) =
                 (Map.find Ra dP.Regs, Map.find Rb dP.Regs)
-            resultDotBindTwoInp getOriginalRegisterVals inputRecord.DestSourceReg inputRecord.AddressReg
+            getOriginalRegisterVals inputRecord.DestSourceReg inputRecord.AddressReg
 
         let makeBytes (bytes: bool) (x,y,z) =
             match bytes with
             | false -> (x,y,z)
             | true -> (x&&&0xFFu,y,z)
-
+        ///Finds the value to increment Rb by, considering
+        /// extra registers and shifts        
         let incrementRbValue (inputRecord: MemInstr) (dP: DataPath<'INS>) =                
             let powerF (baseF: uint32) (expF: uint32) = 
                     ((baseF|>float)**(expF|>float))|>uint32
             match inputRecord.ExtraAddressReg with
-            | None -> Ok (inputRecord.IncrementValue |> uint32)
+            | None -> inputRecord.IncrementValue |> uint32
             | Some x -> 
                        let rC = Map.find x dP.Regs
                        match inputRecord.ShiftExtraRegBy with
-                       | None -> Ok (rC)
-                       | Some y -> if y >= 0 then Ok (rC*(powerF 2u (y|>uint32)))
-                                    else Ok 0u
+                       | None -> rC
+                       | Some y -> if y >= 0 then rC*(powerF 2u (y|>uint32))
+                                    else 0u
 
 
         ///Returns the Ra and Rb values
-        let preOrPost pre post (inputRecord: MemInstr) (dP: DataPath<'INS>) x (rABTup: (uint32 * uint32)) =
+        let preOrPost preOrPost (inputRecord: MemInstr) (dP: DataPath<'INS>) (rABTup: (uint32 * uint32)) x =
             let rA = fst rABTup
             let rB = snd rABTup
             match inputRecord.InstructionType with
-            | Ok LDR -> 
-                       match (pre,post) with
-                       | (true,true) -> Error "execLDR-interpretingRecord: pre and post can't both be true"
-                       | (true, _) -> Ok (accessMemoryLocation dP (WA (rB+x)), rB+x, 0u)
-                       | (_, true) -> Ok (accessMemoryLocation dP (WA (rB)), rB+x, 0u)
-                       | (false,false) -> Ok (accessMemoryLocation dP (WA (rB+x)), rB, x)
-            | Ok STR -> 
-                       match (pre,post) with
-                       | (true,true) -> Error "execLDR-interpretingRecord: pre and post can't both be true"
-                       | (true, _) -> Ok (Ok rA, rB+x, 0u)
-                       | (_, true) -> Ok (Ok rA, rB+x, (-1|>uint32)*x)
-                       | (false,false) -> Ok (Ok rA, rB, x) 
-            | Error m -> Error (sprintf "interpretingRecord-preOrPost: Given instruction type not STR of LDR\n%A" m)                    
-
+            | LDR -> 
+                       match preOrPost with
+                       | Pre -> accessMemoryLocation dP (WA (rB+x)), rB+x, 0u
+                       | Post -> accessMemoryLocation dP (WA (rB)), rB+x, 0u
+                       | Neither -> accessMemoryLocation dP (WA (rB+x)), rB, x
+            | STR -> 
+                       match preOrPost with
+                       | Pre -> Ok rA, rB+x, 0u
+                       | Post -> Ok rA, rB+x, (-1|>uint32)*x
+                       | Neither -> Ok rA, rB, x
         ///Removes unnecessary levels of Result
-        let changeType (v: Result<Result<(Result<uint32,string> * uint32 * uint32),string>,string>) = 
+        let abstractTupleResult v = 
             match v with
-            | Ok x ->   
-                     match x with
-                     | Ok y -> 
-                              match y with
-                              | (Ok z, u, v) -> Ok (z,u,v)
-                              | (_, _, _) -> Error "execLDR-interpretingRecord: Error accesing memory location"
-                     | Error m -> Error m
-            | Error m -> Error m
+            | (Ok z, u, v) -> Ok (z,u,v)
+            | (_, _, _) -> Error "execLDR-interpretingRecord: Error accesing memory location"
         let changedToBytes (inputRecord: MemInstr) (a: Result<(uint32 * uint32 * uint32),string>) =
-            resultDotBindTwoInp makeBytes inputRecord.BytesNotWords a 
-        (getOrigVal inputRecord dP)
-        |> resultDotBindTwoInp 
-            (preOrPost inputRecord.PreIndexRb inputRecord.PostIndexRb inputRecord dP) 
-            (incrementRbValue inputRecord dP)
-        |> changeType
+            resultDotBindTwoInp makeBytes (Ok inputRecord.BytesNotWords) a 
+        incrementRbValue inputRecord dP
+        |> preOrPost inputRecord.PreOrPostIndRb inputRecord dP
+            (getOrigVal inputRecord dP)
+        |> abstractTupleResult
         |> changedToBytes inputRecord                    
 
     let makeTuple a b = (a,b)
@@ -567,13 +569,13 @@ module Mem
             match x with 
             | Ok (a,_,_) -> Ok a
             | Error m -> Error m 
-        let sndRecTuple x =
+        let sndRecTuple x = 
             match x with 
             | Ok (_,b,_) -> Ok b
             | Error m -> Error m 
         let regsMapF (dPF: Result<DataPath<'INS>,string>) reg x = 
             match dPF with 
-            | Ok y -> (resultDotBindTwoInp (updateRegister y) reg x)
+            | Ok y -> (resultDotBindTwoInp (updateRegister y) (Ok reg) x)
             | Error m -> Error m
 
         let updatedDP2 = 
@@ -584,8 +586,8 @@ module Mem
                 |> regsMapF dP0 field 
                 |> resultDotBindTwoInp updateDataPathRegs dP0
             (Ok dP)
-            |> updateDP fstRecTuple (inputRecord.DestSourceReg) 
-            |> updateDP sndRecTuple (inputRecord.AddressReg)
+            |> updateDP fstRecTuple inputRecord.DestSourceReg 
+            |> updateDP sndRecTuple inputRecord.AddressReg
 
         (updatedDP2, Ok symbolTab)
         |> Ok
@@ -607,11 +609,9 @@ module Mem
             let thrdTup tup = 
                 match tup with
                 | (_,_,z) -> z
-            match (inputRecord.AddressReg, regVals) with
-            | (Error _, Error _) -> Map.empty
-            | (Error _, _) -> Map.empty
-            | (_, Error _) -> Map.empty                       
-            | (Ok x, Ok y) -> updateRegister dP x (sndTup y)
+            match regVals with
+            | Error _ -> Map.empty                       
+            | Ok y -> updateRegister dP inputRecord.AddressReg (sndTup y)
         inputRecord
         |> interpretingRecord dP 
         |> updatedSTRMachineMem 
@@ -780,7 +780,7 @@ module Mem
                 match x with
                 | LDR -> (execLDR symbolTab dP inputRecord)
                 | STR -> (execSTR symbolTab dP inputRecord)
-            Result.bind matchMemIns inputRecord.InstructionType
+            Result.bind matchMemIns (Ok inputRecord.InstructionType)
 
         match inputRecord with
         | LabelO x -> Result.bind (labelInstructionsHandler symbolTab dP) x
