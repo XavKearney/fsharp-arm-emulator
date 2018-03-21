@@ -208,6 +208,22 @@ module TopLevel =
     /// returns a list of Ok parsed instructions, or errors
     /// plus the completed symbol table, if given
     let parseLines lines symtab = 
+        let execIfEqu i = 
+            match i with
+            // need to check for EQU instructions
+            | Ok ({PInstr = IMEM (Mem.LabelO (Ok {InstructionType = x}))} as p,syms) when x = Mem.EQU ->
+                // create a dummy datapath
+                let d = 
+                    match initDataPath None None None with
+                    | Ok d -> d
+                    | Error _ -> failwithf "Should never happen."
+                // execute the EQU instruction (datapath is not changed)
+                execParsedLine p d syms 0u
+                // use the updated symbol table and continue
+                |> Result.map (snd)
+                |> Result.map (fun s-> p,s)
+            | _ -> i
+
         // adds all labels in the parsed lines to the symbol table
         let rec createSymTab (symtab': SymbolTable) parsedLines =
             match parsedLines, symtab' with
@@ -218,12 +234,14 @@ module TopLevel =
                 match line with
                 // need to check for EQU instructions
                 | {PInstr = IMEM (Mem.LabelO (Ok {InstructionType = x}))} when x = Mem.EQU ->
+                    // create a dummy datapath
                     let d = 
                         match initDataPath None None None with
                         | Ok d -> d
                         | Error _ -> failwithf "Should never happen."
                     // execute the EQU instruction (datapath is not changed)
                     execParsedLine line d syms 0u
+                    // use the updated symbol table and continue
                     |> Result.bind (fun (_,s) -> createSymTab s rest)
                 // if not EQU, then just add a label if it exists
                 | _ ->
@@ -232,25 +250,27 @@ module TopLevel =
                     | None -> createSymTab symtab' rest
             | _ :: rest, _ ->  createSymTab symtab' rest
         // parses each line one by one, updating the symbol table as it goes
-        // tail recursive so it can't return the final symbol table (maybe refactor?)
-        let rec parseLines' lines loadaddr (symtab': SymbolTable) = 
+        // recursion method means it can't return the complete symbol table (done after instead)
+        let rec parseLines' lines parsedLines loadaddr (symtab': SymbolTable) = 
             let addLabel p =
                 match p.PLabel, symtab' with
                 | Some lab, syms -> p, (syms.Add lab)
                 | _ -> p, symtab'
             match lines with
-            // no more lines to parse, return empty
-            | [] -> [] 
+            // no more lines to parse, return
+            | [] -> parsedLines, symtab' 
+            // otherwise, parse line and update symbol table
             | line :: rest ->
                 parseLine symtab' (WA loadaddr) line
                 |> Result.map addLabel
+                |> execIfEqu
                 |> function
-                    | Ok (p, syms) -> Ok p :: parseLines' rest (loadaddr + p.PSize) syms
+                    | Ok (p, syms) -> parseLines' rest (Ok p :: parsedLines) (loadaddr + p.PSize) syms
                     // not sure how to increment size if error
-                    | Error s -> Error s :: parseLines' rest (loadaddr + 4u) symtab'
-        parseLines' lines 0u symtab
-        |> fun p -> 
-            Result.map (fun s -> p,s) (createSymTab symtab p)
+                    | Error s -> parseLines' rest (Error s :: parsedLines) (loadaddr + 4u) symtab'
+        parseLines' lines [] 0u symtab
+        // |> fun p -> 
+        //     Result.map (fun s -> p,s) (createSymTab symtab p)
 
 
 
@@ -355,8 +375,8 @@ module TopLevel =
         // first pass of parsing
         parseLines lines symtab
         // second pass of parsing
-        |> Result.map snd
-        |> Result.bind (parseLines lines)
+        |> snd
+        |> parseLines lines
         // execute
-        |> Result.bind (function
-            | parsedLines, syms -> execParsedLines parsedLines cpuData syms)
+        |> function
+            | parsedLines, syms -> execParsedLines parsedLines cpuData syms

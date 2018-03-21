@@ -194,7 +194,7 @@ module TopLevelTests
             match f ld with
             | Some x -> x
             | None -> failwithf "Should never happen."
-        makeUnitTestListWithTwoParams parseThenExecLines (cpuData, symtab) "Unit Test execParsedLines" [
+        makeUnitTestListWithTwoParams parseThenExecLines (cpuData, symtab) "Unit Test parseThenExecLines" [
             // // test single valid lines
             ["ADD R0, R0, #1"], 
                 Ok ({cpuData with 
