@@ -44,7 +44,7 @@ module TopLevelTests
 
     [<Tests>]
     let testParseLine = 
-        makeUnitTestList (parseLine (Some Map.empty) (WA 0u)) "Unit Test parseLine" [
+        makeUnitTestList (parseLine (Map.empty) (WA 0u)) "Unit Test parseLine" [
             // test valid instructions
             "ADD R0, R0, #5", 
             Ok {PInstr = IARITH (ArithI {InstrType = Some ADD; SuffixSet = false;
@@ -84,11 +84,11 @@ module TopLevelTests
             Ok {PInstr = IARITH (ArithI {InstrType = Some ADD; SuffixSet = true;
                              Target = R1; Op1 = R2; Op2 = Literal 93u;});
                 PLabel = None; PSize = 4u; PCond = Cne;}
+            "", Ok {PInstr = BLANKLINE; PLabel = None; PSize = 0u; PCond = Cal;}
 
             // test invalid instructions
             "NOTANOPCODE R1, R2, #93", 
             Error (ERRTOPLEVEL "Instruction not implemented: NOTANOPCODE R1, R2, #93")
-            "", Error (ERRTOPLEVEL "Invalid instruction: ")
             "blah", Error (ERRTOPLEVEL "Invalid instruction: blah")
         ]
 
@@ -104,83 +104,80 @@ module TopLevelTests
             | Ok x -> x
             | Error _ -> failwithf "Should never happen."
         let symtab = ["test", 0u] |> Map.ofList
-        let someSymTab = Some (symtab)
         let getParsed f ld = 
             match f ld with
             | Some x -> x
             | None -> failwithf "Should never happen."
         makeUnitTestListWithThreeParams (removeResult >> execParsedLine) (cpuData, symtab, 0u) "Unit Test execParsedLine" [
             // test valid lines
-            (parseLine (someSymTab) (WA 0u) "STM R0, {R1}"), 
-                Ok ({cpuData with MM = cpuData.MM.Add (WA 0u, DataLoc 0u)}, symtab)
-            (parseLine (someSymTab) (WA 0u) "ADD R0, R0, #1"), 
+            (parseLine (symtab) (WA 0u) "ADD R0, R0, #1"), 
                 Ok ({cpuData with Regs = cpuData.Regs.Add (R0, 1u)}, symtab)
-            (parseLine (someSymTab) (WA 0u) "SUB R0, R0, #1"), 
+            (parseLine (symtab) (WA 0u) "SUB R0, R0, #1"), 
                 Ok ({cpuData with Regs = cpuData.Regs.Add (R0, 0u-1u)}, symtab)
-            (parseLine (someSymTab) (WA 0u) "ADC R0, R0, #0xFF"), 
+            (parseLine (symtab) (WA 0u) "ADC R0, R0, #0xFF"), 
                 Ok ({cpuData with Regs = cpuData.Regs.Add (R0, 0xFFu)}, symtab)
-            (parseLine (someSymTab) (WA 0u) "SBC R0, R0, #0xFF"), 
+            (parseLine (symtab) (WA 0u) "SBC R0, R0, #0xFF"), 
                 Ok ({cpuData with Regs = cpuData.Regs.Add (R0, 0u-1u-0xFFu)}, symtab)
-            (parseLine (someSymTab) (WA 0u) "RSB R0, R0, #&FF"), 
+            (parseLine (symtab) (WA 0u) "RSB R0, R0, #&FF"), 
                 Ok ({cpuData with Regs = cpuData.Regs.Add (R0, 0xFFu)}, symtab)
-            (parseLine (someSymTab) (WA 0u) "RSC R0, R0, #0b11"), 
+            (parseLine (symtab) (WA 0u) "RSC R0, R0, #0b11"), 
                 Ok ({cpuData with Regs = cpuData.Regs.Add (R0, 0b11u-1u)}, symtab)
-            (parseLine (someSymTab) (WA 0u) "CMP R0, #0b0000"), 
+            (parseLine (symtab) (WA 0u) "CMP R0, #0b0000"), 
                 Ok ({cpuData with Fl = {N=false;Z=true;V=false;C=false;}}, symtab)
-            (parseLine (someSymTab) (WA 0u) "CMN R0, #0b0000"), 
+            (parseLine (symtab) (WA 0u) "CMN R0, #0b0000"), 
                 Ok ({cpuData with Fl = {N=false;Z=true;V=false;C=false;}}, symtab)
 
             // test BitArithmetic instructions
-            (parseLine (someSymTab) (WA 0u) "MOV R0, #&DE"), 
+            (parseLine (symtab) (WA 0u) "MOV R0, #&DE"), 
                 Ok ({cpuData with Regs = cpuData.Regs.Add (R0, 0xDEu)}, symtab)
-            (parseLine (someSymTab) (WA 0u) "MVN R0, #&DE"), 
+            (parseLine (symtab) (WA 0u) "MVN R0, #&DE"), 
                 Ok ({cpuData with Regs = cpuData.Regs.Add (R0, ~~~0xDEu)}, symtab)
-            (parseLine (someSymTab) (WA 0u) "AND R0, R0, #0xFF"), 
+            (parseLine (symtab) (WA 0u) "AND R0, R0, #0xFF"), 
                 Ok ({cpuData with Regs = cpuData.Regs.Add (R0, 0u)}, symtab)
-            (parseLine (someSymTab) (WA 0u) "ORR R0, R0, #0xFA"), 
+            (parseLine (symtab) (WA 0u) "ORR R0, R0, #0xFA"), 
                 Ok ({cpuData with Regs = cpuData.Regs.Add (R0, 0xFAu)}, symtab)
-            (parseLine (someSymTab) (WA 0u) "EOR R0, R0, #0b1111"), 
+            (parseLine (symtab) (WA 0u) "EOR R0, R0, #0b1111"), 
                 Ok ({cpuData with Regs = cpuData.Regs.Add (R0, 0b1111u)}, symtab)
-            (parseLine (someSymTab) (WA 0u) "BIC R0, R0, #0b1111"), 
+            (parseLine (symtab) (WA 0u) "BIC R0, R0, #0b1111"), 
                 Ok ({cpuData with Regs = cpuData.Regs.Add (R0, 0u)}, symtab)
-            (parseLine (someSymTab) (WA 0u) "LSL R0, R0, #3"), 
+            (parseLine (symtab) (WA 0u) "LSL R0, R0, #3"), 
                 Ok (cpuData, symtab)
-            (parseLine (someSymTab) (WA 0u) "LSR R0, R0, #-1"), 
+            (parseLine (symtab) (WA 0u) "LSR R0, R0, #-1"), 
                 Ok (cpuData, symtab)
-            (parseLine (someSymTab) (WA 0u) "ASR R0, R0, #0xFF"), 
+            (parseLine (symtab) (WA 0u) "ASR R0, R0, #0xFF"), 
                 Ok (cpuData, symtab)
-            (parseLine (someSymTab) (WA 0u) "ROR R0, R0, #0b1101"), 
+            (parseLine (symtab) (WA 0u) "ROR R0, R0, #0b1101"), 
                 Ok (cpuData, symtab)
-            (parseLine (someSymTab) (WA 0u) "RRX R0, R0"), 
+            (parseLine (symtab) (WA 0u) "RRX R0, R0"), 
                 Ok (cpuData, symtab)
-            (parseLine (someSymTab) (WA 0u) "TST R0, #0b1111"), 
+            (parseLine (symtab) (WA 0u) "TST R0, #0b1111"), 
                 Ok ({cpuData with Fl = {cpuData.Fl with Z=true}}, symtab)
-            (parseLine (someSymTab) (WA 0u) "TEQ R0, #0"), 
+            (parseLine (symtab) (WA 0u) "TEQ R0, #0"), 
                 Ok ({cpuData with Fl = {cpuData.Fl with Z=true}}, symtab)
 
             // test Mem instructions
-            (parseLine (someSymTab) (WA 0u) "LDR R0, [R1]"), 
-                Error (ERRIMEM "execLDR-interpretingRecord: Error accesing memory location")
-            (parseLine (someSymTab) (WA 0u) "STR R0, [R1]"), 
+            (parseLine (symtab) (WA 0u) "LDR R0, [R1]"), 
+                Error (ERRLINE (ERRIMEM "execLDR-interpretingRecord: Error accesing memory location", 0u))
+            (parseLine (symtab) (WA 0u) "STR R0, [R1]"), 
                 Ok ({cpuData with MM = cpuData.MM.Add (WA 0u, DataLoc 0u)}, symtab)
-            (parseLine (someSymTab) (WA 0u) "ADR R0, 4"), 
+            (parseLine (symtab) (WA 0u) "ADR R0, 4"), 
                 Ok ({cpuData with Regs = cpuData.Regs.Add (R0, 4u)}, symtab)
-            (parseLine (someSymTab) (WA 0u) "test DCD 1"), 
+            (parseLine (symtab) (WA 0u) "test DCD 1"), 
                 Ok ({cpuData with MM = cpuData.MM.Add (WA 0x100u, DataLoc 1u)}, symtab.Add ("test", 1u))
-            (parseLine (someSymTab) (WA 0u) "test EQU 44"), 
+            (parseLine (symtab) (WA 0u) "test EQU 44"), 
                 Ok (cpuData, symtab.Add ("test", 44u))
-            (parseLine (someSymTab) (WA 0u) "test FILL 4"), 
+            (parseLine (symtab) (WA 0u) "test FILL 4"), 
                 Ok ({cpuData with MM = cpuData.MM.Add (WA 0x100u, DataLoc 0u)}, symtab.Add ("test", 0x100u))
 
             // test MultMem instructions
-            (parseLine (someSymTab) (WA 0u) "STM R0, {R1}"), 
+            (parseLine (symtab) (WA 0u) "STM R0, {R1}"), 
                 Ok ({cpuData with MM = cpuData.MM.Add (WA 0u, DataLoc 0u)}, symtab)
-            (parseLine (someSymTab) (WA 0u) "LDM R0, {R1}"), 
-                Error (ERRIMULTMEM "Invalid memory address.")
+            (parseLine (symtab) (WA 0u) "LDM R0, {R1}"), 
+                Error (ERRLINE (ERRIMULTMEM "Invalid memory address.", 0u))
 
-            (parseLine (someSymTab) (WA 0u) "test ADD R0, R0, #1"), 
+            (parseLine (symtab) (WA 0u) "test ADD R0, R0, #1"), 
                 Ok ({cpuData with Regs = cpuData.Regs.Add (R0, 1u)}, symtab.Add ("test", 0u))
-            (parseLine (someSymTab) (WA 0u) "ADDEQ R0, R0, #4"), 
+            (parseLine (symtab) (WA 0u) "ADDEQ R0, R0, #4"), 
                 Ok (cpuData, symtab)
          ]
 
@@ -193,12 +190,11 @@ module TopLevelTests
             | Ok x -> x
             | Error _ -> failwithf "Should never happen."
         let symtab = ["test", 0x100u] |> Map.ofList
-        let someSymTab = Some (symtab)
         let getParsed f ld = 
             match f ld with
             | Some x -> x
             | None -> failwithf "Should never happen."
-        makeUnitTestListWithTwoParams parseThenExecLines (cpuData, someSymTab) "Unit Test execParsedLines" [
+        makeUnitTestListWithTwoParams parseThenExecLines (cpuData, symtab) "Unit Test execParsedLines" [
             // // test single valid lines
             ["ADD R0, R0, #1"], 
                 Ok ({cpuData with 
