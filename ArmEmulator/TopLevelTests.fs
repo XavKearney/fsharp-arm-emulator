@@ -559,6 +559,18 @@ module TopLevelTests
                                             Op1 = R0;
                                             Op2 = Literal 0u;})))
                     }, symtab.Add ("label",39u))
+            ["ADD R0,R0, #0"; "label EQU 39";], 
+                Ok ({cpuData with 
+                        Regs = cpuData.Regs
+                            |> Map.add R15 8u
+                        MM = cpuData.MM
+                            |> Map.add (WA 0u) 
+                                (Code (IARITH (ArithI {InstrType = Some ADD;
+                                            SuffixSet = false;
+                                            Target = R0;
+                                            Op1 = R0;
+                                            Op2 = Literal 0u;})))
+                    }, symtab.Add ("label",39u))
             
             ["infinite ADD R0, R0, #1"; "B infinite"],
                 Error (ERRTOPLEVEL "Infinite loop detected. Branched more than 100,000 times.")
