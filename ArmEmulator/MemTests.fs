@@ -5,12 +5,6 @@ module MemTests
     open Expecto
     open FsCheck
     open Mem
-    open VisualTest
-    open VisualTest
-    open System.Transactions
-    open System.Transactions
-    open System.Transactions
-    open System.Runtime.CompilerServices
 
 
     let config = { FsCheckConfig.defaultConfig with maxTest = 10000 }
@@ -194,7 +188,7 @@ module MemTests
                     Name = labelRec;
                     EquDcdFill = c}) eQdCfLRec
             let res = Result.bind (parseLabelIns opcodeRec) ld
-            Expect.equal res expected "message"
+            Expect.equal res expected "Label Random Test"
 
 
 
