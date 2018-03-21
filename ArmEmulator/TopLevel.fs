@@ -201,11 +201,25 @@ module TopLevel =
         // adds all labels in the parsed lines to the symbol table
         let rec createSymTab (symtab': SymbolTable option) parsedLines =
             match parsedLines, symtab' with
-            | [], _ -> symtab'
+            // if no more left to parse, return complete symbol table
+            | [], _ -> Ok symtab'
+            // otherwise, check if next line has a label and add to symbol table
             | (Ok line) :: rest, Some syms -> 
-                match line.PLabel with
-                | Some lab -> createSymTab (Some (syms.Add lab)) rest
-                | None -> createSymTab symtab' rest
+                match line with
+                // need to check for EQU instructions
+                | {PInstr = IMEM (Mem.LabelO (Ok {InstructionType = x}))} when x = Mem.EQU ->
+                    let d = 
+                        match initDataPath None None None with
+                        | Ok d -> d
+                        | Error _ -> failwithf "Should never happen."
+                    // execute the EQU instruction (datapath is not changed)
+                    execParsedLine line d syms 0u
+                    |> Result.bind (fun (_,s) -> createSymTab (Some s) rest)
+                // if not EQU, then just add a label if it exists
+                | _ ->
+                    match line.PLabel with
+                    | Some lab -> createSymTab (Some (syms.Add lab)) rest
+                    | None -> createSymTab symtab' rest
             | _ :: rest, _ ->  createSymTab symtab' rest
         // parses each line one by one, updating the symbol table as it goes
         // tail recursive so it can't return the final symbol table (maybe refactor?)
@@ -225,7 +239,8 @@ module TopLevel =
                     // not sure how to increment size if error
                     | Error s -> Error s :: parseLines' rest (loadaddr + 4u) symtab'
         parseLines' lines 0u symtab
-        |> fun p -> p, createSymTab symtab p
+        |> fun p -> 
+            Result.map (fun s -> p,s) (createSymTab symtab p)
 
 
 
@@ -238,12 +253,19 @@ module TopLevel =
         let rec putCodeInMemory lines lineNum cpu' (insMap: Map<WAddr, Parse<Instr> * uint32>) currAddr = 
             match lines with
             | [] -> Ok (cpu', insMap)
-            | Ok {PInstr = BLANKLINE;} :: rest -> putCodeInMemory rest (lineNum+1u) cpu' insMap currAddr
+            // ignore blank lines, but increment line number
+            | Ok {PInstr = BLANKLINE;} :: rest -> 
+                putCodeInMemory rest (lineNum+1u) cpu' insMap currAddr
+            // also ignore EQU instructions,
+            | Ok {PInstr = IMEM (Mem.LabelO (Ok {InstructionType = x}))} :: rest when x = Mem.EQU ->
+                putCodeInMemory rest (lineNum+1u) cpu' insMap currAddr
+            // otherwise, execute instruction as normal
             | Ok line :: rest ->
                 {cpu' with MM = cpu'.MM.Add (WA currAddr, Code line.PInstr) }
                 |> fun c ->
                     insMap.Add (WA currAddr, (line, lineNum))
-                    |> fun iMap -> putCodeInMemory rest (lineNum + 1u) c iMap (currAddr + line.PSize)
+                    |> fun iMap -> 
+                        putCodeInMemory rest (lineNum + 1u) c iMap (currAddr + line.PSize)
             | Error s :: _ -> Error (ERRLINE (s, lineNum))
 
         let setProgCount cpu' = 
@@ -310,7 +332,10 @@ module TopLevel =
                     )
         setProgCount cpuData
         |> fun cpu -> putCodeInMemory parsedLines 0u cpu Map.empty 0u
-        |> Result.bind (fun (cpu', insMap) -> execLines cpu' insMap symtab 0u)
+        |> Result.bind (fun (cpu', insMap) -> 
+            match insMap = Map.empty with
+            | false -> execLines cpu' insMap symtab 0u
+            | true -> Ok (cpu', symtab))
 
 
     /// takes a list of lines as string, a datapath and an optional symbol table
@@ -320,8 +345,9 @@ module TopLevel =
         // first pass of parsing
         parseLines lines symtab
         // second pass of parsing
-        |> snd |> parseLines lines
+        |> Result.map snd
+        |> Result.bind (parseLines lines)
         // execute
-        |> function
+        |> Result.bind (function
             | parsedLines, Some syms -> execParsedLines parsedLines cpuData syms
-            | parsedLines, None -> execParsedLines parsedLines cpuData Map.empty
+            | parsedLines, None -> execParsedLines parsedLines cpuData Map.empty)
