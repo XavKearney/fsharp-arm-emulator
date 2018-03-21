@@ -668,7 +668,7 @@ module Mem
             let fillNf = 
                 match inputRecord.EquDcdFill with
                 | Fl x -> 
-                   x|>int
+                   (x/4u)|>int
                 | _ -> 0
             match inputRecord.InstructionType with
             | DCD ->    
@@ -701,10 +701,15 @@ module Mem
             let waToUint32 (k,_) =
                 match k with
                 | WA y -> y
+            let checkBigEnough x =
+                match x with
+                | v when v >= 0xFCu -> x
+                | _ -> 0xFCu
             dP.MM
             |> Map.toSeq
             |> Seq.map waToUint32
-            |> Seq.max 
+            |> Seq.max
+            |> checkBigEnough
 
         let findAddrs (dP: DataPath<'INS>) :Result<uint32 list, string>=
             if ((dP.MM).IsEmpty) then

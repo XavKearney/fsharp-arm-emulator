@@ -853,8 +853,8 @@ module MemTests
                     makeTest "DCD List Base Case" (makeLabelInstr "labelT" "DCD" "1,3,5") baseDataPath (Ok {baseDataPath with MM = ([WA 0x100u,DataLoc 5u; WA 0x104u, DataLoc 1u; WA 0x108u, DataLoc 3u; WA 0x10Cu, DataLoc 5u] |> Map.ofList)})
 
                     //Fill Working Tests
-                    makeTest "Fill Base Case" (makeLabelInstr "labelT" "FILL" "4") baseDataPath (Ok {baseDataPath with MM = ([WA 0x100u,DataLoc 5u; WA 0x104u, DataLoc 0u; WA 0x108u, DataLoc 0u; WA 0x10Cu, DataLoc 0u; WA 0x110u, DataLoc 0u] |> Map.ofList)})
-                    makeTest "Fill Changed given address" (makeLabelInstr "labelT" "FILL" "4") {baseDataPath with MM =([WA 0x0u,DataLoc 4u] |> Map.ofList)} (Ok {baseDataPath with MM = ([WA 0x0u,DataLoc 4u; WA 0x4u, DataLoc 0u; WA 0x8u, DataLoc 0u; WA 0xCu, DataLoc 0u; WA 0x10u, DataLoc 0u] |> Map.ofList)})
+                    makeTest "Fill Base Case" (makeLabelInstr "labelT" "FILL" "4") baseDataPath (Ok {baseDataPath with MM = ([WA 0x100u,DataLoc 5u; WA 0x104u, DataLoc 0u] |> Map.ofList)})
+                    makeTest "Fill Changed given address" (makeLabelInstr "labelT" "FILL" "4") {baseDataPath with MM =([WA 0x0u,DataLoc 4u] |> Map.ofList)} (Ok {baseDataPath with MM = ([WA 0x0u,DataLoc 4u; WA 0x100u, DataLoc 0u] |> Map.ofList)})
 
                     //EQU Working Tests
                     makeTest "EQU Base Case" (makeLabelInstr "labelT" "EQU" "2") baseDataPath (Ok baseDataPath)
@@ -966,8 +966,8 @@ module MemTests
         Expecto.Tests.testList "execFILLTest Tests"
                 [   
                     //FILL Working Tests
-                    makeTest "execFILL: FILL Base Case" stTwoItem (makeLabelInstr "labelT" "FILL" "4") baseDataPath (Ok ({baseDataPath with MM = ([WA 0x100u,DataLoc 5u; WA 0x104u, DataLoc 0u; WA 0x108u, DataLoc 0u; WA 0x10Cu, DataLoc 0u; WA 0x110u, DataLoc 0u] |> Map.ofList)}, ["testL",256u; "testL2",260u; "labelT",0u] |> Map.ofList))
-                    makeTest "execFILL: FILL Changed base address" stTwoItem (makeLabelInstr "labelT" "FILL" "4") {baseDataPath with MM =([WA 0x0u,DataLoc 5u] |> Map.ofList)} (Ok ({baseDataPath with MM = ([WA 0x0u,DataLoc 5u; WA 0x4u, DataLoc 0u; WA 0x8u, DataLoc 0u; WA 0xCu, DataLoc 0u; WA 0x10u, DataLoc 0u] |> Map.ofList)}, ["testL",256u; "testL2",260u; "labelT",0u] |> Map.ofList))
+                    makeTest "execFILL: FILL Base Case" stTwoItem (makeLabelInstr "labelT" "FILL" "4") baseDataPath (Ok ({baseDataPath with MM = ([WA 0x100u,DataLoc 5u; WA 0x104u, DataLoc 0u] |> Map.ofList)}, ["testL",256u; "testL2",260u; "labelT",0u] |> Map.ofList))
+                    makeTest "execFILL: FILL Changed base address" stTwoItem (makeLabelInstr "labelT" "FILL" "4") {baseDataPath with MM =([WA 0x0u,DataLoc 5u] |> Map.ofList)} (Ok ({baseDataPath with MM = ([WA 0x0u,DataLoc 5u; WA 0x100u, DataLoc 0u] |> Map.ofList)}, ["testL",256u; "testL2",260u; "labelT",0u] |> Map.ofList))
 
                 ]
 

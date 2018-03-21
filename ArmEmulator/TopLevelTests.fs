@@ -504,13 +504,13 @@ module TopLevelTests
                                         Op2 = Ok (BitArithmetic.Literal 3u);}))
                         |> Map.add (WA 8u) 
                             (Code (IMEM (MemO (Ok {InstructionType = STR;
-                                        DestSourceReg = R0;
-                                        AddressReg = R0;
-                                        BytesNotWords = false;
-                                        IncrementValue = 0;
-                                        PreOrPostIndRb = Neither;
-                                        ExtraAddressReg = None;
-                                        ShiftExtraRegBy = None;}))))
+                                      DestSourceReg = R0;
+                                      AddressReg = R0;
+                                      BytesNotWords = false;
+                                      IncrementValue = 0;
+                                      PreOrPostIndRb = Neither;
+                                      ExtraAddressReg = None;
+                                      ShiftExtraRegBy = None;}))))
                         |> Map.add (WA 12u) 
                             (Code (IMEM (MemO (Ok {InstructionType = LDR;
                                        DestSourceReg = R4;
