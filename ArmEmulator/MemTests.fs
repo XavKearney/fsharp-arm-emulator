@@ -8,93 +8,17 @@ module MemTests
     open VisualTest
 
 
+    let config = { FsCheckConfig.defaultConfig with maxTest = 10000 }
 
-
-    [<Tests>]
-    let parseLabelInsTest = 
-        let x:SymbolTable = ["a",uint32 2] |> Map.ofList
-        let ldFunc lab ops  = 
-                {LoadAddr= WA 100u; 
-                    Label= Some lab; 
-                    SymTab= Some x;
-                    OpCode= "";
-                    Operands= ops}
-        let makeTest root ld name output =
-            testCase name <| fun () ->
-                Expect.equal (parseLabelIns root ld) output (sprintf "Label Parsing Tests '%s'" root)
-        Expecto.Tests.testList "parseLabelIns Tests"
-                [   
-                    //EQU, DCD and FILL Working Tests
-                    //EQU Working Test
-                    makeTest "EQU" (ldFunc "labelT" "4") "EQU1" (Ok {InstructionType = Ok EQU; Name = (Ok (Some "labelT")); 
-                                                        EQUExpr = (Some (Ok 4u)); DCDValueList = None;
-                                                        FillN = None})
-                    makeTest "EQU" (ldFunc "labelT" "2") "EQU2" (Ok {InstructionType = Ok EQU; Name = (Ok (Some "labelT")); 
-                                                                            EQUExpr = (Some (Ok 2u)); DCDValueList = None;
-                                                                            FillN = None})
-                    makeTest "EQU" (ldFunc "labelT" "3*4") "EQU Mult" (Ok {InstructionType = Ok EQU; Name = (Ok (Some "labelT")); 
-                                                                                    EQUExpr = (Some (Ok 12u)); DCDValueList = None;
-                                                                                    FillN = None})
-                    makeTest "EQU" (ldFunc "labelT" "1+2") "EQU Add" (Ok {InstructionType = Ok EQU; Name = (Ok (Some "labelT")); 
-                                                                                    EQUExpr = (Some (Ok 3u)); DCDValueList = None;
-                                                                                    FillN = None})
-                    makeTest "EQU" (ldFunc "labelT" "3-2") "EQU Sub" (Ok {InstructionType = Ok EQU; Name = (Ok (Some "labelT")); 
-                                                                                    EQUExpr = (Some (Ok 1u)); DCDValueList = None;
-                                                                                    FillN = None})
-                    makeTest "EQU" (ldFunc "labelT" "5-4*3-1*1+2*2*2") "EQU All" (Ok {InstructionType = Ok EQU; Name = (Ok (Some "labelT"));
-                                                                                    EQUExpr = (Some (Ok 0u)); DCDValueList = None;
-                                                                                    FillN = None})
-                    //EQU Error Message Tests
-                    makeTest "EQU" (ldFunc "labelT" "") "EQU No Literal" (Error "No input expression supplied.")
-
-
-                    //Fill Working Tests
-                    makeTest "FILL" (ldFunc "labelT" "4") "FILL 4" (Ok {InstructionType = Ok FILL; Name = (Ok (Some "labelT"));
-                                                                                    EQUExpr = None; DCDValueList = None;
-                                                                                    FillN = Some (Ok 4u)})
-                    makeTest "FILL" (ldFunc "labelT" "64") "FILL 64" (Ok {InstructionType = Ok FILL; Name = (Ok (Some "labelT"));
-                                                                                    EQUExpr = None; DCDValueList = None;
-                                                                                    FillN = Some (Ok 64u)})
-                    makeTest "FILL" (ldFunc "labelT" "0") "FILL 0" (Ok {InstructionType = Ok FILL; Name = (Ok (Some "labelT"));
-                                                                                    EQUExpr = None; DCDValueList = None;
-                                                                                    FillN = Some (Ok 0u)})
-                    //Fill Error Message Tests
-                    makeTest "FILL" (ldFunc "labelT" "3") "FILL 3" (Error "parseLabelIns: Fill expression (3u) <0 or not divisible by four")
-                    makeTest "FILL" (ldFunc "labelT" "123") "FILL 123" (Error "parseLabelIns: Fill expression (123u) <0 or not divisible by four")
-                    makeTest "FILL" (ldFunc "labelT" "-1") "FILL -1" (Error "parseLabelIns: Fill expression (4294967295u) <0 or not divisible by four")
-                    makeTest "FILL" (ldFunc "labelT" "-4") "FILL -4" (Error "parseLabelIns: Fill expression (4294967292u) <0 or not divisible by four")
-                    makeTest "FILL" (ldFunc "labelT" "") "FILL No Input" (Error "No input expression supplied.")
-
-                    //DCD Working Tests
-                    makeTest "DCD" (ldFunc "labelT" "1") "DCD 1" (Ok {InstructionType = Ok DCD; Name = (Ok (Some "labelT"));
-                                                                                    EQUExpr = None; DCDValueList = Some (Ok ["1"]);
-                                                                                    FillN = None})
-                    makeTest "DCD" (ldFunc "labelT" "1,3,5") "DCD 1,3,5" (Ok {InstructionType = Ok DCD; Name = (Ok (Some "labelT"));
-                                                                                    EQUExpr = None; DCDValueList = Some (Ok ["1";"3";"5"]);
-                                                                                    FillN = None})
-                    makeTest "DCD" (ldFunc "labelT" "1, 3, 5") "DCD 1, 3, 5" (Ok {InstructionType = Ok DCD; Name = (Ok (Some "labelT"));
-                                                                                    EQUExpr = None; DCDValueList = Some (Ok ["1";"3";"5"]);
-                                                                                    FillN = None})
-                    makeTest "DCD" (ldFunc "labelT" "  1, 3, 5  ") "DCD   1, 3, 5  " (Ok {InstructionType = Ok DCD; Name = (Ok (Some "labelT"));
-                                                                                    EQUExpr = None; DCDValueList = Some (Ok ["1";"3";"5"]);
-                                                                                    FillN = None})
-                    makeTest "DCD" (ldFunc "labelT" "1, -3, 5") "DCD 1, -3, 5" (Ok {InstructionType = Ok DCD; Name = (Ok (Some "labelT"));
-                                                                                    EQUExpr = None; DCDValueList = Some (Ok ["1";"-3";"5"]);
-                                                                                    FillN = None})
-                    makeTest "DCD" (ldFunc "labelT" "-1, 0, 5") "DCD -1, 0, 5" (Ok {InstructionType = Ok DCD; Name = (Ok (Some "labelT"));
-                                                                                    EQUExpr = None; DCDValueList = Some (Ok ["-1";"0";"5"]);
-                                                                                    FillN = None})
-                    //DCD Error Message Tests
-                    makeTest "DCD" (ldFunc "labelT" "") "DCD no input" (Error "parseLabelIns: Input to DCD function not valid (No input etc)")
-                    makeTest "DCD" (ldFunc "labelT" "a") "DCD invalid input" (Error "parseLabelIns: Input to DCD function not valid (No input etc)")
-                    makeTest "DCD" (ldFunc "labelT" "1, ,5") "DCD invalid space list input" (Error "parseLabelIns: Input to DCD function not valid (No input etc)")
-                    makeTest "DCD" (ldFunc "labelT" "1, a, 5") "DCD invalid list input" (Error "parseLabelIns: Input to DCD function not valid (No input etc)")
-
-                ]
-
-
+    /// choose an item from list at random
+    let chooseFromList lst = 
+        Gen.elements lst
+        |> Gen.sample 0 1
+        |> List.head
 
     let stTwoItem = ["testL",256u; "testL2",260u] |> Map.ofList
+ 
+
 
     [<Tests>]
     let evalExpressionTest =
@@ -132,6 +56,129 @@ module MemTests
                     // makeEvalExpTest "evalExpressions: Labels not allowed" false "testL2" (Error "evalExpression-numberOrLabel: Attempting to parse label when labels are not allowed, ie for Fill")
 
                 ]
+
+
+
+    [<Tests>]
+    let parseLabelInsTest = 
+        let x:SymbolTable = ["a",uint32 2] |> Map.ofList
+        let ldFunc lab ops  = 
+                {LoadAddr= WA 100u; 
+                    Label= Some lab; 
+                    SymTab= Some x;
+                    OpCode= "";
+                    Operands= ops}
+        let makeTest root ld name output =
+            testCase name <| fun () ->
+                Expect.equal (parseLabelIns root ld) output (sprintf "Label Parsing Tests '%s'" root)
+        Expecto.Tests.testList "parseLabelIns Tests"
+                [   
+                    //EQU, DCD and FILL Working Tests
+                    //EQU Working Test
+                    makeTest "EQU" (ldFunc "labelT" "4") "EQU1" (Ok {InstructionType = EQU; Name = (Some "labelT"); 
+                                                                    EquDcdFill = (Eq 4u)})
+                    makeTest "EQU" (ldFunc "labelT" "2") "EQU2" (Ok {InstructionType = EQU; Name = (Some "labelT"); 
+                                                                    EquDcdFill = (Eq 2u)})
+                    makeTest "EQU" (ldFunc "labelT" "3*4") "EQU Mult" (Ok {InstructionType = EQU; Name = (Some "labelT"); 
+                                                                            EquDcdFill = (Eq 12u)})
+                    makeTest "EQU" (ldFunc "labelT" "1+2") "EQU Add" (Ok {InstructionType = EQU; Name = (Some "labelT"); 
+                                                                            EquDcdFill = (Eq 3u)})
+                    makeTest "EQU" (ldFunc "labelT" "3-2") "EQU Sub" (Ok {InstructionType = EQU; Name = (Some "labelT"); 
+                                                                            EquDcdFill = (Eq 1u)})
+                    makeTest "EQU" (ldFunc "labelT" "5-4*3-1*1+2*2*2") "EQU All" (Ok {InstructionType = EQU; Name = (Some "labelT"); 
+                                                                            EquDcdFill = (Eq 0u)})
+                    //EQU Error Message Tests
+                    makeTest "EQU" (ldFunc "labelT" "") "EQU No Literal" (Error "No input expression supplied.")
+
+
+                    //Fill Working Tests
+                    makeTest "FILL" (ldFunc "labelT" "4") "FILL 4" (Ok {InstructionType = FILL; Name = (Some "labelT"); 
+                                                                        EquDcdFill = (Fl 4u)})
+                    makeTest "FILL" (ldFunc "labelT" "64") "FILL 64" (Ok {InstructionType = FILL; Name = (Some "labelT"); 
+                                                                        EquDcdFill = (Fl 64u)})
+                    makeTest "FILL" (ldFunc "labelT" "0") "FILL 0" (Ok {InstructionType = FILL; Name = (Some "labelT"); 
+                                                                        EquDcdFill = (Fl 0u)})
+                    //Fill Error Message Tests
+                    makeTest "FILL" (ldFunc "labelT" "3") "FILL 3" (Error "parseLabelIns: Fill expression (3u) <0 or not divisible by four")
+                    makeTest "FILL" (ldFunc "labelT" "123") "FILL 123" (Error "parseLabelIns: Fill expression (123u) <0 or not divisible by four")
+                    makeTest "FILL" (ldFunc "labelT" "-1") "FILL -1" (Error "parseLabelIns: Fill expression (4294967295u) <0 or not divisible by four")
+                    makeTest "FILL" (ldFunc "labelT" "-4") "FILL -4" (Error "parseLabelIns: Fill expression (4294967292u) <0 or not divisible by four")
+                    makeTest "FILL" (ldFunc "labelT" "") "FILL No Input" (Error "No input expression supplied.")
+
+                    //DCD Working Tests
+                    makeTest "DCD" (ldFunc "labelT" "1") "DCD 1" (Ok {InstructionType = DCD; Name = (Some "labelT"); 
+                                                                        EquDcdFill = (Vl ["1"])})
+                    makeTest "DCD" (ldFunc "labelT" "1,3,5") "DCD 1,3,5" (Ok {InstructionType = DCD; Name = (Some "labelT"); 
+                                                                        EquDcdFill = (Vl ["1";"3";"5"])})
+                    makeTest "DCD" (ldFunc "labelT" "1, 3, 5") "DCD 1, 3, 5" (Ok {InstructionType = DCD; Name = (Some "labelT"); 
+                                                                        EquDcdFill = (Vl ["1";"3";"5"])})
+                    makeTest "DCD" (ldFunc "labelT" "  1, 3, 5  ") "DCD   1, 3, 5  " (Ok {InstructionType = DCD; Name = (Some "labelT"); 
+                                                                        EquDcdFill = (Vl ["1";"3";"5"])})
+                    makeTest "DCD" (ldFunc "labelT" "1, -3, 5") "DCD 1, -3, 5" (Ok {InstructionType = DCD; Name = (Some "labelT"); 
+                                                                        EquDcdFill = (Vl ["1";"-3";"5"])})
+                    makeTest "DCD" (ldFunc "labelT" "-1, 0, 5") "DCD -1, 0, 5" (Ok {InstructionType = DCD; Name = (Some "labelT"); 
+                                                                        EquDcdFill = (Vl ["-1";"0";"5"])})
+                    //DCD Error Message Tests
+                    makeTest "DCD" (ldFunc "labelT" "") "DCD no input" (Error "parseLabelIns: Input to DCD function not valid (No input etc)")
+                    makeTest "DCD" (ldFunc "labelT" "a") "DCD invalid input" (Error "parseLabelIns: Input to DCD function not valid (No input etc)")
+                    makeTest "DCD" (ldFunc "labelT" "1, ,5") "DCD invalid space list input" (Error "parseLabelIns: Input to DCD function not valid (No input etc)")
+                    makeTest "DCD" (ldFunc "labelT" "1, a, 5") "DCD invalid list input" (Error "parseLabelIns: Input to DCD function not valid (No input etc)")
+
+                ]
+
+
+    ///Property-based testing of parseLabelIns function
+    /// for randomly generated DCD, EQU and FILL 
+    /// instructions
+    ///Note: this does not test:
+    ///     - Expressions
+    ///     - Hex or binary inputs
+    [<Tests>]
+    let parseLabelInsTestRandomised =
+        let removeResult x =
+            match x with
+            | Ok y -> y
+            | Error _ -> failwithf "parseAdrInsTestRandomised: Should never happen"
+        let makeLineData wa opcode suffixStr label eQdCfL = 
+            let opCodeStr = 
+                match opcode with
+                | EQU -> "EQU"
+                | FILL -> "FILL"
+                | DCD -> "DCD"
+            let operandStr =
+                match eQdCfL with
+                | Eq x -> x |> string
+                | Fl x -> x |> string
+                | Vl x -> List.reduce (fun a b -> a+", "+b) x
+            operandStr
+            |> fun operandStr ->
+            {
+                LoadAddr = wa; 
+                Label = label; 
+                SymTab = None;
+                OpCode = opCodeStr + suffixStr;
+                Operands = operandStr;
+            }
+        testPropertyWithConfig config "Property Test parseAdrIns" <| 
+        fun wa opcode label eQdCfL ->
+            // choose a random root string
+            let rootStr = chooseFromList ["DCD";"FILL";"EQU"]
+            // choose a random suffix string, including aliases
+            let suffixStr = chooseFromList [""]
+            // make the correct input data from random params
+            let ld = makeLineData wa opcode suffixStr label eQdCfL
+            // determine correct output based on params
+            let expected = 
+                // Ok {InstructionType= opcode;
+                //     DestReg= rD;
+                //     SecondOp= secondOp;}
+                Ok {InstructionType = opcode; 
+                    Name = label;
+                    EquDcdFill = eQdCfL}
+
+            let res = parseLabelIns rootStr ld
+            Expect.equal res expected "message"
+
 
 
     [<Tests>]
@@ -388,8 +435,8 @@ module MemTests
                     makeTest "STR" "" (ldFunc ", [R1]") "error: STR Missing Ra" (Error "ops didn't match anything, ops: \", [R1]\"")
                     makeTest "STR" "" (ldFunc "R0, [R]") "error: STR Wrong Rb" (Error "ops didn't match anything, ops: \"R0, [R]\"")
 
-
                 ]
+
 
 
     [<Tests>]
@@ -424,42 +471,33 @@ module MemTests
                     makeTest "ADR" (ldFunc stTwoItem "R0, 4") "ADR Number Only Exp" (Ok {InstructionType= ADRm;
                                                                                 DestReg= R0;
                                                                                 SecondOp= 4u;})
+                    makeTest "ADR" (ldFunc stTwoItem "R0, 0x4") "ADR Hex Number Only Exp" (Ok {InstructionType= ADRm;
+                                                                                DestReg= R0;
+                                                                                SecondOp= 4u;})
+                    makeTest "ADR" (ldFunc stTwoItem "R0, 0xF") "ADR F Hex Number Only Exp" (Ok {InstructionType= ADRm;
+                                                                                DestReg= R0;
+                                                                                SecondOp= 15u;})
                     //ADR Error Message Tests
                     makeTest "ADR" (ldFunc stTwoItem "R0, ") "ADR No Literal" (Error "No input expression supplied.")
                     makeTest "ADR" (ldFunc stTwoItem ", 4") "ADR No Register" (Error"parseAdrIns: No destination register identified in parseAdrIns\nls.Operands: \", 4\"\nparseAdrIns: Line Data in incorrect form\nls.Operands: \", 4\"\nparseAdrIns: No destination register identified in parseAdrIns\nls.Operands: \", 4\"")
                     makeTest "ADR" (ldFunc stTwoItem "") "ADR No Input" (Error"parseAdrIns: No destination register identified in parseAdrIns\nls.Operands: \"\"\nparseAdrIns: Line Data in incorrect form\nls.Operands: \"\"\nparseAdrIns: No destination register identified in parseAdrIns\nls.Operands: \"\"")
 
-
                 ]
 
 
 
-    let config = { FsCheckConfig.defaultConfig with maxTest = 10000 }
-
-    /// choose an item from list at random
-    let chooseFromList lst = 
-        Gen.elements lst
-        |> Gen.sample 0 1
-        |> List.head
-
-
-    /// property-based testing of parse function
-    /// for randomly generated LDM/STM instructions
+    ///Property-based testing of parseAdrIns function
+    /// for randomly generated ADR instructions
+    ///Note: this does not test:
+    ///     - Expressions
+    ///     - Hex or binary inputs
     [<Tests>]
     let parseAdrInsTestRandomised =
-        let removeResult x =
-            match x with
-            | Ok y -> y
-            | Error _ -> failwithf "parseAdrInsTestRandomised: Should never happen"
         let makeLineData wa opcode suffixStr rD secondOp = 
-            // (Ok {InstructionType= Ok ADRm;
-            // DestReg= Ok R0;
-            // SecondOp= Ok 256u;})
             let opCodeStr = 
                 match opcode with
                 | ADRm -> "ADR"
-            let operands = regStrings.[rD] + ", " + (secondOp |> string)
-            operands
+            regStrings.[rD] + ", " + (secondOp |> string)
             |> fun operandStr ->
             {
                 LoadAddr = wa; 
@@ -482,10 +520,6 @@ module MemTests
                     SecondOp= secondOp;}
             let res = parseAdrIns "ADR" ld
             Expect.equal res expected "message"
-
-
-
-
 
 
 
@@ -526,36 +560,30 @@ module MemTests
                                                                     PLabel = Some ("labelTest", 100u);
                                                                     PSize = 4u; PCond = Cal}))
                     //DCD
-                    makeTest (ldFunc stTwoItem "DCD" "1") "Base DCD Test" (Some (Ok {PInstr = LabelO (Ok {InstructionType = Ok DCD; Name = (Ok (Some "labelTest"));
-                                                                                    EQUExpr = None; DCDValueList = Some (Ok ["1"]);
-                                                                                    FillN = None});
+                    makeTest (ldFunc stTwoItem "DCD" "1") "Base DCD Test" (Some (Ok {PInstr = LabelO (Ok {InstructionType = DCD; Name = (Some "labelTest");
+                                                                                    EquDcdFill = Vl ["1"]});
                                                                     PLabel = Some ("labelTest", 100u);
                                                                     PSize = 4u; PCond = Cal}))
-                    makeTest (ldFunc stTwoItem "DCD" "1,3,5") "DCD 1,3,5 Test" (Some (Ok {PInstr = LabelO (Ok {InstructionType = Ok DCD; Name = (Ok (Some "labelTest"));
-                                                                                    EQUExpr = None; DCDValueList = Some (Ok ["1";"3";"5"]);
-                                                                                    FillN = None});
+                    makeTest (ldFunc stTwoItem "DCD" "1,3,5") "DCD 1,3,5 Test" (Some (Ok {PInstr = LabelO (Ok {InstructionType = DCD; Name = (Some "labelTest");
+                                                                                    EquDcdFill = Vl ["1";"3";"5"]});
                                                                     PLabel = Some ("labelTest", 100u);
                                                                     PSize = 12u; PCond = Cal}))
-                    makeTest (ldFuncAll 200u "labelTestTwo" stTwoItem "DCD" "1,3,5") "DCD Word Address Test" (Some (Ok {PInstr = LabelO (Ok {InstructionType = Ok DCD; Name = (Ok (Some "labelTestTwo"));
-                                                                                    EQUExpr = None; DCDValueList = Some (Ok ["1";"3";"5"]);
-                                                                                    FillN = None});
+                    makeTest (ldFuncAll 200u "labelTestTwo" stTwoItem "DCD" "1,3,5") "DCD Word Address Test" (Some (Ok {PInstr = LabelO (Ok {InstructionType = DCD; Name = (Some "labelTestTwo");
+                                                                                    EquDcdFill = Vl ["1";"3";"5"]});
                                                                     PLabel = Some ("labelTestTwo", 200u);
                                                                     PSize = 12u; PCond = Cal}))
                     //EQU
-                    makeTest (ldFuncAll 100u "labelTest" stTwoItem "EQU" "2") "EQU Base Case" (Some (Ok {PInstr = LabelO (Ok {InstructionType = Ok EQU; Name = (Ok (Some "labelTest"));
-                                                                                    EQUExpr = (Some (Ok 2u)); DCDValueList = None;
-                                                                                    FillN = None});
+                    makeTest (ldFuncAll 100u "labelTest" stTwoItem "EQU" "2") "EQU Base Case" (Some (Ok {PInstr = LabelO (Ok {InstructionType = EQU; Name = (Some "labelTest");
+                                                                                    EquDcdFill = Eq 2u});
                                                                     PLabel = Some ("labelTest", 100u);
                                                                     PSize = 0u; PCond = Cal}))
-                    makeTest (ldFuncAll 100u "labelTest" stTwoItem "EQU" "5-4*3-1*1+2*2*2") "EQU +-* Eg Case" (Some (Ok {PInstr = LabelO (Ok {InstructionType = Ok EQU; Name = (Ok (Some "labelTest"));
-                                                                                    EQUExpr = (Some (Ok 0u)); DCDValueList = None;
-                                                                                    FillN = None});
+                    makeTest (ldFuncAll 100u "labelTest" stTwoItem "EQU" "5-4*3-1*1+2*2*2") "EQU +-* Eg Case" (Some (Ok {PInstr = LabelO (Ok {InstructionType = EQU; Name = (Some "labelTest");
+                                                                                    EquDcdFill = Eq 0u});
                                                                     PLabel = Some ("labelTest", 100u);
                                                                     PSize = 0u; PCond = Cal}))
                     //Fill
-                    makeTest (ldFuncAll 100u "labelTest" stTwoItem "FILL" "4") "Fill Base Case" (Some (Ok {PInstr = LabelO (Ok {InstructionType = Ok FILL; Name = (Ok (Some "labelTest"));
-                                                                                    EQUExpr = None; DCDValueList = None;
-                                                                                    FillN = Some (Ok 4u)});
+                    makeTest (ldFuncAll 100u "labelTest" stTwoItem "FILL" "4") "Fill Base Case" (Some (Ok {PInstr = LabelO (Ok {InstructionType = FILL; Name = (Some "labelTest");
+                                                                                    EquDcdFill = Fl 4u});
                                                                     PLabel = Some ("labelTest", 100u);
                                                                     PSize = 4u; PCond = Cal}))
                     makeTest (ldFuncAll 100u "labelTest" stTwoItem "FILL" "-1") "parse: Fill Error Case" (Some (Error "parseLabelIns: Fill expression (4294967295u) <0 or not divisible by four"))
@@ -610,10 +638,9 @@ module MemTests
                     makeTest (ldFuncAll 100u "labelTest" stTwoItem "LDR" "R0, [R]") "parse: LDR wrong Rb2" (Some (Error "ops didn't match anything, ops: \"R0, [R]\""))
                     makeTest (ldFuncAll 100u "labelTest" stTwoItem "STR" "R6, [R5, ]") "parse: STR Wrong Rc" (Some (Error "ops didn't match anything, ops: \"R6, [R5, ]\""))
 
-
-
-
                 ]
+
+
 
     let stOneItem = ["testL",256u] |> Map.ofList
 
@@ -627,9 +654,8 @@ module MemTests
                     OpCode= opCodeIn;
                     Operands= ops}
 
-        let baseEquFunc lab valO = ({InstructionType = Ok EQU; Name = (Ok (Some lab)); 
-                                    EQUExpr = (Some (Ok valO)); DCDValueList = None;
-                                    FillN = None})
+        let baseEquFunc lab valO = ({InstructionType = EQU; Name = (Some lab); 
+                                    EquDcdFill = Eq valO})
         let makeLabelInstr label root input =
             let ldFuncEQU lab ops  = 
                     {LoadAddr= WA 100u; 
@@ -644,11 +670,11 @@ module MemTests
             | Ok v ->   
                     match field with 
                     | "EQU" ->  testCase name <| fun () ->
-                                    Expect.equal (updateSymbolTable symTab v v.EQUExpr) output (sprintf "checkUpdateSymbolTable Tests, Test: %A" name)
+                                    Expect.equal (updateSymbolTable symTab v v.EquDcdFill) output (sprintf "checkUpdateSymbolTable Tests, Test: %A" name)
                     | "FILL" ->  testCase name <| fun () ->
-                                    Expect.equal (updateSymbolTable symTab v v.FillN) output (sprintf "checkUpdateSymbolTable Tests, Test: %A" name)
+                                    Expect.equal (updateSymbolTable symTab v v.EquDcdFill) output (sprintf "checkUpdateSymbolTable Tests, Test: %A" name)
                     | "DCD" ->  testCase name <| fun () ->
-                                    Expect.equal (updateSymbolTable symTab v (removeOptionD v.DCDValueList)) output (sprintf "checkUpdateSymbolTable Tests, Test: %A" name)
+                                    Expect.equal (updateSymbolTable symTab v v.EquDcdFill) output (sprintf "checkUpdateSymbolTable Tests, Test: %A" name)
                     | _ ->      testCase name <| fun () ->
                                     Expect.equal 1 2 (sprintf "checkUpdateSymbolTable Tests, Test: %A, Unexpected field value: %A" name field)
             | Error m -> testCase name <| fun () ->
@@ -661,7 +687,6 @@ module MemTests
                     makeTest stOneItem (makeLabelInstr "labelT" "EQU" "2") "EQU" "updateSymbolTable EQU parseLabelIns generation Test" (["testL",256u; "labelT",2u] |> Map.ofList |> Ok)
                     makeTest stOneItem (makeLabelInstr "labelT2" "EQU" "5-4*3-1*1+2*2*2") "EQU" "updateSymbolTable EQU +*- Test" (["testL",256u; "labelT2",0u] |> Map.ofList |> Ok)
 
-
                     //FILL Working tests
                     makeTest stOneItem (makeLabelInstr "labelT" "FILL" "4") "FILL" "updateSymbolTable FILL Base Case" (["testL",256u; "labelT",0u] |> Map.ofList |> Ok)
                     makeTest stOneItem (makeLabelInstr "labelT" "FILL" "4*3") "FILL" "updateSymbolTable FILL Mult Case" (["testL",256u; "labelT",0u] |> Map.ofList |> Ok)
@@ -671,8 +696,9 @@ module MemTests
                     makeTest stOneItem (makeLabelInstr "labelT" "DCD" "1") "DCD" "updateSymbolTable DCD Base Case" (["testL",256u; "labelT",1u] |> Map.ofList |> Ok)
                     makeTest stOneItem (makeLabelInstr "labelT" "DCD" "1,3,5") "DCD" "updateSymbolTable DCD List Base Case" (["testL",256u; "labelT",1u] |> Map.ofList |> Ok)
 
-
                 ]
+
+
 
     [<Tests>]
     let updateMemoryDataPathTest =
@@ -754,6 +780,8 @@ module MemTests
 
                 ]
 
+
+
     [<Tests>]
     let execEQUTest =
         let makeLabelInstr label root input =
@@ -821,6 +849,7 @@ module MemTests
                 ]
 
 
+
     [<Tests>]
     let execADRTest =
         let makeADRInstr label root input =
@@ -852,10 +881,6 @@ module MemTests
                     makeTest "execADR: ADR Replacing Reg Value" stTwoItem (makeADRInstr "labelT" "ADR" "R0, testL") baseDataPath (Ok ({baseDataPath with Regs = ([(R0: RName), 256u] |> Map.ofList)}, stTwoItem))
 
                 ]
-
-
-
-
 
 
 
@@ -901,14 +926,10 @@ module MemTests
                     makeTest "execLDR: LDR Shifted and Pre" stTwoItem (makeMemInstr "LDR" "" "R10, [R11, R15, LSL #2]!") baseDataPath3 (Ok ({baseDataPath3 with Regs = ([R10, 7u; R11, 0x104u; R15, 0x1u] |> Map.ofList)}, stTwoItem))
                     makeTest "execLDR: LDR 0 Shift and Pre" stTwoItem (makeMemInstr "LDR" "" "R10, [R11, R15, LSL #0]!") baseDataPath4 (Ok ({baseDataPath4 with Regs = ([R10, 7u; R11, 0x104u; R15, 0x4u] |> Map.ofList)}, stTwoItem))
 
-
                     // //LDR Error Message Tests
                     makeTest "execLDR: LDR -1 Shift and Pre" stTwoItem (makeMemInstr "LDR" "" "R10, [R11, R15, LSL #-1]!") baseDataPath4 (Ok ({baseDataPath4 with Regs = ([R10, 5u; R11, 0x100u; R15, 0x4u] |> Map.ofList)}, stTwoItem))
 
                 ]
-
-
-
 
 
 

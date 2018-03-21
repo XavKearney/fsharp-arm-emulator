@@ -249,24 +249,23 @@ module Mem
    // a PC relative address
    // an absolute address
    // or a 32 bit integer
-    type EquExpr = uint32 
-    type ValueList = string list
-    type LabelL = Result<string option,string>
-
+    type EquDcdFillSpecific = 
+        | Eq of uint32
+        | Vl of string list
+        | Fl of uint32
 
 
     ///A record that contains all the information needed
     /// to execute a label instruction (EQU, FILL of DCD)
     type LabelInstr =
         {
-            InstructionType: Result<LabelInstrType,String>;
-            Name: LabelL;
-            //The value to assign to the label
-            EQUExpr: Result<uint32,String> option;
-            //What to fill the memory with
-            DCDValueList: Result<ValueList,string> option; 
-            //The number of memory cells to initialise as 0
-            FillN: Result<uint32,String> option;
+            InstructionType: LabelInstrType;
+            Name: string option;
+            //The value to assign to the label for EQU
+            //Or what to fill the memory with for DCD
+            //Or the number of memory cells to initialise as 
+            // 0 for Fill
+            EquDcdFill: EquDcdFillSpecific;
         }
 
     ///Specification for label instructions
@@ -326,30 +325,39 @@ module Mem
             | "DCD"  -> Ok DCD
             | _      -> Error (sprintf "parseLabelIns: root (%A) was 
                         not EQU, FILL or DCD" root) 
-        let (fillN, valList, equExp) =
+        let insSpecificReturn =
             match instTypeTmp with
-            | Ok EQU  -> let equExp1 = evalExprHandler ls.Operands (ls.SymTab) true
-                         (None, None, (Some equExp1))  
-            | Ok FILL -> let fillN1 = evalExprHandler ls.Operands (ls.SymTab) false
-                                      |> checkPosAndDivFour
-                         (Some fillN1, None, None)
-            | Ok DCD  -> let valList = (ls.Operands).Split(',') 
-                                     |> Array.map (fun s-> s.Trim()) 
-                                     |> Seq.toList
-                         let valListRet =
-                            let symTab = [] |> Map.ofList
-                            let checkAllLiterals = 
-                                let checkLiteral x =
-                                    match (evalExpression x symTab true) with
-                                    | Ok _ -> 0
-                                    | Error _ -> 1
-                                List.map (checkLiteral) valList
-                                |> List.reduce (+)
-                            match checkAllLiterals with 
-                            | 0 -> Ok valList
-                            | _ -> Error "parseLabelIns: Input to DCD function not valid (No input etc)"
-                         (None, Some valListRet, None)
-            | _       -> (None, None, None)                   
+            | Ok EQU  -> 
+                let equExp1 = evalExprHandler ls.Operands (ls.SymTab) true
+                match equExp1 with
+                | Ok x -> Ok (Eq x)
+                | Error m -> Error m
+            | Ok FILL -> 
+                let fillN1 = evalExprHandler ls.Operands (ls.SymTab) false
+                              |> checkPosAndDivFour
+                match fillN1 with
+                | Ok x -> Ok (Fl x)
+                | Error m -> Error m
+            | Ok DCD  -> 
+                let valList = (ls.Operands).Split(',') 
+                             |> Array.map (fun s-> s.Trim()) 
+                             |> Seq.toList
+                let valListRet =
+                    let symTab = [] |> Map.ofList
+                    let checkAllLiterals = 
+                        let checkLiteral x =
+                            match (evalExpression x symTab true) with
+                            | Ok _ -> 0
+                            | Error _ -> 1
+                        List.map (checkLiteral) valList
+                        |> List.reduce (+)
+                    match checkAllLiterals with 
+                    | 0 -> Ok valList
+                    | _ -> Error "parseLabelIns: Input to DCD function not valid (No input etc)"
+                match valListRet with
+                | Ok x -> Ok (Vl x)
+                | Error m -> Error m
+            | Error m -> Error m
         let nameOut = 
             match ls.Label with
             | None -> if ((instTypeTmp = Ok EQU)||(instTypeTmp = Ok DCD))
@@ -357,21 +365,13 @@ module Mem
                            instructions (%A) must have a label\nls: %A" root ls)
                       else Ok None
             | Some _ -> Ok ls.Label
-        let makeLabelOut (nO: string option) _ =
-            {InstructionType = instTypeTmp; Name = Ok nO; 
-                EQUExpr = equExp; DCDValueList = valList; 
-                FillN = fillN}
-        let errorMessage1 = optionResultAbstract fillN valList equExp
-        let errorMessage2 = resultDotBindTwoInp selectFirst errorMessage1 nameOut
-        let realOut =
-            match (instTypeTmp, errorMessage2) with
-            | (Error x, Error y) -> Error (x+"\n"+y)
-            | (Error x, _) -> Error x
-            | (_, Error y) -> Error y
-            | (Ok _, Ok _) ->  Ok {InstructionType = instTypeTmp; Name = nameOut; 
-                                EQUExpr = equExp; DCDValueList = valList; 
-                                FillN = fillN}
-        realOut
+        let defaultReturn = 
+            Ok {InstructionType = DCD; Name = Some "defaultLabel"; 
+                EquDcdFill = (Eq 4u)}
+        defaultReturn
+        |> resultDotBindTwoInp (fun y x -> {x with InstructionType = y}) instTypeTmp 
+        |> resultDotBindTwoInp (fun y x -> {x with Name = y}) nameOut 
+        |> resultDotBindTwoInp (fun y x -> {x with EquDcdFill = y}) insSpecificReturn 
 
 
 
@@ -388,15 +388,13 @@ module Mem
     let findDcdPSize pInstr =
         let removeRes x =
             let removeOpt y =
-                match y with 
-                | Some z -> 
-                           match z with
-                           | Ok u -> ((List.length u)*4)|>uint32
-                           | _ -> 0u
-                | None -> 0u 
+               ((List.length y)*4)|>uint32
             match x with
-            | Ok y -> removeOpt y.DCDValueList
-            | _ ->  0u
+            | Ok y -> 
+                match y.EquDcdFill with
+                | Vl z -> removeOpt z
+                | _ -> 0u
+            | Error _ -> 0u
         match pInstr with     
         | LabelO x -> removeRes x
         | _ -> 0u
@@ -626,74 +624,67 @@ module Mem
         |> abstractResults
 
 
+    ///Taken out for testing - (Could not reference it in
+    /// memInstructionTests when it was a subfunction of
+    /// execDCD)
+    let makeType (x: string list) =   
+        let y = (x.[0])|>uint32
+        match Ok y with
+        | Ok y -> Ok y
+        | _ -> Error "makeType: should never happen"
+
 
     ///Updates the symbol table
     ///Used for execDCD, execEQU and execFILL
-    let updateSymbolTable (symbolTab: SymbolTable) (inputRecord: LabelInstr) field = 
-        let getLabel (rec1: LabelInstr) = 
+    let updateSymbolTable (symbolTab: SymbolTable) (inputRecord: LabelInstr) (field: EquDcdFillSpecific) = 
+        let getLabel rec1 = 
             match rec1.Name with
-            | Ok y -> 
-                     match y with
-                     | Some z -> Ok z
-                     | None -> Error (sprintf "updateSymbolTable: (Ok (%A).Name) = None" rec1)
-            | Error n -> Error (n+"\n"+(sprintf "updateSymbolTable: (%A).Name = Error" rec1))
-        let getValue field inputRecord =
+            | Some z -> Ok z
+            | None -> Error (sprintf "updateSymbolTable: (Ok (%A).Name) = None" rec1)
+        let getValue (field: EquDcdFillSpecific) inputRecord =
             match inputRecord.InstructionType with
-            | Ok EQU -> 
-                       match field with
-                       | Some y -> y
-                       | None -> Error (sprintf "updateSymbolTable-getValue: (Ok (%A).EQUExpr) = None" field)
-            | Ok FILL -> 
-                        match field with
-                        | Some y ->
-                                   match y with
-                                   | Ok _ -> Ok 0u
-                                   | Error m -> Error m
-                        | None -> Error (sprintf "updateSymbolTable-getValue: (Ok (%A).FillN) = None" field)
-            | Ok DCD  ->
-                        match field with
-                        | Some y -> y
-                        | None -> Error (sprintf "updateSymbolTable-getValue: (Ok (%A).FillN) = None" field)
-            | _ -> Error (sprintf "updateSymbolTable-getValue: InstructionType (%A) not EQU, DCD or FILL" inputRecord.InstructionType)
+            | EQU -> 
+                match field with
+                | Eq y -> Ok y
+                | _ -> Error (sprintf "updateSymbolTable-getValue: InstructionType = EQU but EquDcdFillSpecific != Eq _")
+            | FILL -> 
+                match field with
+                | Fl _ ->
+                    Ok 0u
+                | _ -> Error (sprintf "updateSymbolTable-getValue: InstructionType = FILL but EquDcdFillSpecific != Fl _")
+            | DCD  ->
+                match field with
+                | Vl y -> (makeType y)
+                | _ -> Error (sprintf "updateSymbolTable-getValue: InstructionType = DCD but EquDcdFillSpecific != Vl _")
         let addToSymTab x y = symbolTab.Add(x,y)
         resultDotBindTwoInp addToSymTab (getLabel inputRecord) (getValue field inputRecord)
+
 
     ///Updates the Memory in the DataPath (Adds something
     /// to memory). Called by execDCD and execFILL
     let updateMemoryDataPath (inputRecord: LabelInstr) (dP: DataPath<'INS>) =
         let dataValList = 
             let fillNf = 
-                match inputRecord.FillN with
-                | Some x -> 
-                           match x with 
-                           | Ok y -> y|>int
-                           | _ -> 0
+                match inputRecord.EquDcdFill with
+                | Fl x -> 
+                   x|>int
                 | _ -> 0
             match inputRecord.InstructionType with
-            | Ok x ->   
-                    match x with
-                    | DCD ->    
-                            match inputRecord.DCDValueList with
-                            | Some z -> 
-                                       match z with
-                                       | Ok u -> Ok (List.map (fun y -> (y|>int|>uint32)) u)
-                                       | Error m -> Error m
-                            | None -> Error "updateMemoryDataPath-dataValList: DCDValueList = None"
-                    | FILL -> 
-                             match inputRecord.FillN with
-                             | Some y -> 
-                                        match y with 
-                                        | Ok _ -> Ok (List.replicate fillNf 0u)
-                                        | Error m -> Error m
-                             | None -> Error "updateMemoryDataPath-dataValList: FillN = None" 
-                    | EQU -> 
-                            match inputRecord.EQUExpr with
-                            | Some y -> 
-                                       match y with 
-                                       | Ok _ -> Ok []
-                                       | Error m -> Error m
-                            | None -> Error "updateMemoryDataPath-dataValList: EQUExpr = None" 
-            | Error m -> Error m
+            | DCD ->    
+                match inputRecord.EquDcdFill with
+                | Vl z -> 
+                    Ok (List.map (fun y -> (y|>int|>uint32)) z)
+                | _ -> Error "updateMemoryDataPath-dataValList: Instruction type = DCD but EquDcdFill != Vl x"
+            | FILL -> 
+                match inputRecord.EquDcdFill with
+                | Fl _ -> 
+                    Ok (List.replicate fillNf 0u)
+                | _ -> Error "updateMemoryDataPath-dataValList: Instruction type = FILL but EquDcdFill != Fl x"
+            | EQU -> 
+                match inputRecord.EquDcdFill with
+                | Eq _ -> 
+                    Ok []
+                | _ -> Error "updateMemoryDataPath-dataValList: Instruction type = EQU but EquDcdFill != Eq x"
 
         let getAddrList lst length =
             let rec getAddrList' list len =
@@ -738,31 +729,11 @@ module Mem
         | Error m -> Error m
         
 
-    ///Taken out for testing - (Could not reference it in
-    /// memInstructionTests when it was a subfunction of
-    /// execDCD)
-    let removeOptionD (x:Result<ValueList,string> option) =   
-        let makeType (x:ValueList)  =
-            let y = (x.[0])|>uint32
-            let temp =
-                match Ok y with
-                       | Ok y -> Ok y
-                       | _ -> Error "should never happen"
-            Some temp
-        let removeResult x =
-            match x with 
-            | Ok y -> makeType y
-            | Error m -> Some (Error m)
-
-        match x with
-        | Some y -> removeResult y
-        | _ -> None
-
     ///Executes the DCD instruction, taking in the symbol table,
     /// DataPath and labelInstr record and outputing updated 
     /// Symbol tables and DataPaths
     let execDCD (symbolTab: SymbolTable) (dP: DataPath<'INS>) (inputRecord: LabelInstr) = 
-        removeOptionD (inputRecord.DCDValueList)
+        inputRecord.EquDcdFill
         |> updateSymbolTable symbolTab inputRecord
         |> fun b -> Ok ((updateMemoryDataPath inputRecord dP), b)
         |> abstractResults
@@ -773,14 +744,14 @@ module Mem
     /// state of the program by executing an EQU instruction
     ///Updates SymbolTable only
     let execEQU (symbolTab: SymbolTable) (dP: DataPath<'INS>) (inputRecord: LabelInstr) = 
-        inputRecord.EQUExpr
+        inputRecord.EquDcdFill
         |> updateSymbolTable symbolTab inputRecord
         |> fun b -> Ok (Ok dP, b)
         |> abstractResults 
     
     ///Executes a Fill instruction, updates Symbol Table and DataPath
     let execFILL (symbolTab: SymbolTable) (dP: DataPath<'INS>) (inputRecord: LabelInstr) = 
-        inputRecord.FillN
+        inputRecord.EquDcdFill
         |> updateSymbolTable symbolTab inputRecord 
         |> fun b -> Ok (updateMemoryDataPath inputRecord dP, b)
         |> abstractResults 
@@ -807,7 +778,7 @@ module Mem
                 | EQU -> (execEQU symbolTab dP inputRecord)
                 | DCD -> (execDCD symbolTab dP inputRecord)
                 | FILL -> (execFILL symbolTab dP inputRecord)
-            Result.bind matchLabIns inputRecord.InstructionType
+            matchLabIns inputRecord.InstructionType
         let memInstructionsHandler (symbolTab: SymbolTable) (dP: DataPath<'INS>) (inputRecord: MemInstr) =
             let matchMemIns x =
                 match x with
