@@ -258,7 +258,7 @@ module BitArithmetic
         | LSL | LSR | ASR | ROR when ops.Length = 3 -> 
             Ok {baseInstr with Dest = checkReg (toReg ops.[0])
                                       Op1 = checkValid (toFlexOp [|ops.[1]|])
-                                      Op2 = checkValid (toFlexOp ops.[2..])}
+                                      Op2 = toFlexOp ops.[2..] |> checkValid |> checkLit}
 
         | RRX when ops.Length = 2 -> 
             Ok {baseInstr with Dest = checkReg (toReg ops.[0])
