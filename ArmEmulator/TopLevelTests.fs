@@ -209,6 +209,19 @@ module TopLevelTests
                                             Op1 = R0;
                                             Op2 = Literal 1u;})))
                     }, symtab)
+            ["ADD R0, R0, R0, LSL #5"], 
+                Ok ({cpuData with 
+                        Regs = cpuData.Regs
+                            |> Map.add R0 0u
+                            |> Map.add R15 8u
+                        MM = cpuData.MM
+                            |> Map.add (WA 0u) 
+                                (Code (IARITH (ArithI {InstrType = Some ADD;
+                                        SuffixSet = false;
+                                        Target = R0;
+                                        Op1 = R0;
+                                        Op2 = RegisterShift (R0,LSL,5);})))
+                    }, symtab)
             // test valid line with blank lines
             ["; some comment here"; "ADD R0, R0, #1"; ""], 
                 Ok ({cpuData with 

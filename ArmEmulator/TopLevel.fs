@@ -53,7 +53,7 @@ module TopLevel =
         /// put parameters into a LineData record
         let makeLineData opcode operands = {
             OpCode=opcode
-            Operands=String.concat "" operands
+            Operands=String.concat " " operands
             Label=None
             LoadAddr = loadAddr
             SymTab = Some symtab
