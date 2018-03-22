@@ -25,18 +25,18 @@ This project is both a self-contained emulator for ARM code, and also used as th
 
 The project is split into independent modules, each with their own file of tests. The modules, in the order that the project includes them, along with their respective purposes and level of testing are:
 
-| Module | Purpose | Unit Tests | Property-based Tests |
-|---|---|---|---|
-| `VTest` | Framework for testing against [VisUAL](https://salmanarif.bitbucket.io/visual/). | n/a | n/a |
-| `CommonData` | Defines generic, project-wide types for data processing. | n/a | n/a |
-| `CommonLex` | Defines generic, project-wide types for parsing instructions.  | n/a | n/a |
-| `ParseExpr` | Defines generic, project-wide types for parsing instructions.  | ✔️ | ✖️ |
-| `Arithmetic` | Implements arithmetic instructions, e.g. `ADD`,`SUB`,`CMP`  | ✔️ | ✔️ |
-| `BitArithmetic` | Implements bitwise arithmetic instructions, e.g. `MOV`,`ORR`,`LSL`  | ✔️ | ✔️ |
-| `Mem` | Implements memory-based instructions, e.g. `LDR`,`ADR`,`FILL`  | ✔️ | ✔️ |
-| `MultMem` | Implements multiple-location memory-based instructions, as well as misc. instructions, e.g. `LDM`,`STM`,`B`  | ✔️ | ✔️ |
-| `TopLevel` | Implements complete emulation & instruction execution | ✔️ | ✖️  |
-| `Main` | CLI to run tests or execute instructions from file. | ✖️ | ✖️ |
+| Module | Purpose | Unit Tests | Property-based Tests | Tested vs. VisUAL |
+|---|---|---|---|---|
+| `VTest` | Framework for testing against [VisUAL](https://salmanarif.bitbucket.io/visual/). | n/a | n/a | n/a |
+| `CommonData` | Defines generic, project-wide types for data processing. | n/a | n/a | n/a |
+| `CommonLex` | Defines generic, project-wide types for parsing instructions.  | n/a | n/a | n/a |
+| `ParseExpr` | Defines generic, project-wide types for parsing instructions.  | ✔️ | ✖️ | n/a |
+| `Arithmetic` | Implements arithmetic instructions, e.g. `ADD`,`SUB`,`CMP`  | ✔️ | ✔️ | ✔️ |
+| `BitArithmetic` | Implements bitwise arithmetic instructions, e.g. `MOV`,`ORR`,`LSL`  | ✔️ | ✔️ | ✔️ |
+| `Mem` | Implements memory-based instructions, e.g. `LDR`,`ADR`,`FILL`  | ✔️ | ✔️ | ✖️ |
+| `MultMem` | Implements multiple-location memory-based instructions, as well as misc. instructions, e.g. `LDM`,`STM`,`B`  | ✔️ | ✔️ | ✔️|
+| `TopLevel` | Implements complete emulation & instruction execution | ✔️ | ✖️  | n/a |
+| `Main` | CLI to run tests or execute instructions from file. | ✖️ | ✖️ | n/a |
 
 Unit tests have been written for all modules with significant complexity. Property-based testing has been employed in all cases where randomised generation of parameters is feasible (e.g. in `TopLevel`, randomly generating a random source file is not feasible).
 
