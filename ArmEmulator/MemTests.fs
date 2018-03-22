@@ -51,8 +51,7 @@ module MemTests
                 
                     // evalExpression Error Message Tests
                     makeEvalExpTest "No Input" true "" (Error "No input expression supplied.")
-                    // Below is commented out because ParseExpr always parses labels (TODO: fix this)
-                    // makeEvalExpTest "evalExpressions: Labels not allowed" false "testL2" (Error "evalExpression-numberOrLabel: Attempting to parse label when labels are not allowed, ie for Fill")
+                    makeEvalExpTest "evalExpressions: Labels not allowed" false "testL2" (Error "Invalid literal at end of expression.")
 
                 ]
 
@@ -125,6 +124,7 @@ module MemTests
                     makeTest "DCD" (ldFunc "labelT" "\"\"") "DCD quotes only input" (Error "parseLabelIns: Input to DCD function not valid (No input etc)")
                     makeTest "DCD" (ldFunc "labelT" "+") "DCD + input" (Error "parseLabelIns: Input to DCD function not valid (No input etc)")
                     makeTest "DCD" (ldFunc "labelT" "null") "DCD null input" (Error "parseLabelIns: Input to DCD function not valid (No input etc)")
+                    // makeTest "DCD" (ldFunc "labelT" "4*)") "DCD failed random input" (Error "parseLabelIns: Input to DCD function not valid (No input etc)")
 
                 ]
 

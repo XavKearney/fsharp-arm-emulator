@@ -124,7 +124,7 @@ module BitArithmetic
         | false -> 
             match str.[0] with
             | '#' -> 
-                match evalExpr symTab str.[1..] with
+                match evalExpr symTab true str.[1..] with
                 | Ok num -> allowedLiterals (int num)
                 | _ -> Error "Invalid litteral or expression"
             | _ -> Error "No # preceeding expression/litteral"

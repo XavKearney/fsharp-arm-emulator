@@ -197,8 +197,8 @@ module Mem
     /// - Add multiple bracket functionality 
     ///   Eg 2*(6+(3*4)-(6+3))*5
     /// - Add working CheckLiteral function which works for -ve's
-    let evalExpression (exp0: string) (symTab: SymbolTable) (_: bool) =
-        evalExpr symTab exp0
+    let evalExpression (exp0: string) (symTab: SymbolTable) (labels: bool) =
+        evalExpr symTab labels exp0 
 
 
 

@@ -191,7 +191,7 @@ module MultMem
     /// and gets the address corresponding to the expression in the operands
     /// requires that the symbol table is given (2nd pass)
     let makeBranchInstr (suffix, operands:string, WA loadaddr, symTab:Map<string,uint32>) =
-        let branchAddr = evalExpr symTab operands
+        let branchAddr = evalExpr symTab true operands 
         let linkAddr = 
             match suffix with
             // link address is address of next instruction (current address + 4)

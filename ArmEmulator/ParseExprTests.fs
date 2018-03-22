@@ -6,11 +6,12 @@ module ParseExprTests
     [<Tests>]
     let testEvalExprUnit =
         let testSymTab = [("test1",10u);("test2",23u)] |> Map.ofList 
-        makeUnitTestList (evalExpr testSymTab) "evalExpr Unit"
+        let labels = true
+        makeUnitTestList (evalExpr testSymTab labels) "evalExpr Unit"
            [
                 // test individual operators
                 "5*63", Ok(5u*63u)
-                "111*0", Ok(111u*0u)
+                "111*0", Ok(111u*0u) 
                 "1*000", Ok(1u*000u)
                 "17+94", Ok(17u+94u)
                 "97-6", Ok(97u-6u)

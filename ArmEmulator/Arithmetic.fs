@@ -208,7 +208,7 @@ module Arithmetic
     let recursiveSplit expression (symTable:SymbolTable option) =
         match symTable with
         | Some symTab -> 
-            let result = ParseExpr.evalExpr symTab expression
+            let result = ParseExpr.evalExpr symTab true expression 
             match result with
             | Ok res ->
                 match check32BitBound res with

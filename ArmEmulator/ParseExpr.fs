@@ -104,16 +104,17 @@ module ParseExpr
     /// matches a literal in hex form (0x.. or &..),
     /// in binary form (0b..) or as a standard number
     /// if no match, try and find the string in the SymbolTable
-    let (|Literal|_|) (symTab:SymbolTable) (inp:string) =
-        match inp with
-        | Match1 @"^(0[xX][a-fA-F0-9]{1,8})$" x -> parseHex x.[2..] |> Some
-        | Match1 @"^(&[a-fA-F0-9]{1,8})$" x -> parseHex x.[1..] |> uint32 |> Some
-        | Match1 @"^(0b[0-1]{1,32})$" x -> parseBin x.[2..] |> Some
-        | Match1 @"^([0-9]{1,11})$" x -> 
+    let (|Literal|_|) (symTab:SymbolTable) (labels:bool) (inp:string) =
+        match (labels, inp) with
+        | (_, Match1 @"^(0[xX][a-fA-F0-9]{1,8})$" x) -> parseHex x.[2..] |> Some
+        | (_, Match1 @"^(&[a-fA-F0-9]{1,8})$" x) -> parseHex x.[1..] |> uint32 |> Some
+        | (_, Match1 @"^(0b[0-1]{1,32})$" x) -> parseBin x.[2..] |> Some
+        | (_, Match1 @"^([0-9]{1,11})$" x) -> 
             match x with
             | BelowMaxUint32 i -> uint32 i |> Some
             | _ -> None
-        | label -> symTab.TryFind label
+        | (true, label) -> symTab.TryFind label
+        | (false, _) -> None
 
     let (|Contains|_|) element lst =
         match List.contains element lst with
@@ -134,7 +135,7 @@ module ParseExpr
         | RBra
         | Op of Operator
 
-    let tokenize expr (symTab: SymbolTable) =
+    let tokenize expr (symTab: SymbolTable) labels =
         let recIfOk a f x =
             match f x with
             | Ok y -> Ok (a :: y)
@@ -158,12 +159,12 @@ module ParseExpr
                 // match if the only thing remaining is a literal
                 | Match1 @"^([&a-zA-Z0-9]+)$" x -> 
                     match x with
-                    | Literal symTab n -> Ok [Num n]
+                    | Literal symTab labels n -> Ok [Num n]
                     | _ -> Error "Invalid literal at end of expression."
                 // otherwise, match the label/number up to the next operator
                 | MatchGroups @"^([&a-zA-Z0-9]+)(.+)$" (txt :: [rest]) ->
                     match txt with
-                    | Literal symTab n -> recIfOk (Num n) tok' (Seq.toList rest)
+                    | Literal symTab labels n -> recIfOk (Num n) tok' (Seq.toList rest)
                     | _ -> Error "Invalid literal in expression."
                 | _ -> Error "Invalid expression."
         tok' (Seq.toList expr)
@@ -233,6 +234,6 @@ module ParseExpr
     /// takes a symbol table and expression string
     /// returns a Result which is either the evaluated
     /// expression as a number, or an error string
-    let evalExpr symTab expr = 
-        tokenize expr symTab
+    let evalExpr symTab labels expr = 
+        tokenize expr symTab labels
         |> Result.bind evalTokenized
