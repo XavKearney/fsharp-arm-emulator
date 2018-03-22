@@ -133,6 +133,20 @@ module BitArithmetic
 
 
 
+    /// checkLit checks a valid literal is used for ORR and EOR
+    let checkLit flexResult =
+        let valid lit = 
+            let rotMask n = (0xFFu >>> n) ||| (0xFFu <<< 32 - n)
+            [0..2..30] 
+            |> List.map rotMask 
+            |> List.exists (fun mask -> (mask &&& lit) = lit)
+            |> function  
+                    | true -> flexResult
+                    | false -> Error "Litteral can't be created by rotating an 8 bit number in a 32 bit word "  
+        match flexResult with 
+        | Ok (Literal lit) -> valid lit
+        | Ok (RegShiftLit (_,_,lit)) -> valid lit
+        | _ -> flexResult
 
 
 
@@ -231,10 +245,15 @@ module BitArithmetic
             Ok {baseInstr with Dest = checkReg (toReg ops.[0]) 
                                       Op1 = checkValid (toFlexOp ops.[1..])}                                  
 
-        | AND | ORR | EOR | BIC when (ops.Length = 3) || (ops.Length = 4) ->
+        | AND | BIC when (ops.Length = 3) || (ops.Length = 4) ->
             Ok {baseInstr with Dest = checkReg (toReg ops.[0])
                                       Op1 = checkValid (toFlexOp [|ops.[1]|]) 
                                       Op2 = checkValid (toFlexOp ops.[2..])}
+
+        | ORR | EOR when (ops.Length = 3) || (ops.Length = 4) ->
+            Ok {baseInstr with Dest = checkReg (toReg ops.[0])
+                                      Op1 = checkValid (toFlexOp [|ops.[1]|])
+                                      Op2 = (toFlexOp ops.[2..]) |> checkValid |> checkLit}
 
         | LSL | LSR | ASR | ROR when ops.Length = 3 -> 
             Ok {baseInstr with Dest = checkReg (toReg ops.[0])
@@ -303,13 +322,11 @@ module BitArithmetic
     /// i.e returns (evaluated shift number, carry)
     let doShift n shifter shiftVal =
         let sVal = int32 shiftVal
-        match shifter, sVal > 32 with
-        | _,true -> 0u,false 
-        | Lsl,false -> n <<< sVal , (((n <<< sVal - 1) >>> 31) |> intToBool)
-        | Lsr,false -> n >>> sVal , (((n >>> (sVal - 1)) &&& 1u) |> intToBool)
-        | Asr,false -> uint32 (int32 n >>> sVal) , (((uint32 (int32 n >>> (sVal - 1))) &&& 1u) |> intToBool)
-        | Ror,false -> (n >>> sVal) ||| (n <<<(32- sVal)) , ((((n >>> (sVal - 1)) ||| (n <<<(31 - sVal))) &&& 1u) |> intToBool)
-
+        match shifter with 
+        | Lsl -> n <<< sVal , (((n <<< sVal - 1) >>> 31) |> intToBool)
+        | Lsr -> n >>> sVal , (((n >>> (sVal - 1)) &&& 1u) |> intToBool)
+        | Asr -> uint32 (int32 n >>> sVal) , (((uint32 (int32 n >>> (sVal - 1))) &&& 1u) |> intToBool)
+        | Ror -> (n >>> sVal) ||| (n <<<(32- sVal)) , ((((n >>> (sVal - 1)) ||| (n <<<(31 - sVal))) &&& 1u) |> intToBool)
     let doRRX n carry = 
         let newCarry = (n &&& 1u) |> intToBool        
         (n >>> 1) + (carry <<< 31),newCarry      
