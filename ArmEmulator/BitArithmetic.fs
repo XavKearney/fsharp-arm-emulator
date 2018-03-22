@@ -286,12 +286,7 @@ module BitArithmetic
 // executing instructions
 
 
-// When an Operand2 constant is used with the instructions 
-// MOVS, MVNS, ANDS, ORRS, ORNS, EORS, BICS, TEQ or TST, 
-// the carry flag is updated to bit[31] of the constant, 
-// if the constant is greater than 255 and can be produced 
-// by shifting an 8-bit value. These instructions do not 
-// affect the carry flag if Operand2 is any other constant.
+
 
 
     let intToBool num = 

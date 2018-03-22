@@ -7,7 +7,7 @@ module BitArithmeticTests
     open Expecto
     open VisualTest.VCommon
     open VisualTest
-    open VisualTest
+
 
 
     let config = { FsCheckConfig.defaultConfig with maxTest = 10000 }
@@ -673,7 +673,9 @@ module BitArithmeticTests
             vTest "AND test 1" "AND R2, R1, R0" "0000" [R 0, 0]
             vTest "AND test 2" "AND R3, R2, R0" "0000" [R 0, 0]
             vTest "AND test 3" "AND R2, R2, R0" "0000" [R 2, 0]
-            vTest "AND test 4" "AND R3, R3, R3" "0000" [R 3, 30]  
+            vTest "AND test 4" "AND R3, R3, R3" "0000" [R 3, 30] 
+
+            vTest "EORS test 1" "EORS R0, R0, #0" "0100" [R 0, 0]
             ]
 
 
@@ -881,13 +883,13 @@ module BitArithmeticTests
             vTest "ANDS test 2" "ANDS R0, R1, #1" <|| parseThenExe R0 {ld with OpCode = "ANDS" ; Operands = "R0, R1, #1"}
             vTest "ANDS test 3" "ANDS R0, R9, #97" <|| parseThenExe R0 {ld with OpCode = "ANDS" ; Operands = "R0, R9, #97"}
             vTest "ANDS test 4" "ANDS R0, R7, #255" <|| parseThenExe R0 {ld with OpCode = "ANDS" ; Operands = "R0, R7, #255"}
-                // visual error?
-            // vTest "ANDS test 5" "ANDS R0, R2, #256" <|| parseThenExe R0 {ld with OpCode = "ANDS" ; Operands = "R0, R2, #256"}
-            // vTest "ANDS test 6" "ANDS R0, R7, #4080" <|| parseThenExe R0 {ld with OpCode = "ANDS" ; Operands = "R0, R7, #4080"}
-            // vTest "ANDS test 7" "ANDS R0, R7, #-4081" <|| parseThenExe R0 {ld with OpCode = "ANDS" ; Operands = "R0, R7, #-4081"}
-            // vTest "ANDS test 8" "ANDS R0, R7, #-1" <|| parseThenExe R0 {ld with OpCode = "ANDS" ; Operands = "R0, R7, #-1"}
-            // vTest "ANDS test 9" "ANDS R0, R7, #-3" <|| parseThenExe R0 {ld with OpCode = "ANDS" ; Operands = "R0, R7, #-3"}
-            // vTest "ANDS test 10" "ANDS R0, R7, #-0x1" <|| parseThenExe R0 {ld with OpCode = "ANDS" ; Operands = "R0, R7, #-0x1"}
+                // visual error? Not sure why carry is set with these instructions
+            vTest "ANDS test 5" "ANDS R0, R2, #256" <|| parseThenExe R0 {ld with OpCode = "ANDS" ; Operands = "R0, R2, #256"}
+            vTest "ANDS test 6" "ANDS R0, R7, #4080" <|| parseThenExe R0 {ld with OpCode = "ANDS" ; Operands = "R0, R7, #4080"}
+            vTest "ANDS test 7" "ANDS R0, R7, #-4081" <|| parseThenExe R0 {ld with OpCode = "ANDS" ; Operands = "R0, R7, #-4081"}
+            vTest "ANDS test 8" "ANDS R0, R7, #-1" <|| parseThenExe R0 {ld with OpCode = "ANDS" ; Operands = "R0, R7, #-1"}
+            vTest "ANDS test 9" "ANDS R0, R7, #-3" <|| parseThenExe R0 {ld with OpCode = "ANDS" ; Operands = "R0, R7, #-3"}
+            vTest "ANDS test 10" "ANDS R0, R7, #-0x1" <|| parseThenExe R0 {ld with OpCode = "ANDS" ; Operands = "R0, R7, #-0x1"}
 
             vTest "ANDS test 11" "ANDS R0, R7, #4*6+7" <|| parseThenExe R0 {ld with OpCode = "ANDS" ; Operands = "R0, R7, #4*6+7"}
             vTest "ANDS test 12" "ANDS R0, R7, R0" <|| parseThenExe R0 {ld with OpCode = "ANDS" ; Operands = "R0, R7, R0"}
@@ -895,7 +897,9 @@ module BitArithmeticTests
             vTest "ANDS test 14" "ANDS R0, R7, R7" <|| parseThenExe R0 {ld with OpCode = "ANDS" ; Operands = "R0, R7, R7"}
             vTest "ANDS test 15" "ANDS R0, R7, #30*4" <|| parseThenExe R0 {ld with OpCode = "ANDS" ; Operands = "R0, R7, #30*4"}
             vTest "ANDS test 16" "ANDS R0, R7, #0b10101" <|| parseThenExe R0 {ld with OpCode = "ANDS" ; Operands = "R0, R7, #0b10101"}
-            // vTest "ANDS test 17" "ANDS R0, R7, #-0b1" <|| parseThenExe R0 {ld with OpCode = "ANDS" ; Operands = "R0, R7, #-0b1"}
+                // visual error? Not sure why carry is set with these instructions
+            vTest "ANDS test 17" "ANDS R0, R7, #-0b1" <|| parseThenExe R0 {ld with OpCode = "ANDS" ; Operands = "R0, R7, #-0b1"}
+
             vTest "ANDS test 18" "ANDS R0, R7, #0xFF" <|| parseThenExe R0 {ld with OpCode = "ANDS" ; Operands = "R0, R7, #0xFF"}
             vTest "ANDS test 19" "ANDS R0, R7, #0x0" <|| parseThenExe R0 {ld with OpCode = "ANDS" ; Operands = "R0, R7, #0x0"}            
             vTest "ANDS test 20" "ANDS R0, R7, #0xA" <|| parseThenExe R0 {ld with OpCode = "ANDS" ; Operands = "R0, R7, #10"}
@@ -919,48 +923,49 @@ module BitArithmeticTests
 
 
             
-    // [<Tests>]
-    // let testsExeEORS = 
+    [<Tests>]
+    let testsExeEORS = 
      
-    //     testList "Execution EORS tests"
-    //         [
+        testList "Execution EORS tests"
+            [
 
-    //         // valid input tests (suffix not set)
+            // valid input tests (suffix not set)
 
-    //         // EORS tests
+            // EORS tests
 
-    //         vTest "EORS test 1" "EORS R0, R0, #0" <|| parseThenExe R0 {ld with OpCode = "EORS" ; Operands = "R0, R0, #0"}
-    //         vTest "EORS test 2" "EORS R0, R1, #1" <|| parseThenExe R0 {ld with OpCode = "EORS" ; Operands = "R0, R1, #1"}
-    //         vTest "EORS test 3" "EORS R0, R9, #97" <|| parseThenExe R0 {ld with OpCode = "EORS" ; Operands = "R0, R9, #97"}
-    //         vTest "EORS test 4" "EORS R0, R7, #255" <|| parseThenExe R0 {ld with OpCode = "EORS" ; Operands = "R0, R7, #255"}
-    //             // visual error?
-    //         vTest "EORS test 5" "EORS R0, R2, #256" <|| parseThenExe R0 {ld with OpCode = "EORS" ; Operands = "R0, R2, #256"}
-    //         vTest "EORS test 6" "EORS R0, R7, #4080" <|| parseThenExe R0 {ld with OpCode = "EORS" ; Operands = "R0, R7, #4080"}
-    //             // errored due to visUAL creating these literals by inverting
-    //         //vTest "EORS test 7" "EORS R0, R7, #-4081" <|| parseThenExe R0 {ld with OpCode = "EORS" ; Operands = "R0, R7, #-4081"}
-    //         //vTest "EORS test 8" "EORS R0, R7, #-1" <|| parseThenExe R0 {ld with OpCode = "EORS" ; Operands = "R0, R7, #-1"}
-    //         //vTest "EORS test 9" "EORS R0, R7, #-3" <|| parseThenExe R0 {ld with OpCode = "EORS" ; Operands = "R0, R7, #-3"}
-    //         //vTest "EORS test 10" "EORS R0, R7, #-0x1" <|| parseThenExe R0 {ld with OpCode = "EORS" ; Operands = "R0, R7, #-0x1"}
+            vTest "EORS test 1" "EORS R0, R0, #0" <|| parseThenExe R0 {ld with OpCode = "EORS" ; Operands = "R0, R0, #0"}
+            vTest "EORS test 2" "EORS R0, R1, #1" <|| parseThenExe R0 {ld with OpCode = "EORS" ; Operands = "R0, R1, #1"}
+            vTest "EORS test 3" "EORS R0, R9, #97" <|| parseThenExe R0 {ld with OpCode = "EORS" ; Operands = "R0, R9, #97"}
+            vTest "EORS test 4" "EORS R0, R7, #255" <|| parseThenExe R0 {ld with OpCode = "EORS" ; Operands = "R0, R7, #255"}
+                // visual error?
+            vTest "EORS test 5" "EORS R0, R2, #256" <|| parseThenExe R0 {ld with OpCode = "EORS" ; Operands = "R0, R2, #256"}
+            vTest "EORS test 6" "EORS R0, R7, #4080" <|| parseThenExe R0 {ld with OpCode = "EORS" ; Operands = "R0, R7, #4080"}
+                // errored due to visUAL creating these literals by inverting
+            //vTest "EORS test 7" "EORS R0, R7, #-4081" <|| parseThenExe R0 {ld with OpCode = "EORS" ; Operands = "R0, R7, #-4081"}
+            //vTest "EORS test 8" "EORS R0, R7, #-1" <|| parseThenExe R0 {ld with OpCode = "EORS" ; Operands = "R0, R7, #-1"}
+            //vTest "EORS test 9" "EORS R0, R7, #-3" <|| parseThenExe R0 {ld with OpCode = "EORS" ; Operands = "R0, R7, #-3"}
+            //vTest "EORS test 10" "EORS R0, R7, #-0x1" <|| parseThenExe R0 {ld with OpCode = "EORS" ; Operands = "R0, R7, #-0x1"}
 
-    //         vTest "EORS test 11" "EORS R0, R7, R7, #4*6+7" <|| parseThenExe R0 {ld with OpCode = "EORS" ; Operands = "R0, R7, R7, #4*6+7"}
-    //         vTest "EORS test 12" "EORS R0, R7, R0" <|| parseThenExe R0 {ld with OpCode = "EORS" ; Operands = "R0, R7, R0"}
-    //         vTest "EORS test 13" "EORS R0, R7, R1" <|| parseThenExe R0 {ld with OpCode = "EORS" ; Operands = "R0, R7, R1"}
-    //         vTest "EORS test 14" "EORS R0, R7, R7" <|| parseThenExe R0 {ld with OpCode = "EORS" ; Operands = "R0, R7, R7"}
-    //         vTest "EORS test 15" "EORS R0, R7, #30*4" <|| parseThenExe R0 {ld with OpCode = "EORS" ; Operands = "R0, R7, #30*4"}
-    //         vTest "EORS test 16" "EORS R0, R7, #0b10101" <|| parseThenExe R0 {ld with OpCode = "EORS" ; Operands = "R0, R7, #0b10101"}
-    //         // vTest "EORS test 17" "EORS R0, R7, #-0b1" <|| parseThenExe R0 {ld with OpCode = "EORS" ; Operands = "R0, R7, #-0b1"}
-    //         vTest "EORS test 18" "EORS R0, R7, #0xFF" <|| parseThenExe R0 {ld with OpCode = "EORS" ; Operands = "R0, R7, #0xFF"}
-    //         vTest "EORS test 19" "EORS R0, R7, #0x0" <|| parseThenExe R0 {ld with OpCode = "EORS" ; Operands = "R0, R7, #0x0"}            
-    //         vTest "EORS test 20" "EORS R0, R7, #0xA" <|| parseThenExe R0 {ld with OpCode = "EORS" ; Operands = "R0, R7, #10"}
+            vTest "EORS test 11" "EORS R0, R7, #4*6+7" <|| parseThenExe R0 {ld with OpCode = "EORS" ; Operands = "R0, R7, #4*6+7"}
+            vTest "EORS test 12" "EORS R0, R7, R0" <|| parseThenExe R0 {ld with OpCode = "EORS" ; Operands = "R0, R7, R0"}
+            vTest "EORS test 13" "EORS R0, R7, R1" <|| parseThenExe R0 {ld with OpCode = "EORS" ; Operands = "R0, R7, R1"}
+            vTest "EORS test 14" "EORS R0, R7, R7" <|| parseThenExe R0 {ld with OpCode = "EORS" ; Operands = "R0, R7, R7"}
+            vTest "EORS test 15" "EORS R0, R7, #30*4" <|| parseThenExe R0 {ld with OpCode = "EORS" ; Operands = "R0, R7, #30*4"}
+            vTest "EORS test 16" "EORS R0, R7, #0b10101" <|| parseThenExe R0 {ld with OpCode = "EORS" ; Operands = "R0, R7, #0b10101"}
+                //  errored due to visUAL creating these literals by inverting
+            //vTest "EORS test 17" "EORS R0, R7, #-0b1" <|| parseThenExe R0 {ld with OpCode = "EORS" ; Operands = "R0, R7, #-0b1"}
+            vTest "EORS test 18" "EORS R0, R7, #0xFF" <|| parseThenExe R0 {ld with OpCode = "EORS" ; Operands = "R0, R7, #0xFF"}
+            vTest "EORS test 19" "EORS R0, R7, #0x0" <|| parseThenExe R0 {ld with OpCode = "EORS" ; Operands = "R0, R7, #0x0"}            
+            vTest "EORS test 20" "EORS R0, R7, #0xA" <|| parseThenExe R0 {ld with OpCode = "EORS" ; Operands = "R0, R7, #10"}
 
-    //         vTest "EORS test 21" "EORS R0, R7, R3, LSL #5" <|| parseThenExe R0 {ld with OpCode = "EORS" ; Operands = "R0, R7, R3, LSL #5"}
-    //         vTest "EORS test 22" "EORS R0, R8, R5, LSR R6" <|| parseThenExe R0 {ld with OpCode = "EORS" ; Operands = "R0, R8, R5, LSR R6"}
-    //         vTest "EORS test 23" "EORS R0, R2, R7, ROR #6" <|| parseThenExe R0 {ld with OpCode = "EORS" ; Operands = "R0, R2, R7, ROR #6"}
-    //         vTest "EORS test 24" "EORS R0, R3, R7, RRX" <|| parseThenExe R0 {ld with OpCode = "EORS" ; Operands = "R0, R3, R7, RRX"}
-    //         vTest "EORS test 25" "EORS R0, R1, R7, ASR #30*4" <|| parseThenExe R0 {ld with OpCode = "EORS" ; Operands = "R0, R1, R7, ASR #30*4"}
-    //         vTest "EORS test 26" "EORS R0, R2, R5, LSL #0b10101" <|| parseThenExe R0 {ld with OpCode = "EORS" ; Operands = "R0, R2, R5, LSL #0b10101"}
-    //         vTest "EORS test 27" "EORS R0, R5, R3, LSL #0x1" <|| parseThenExe R0 {ld with OpCode = "EORS" ; Operands = "R0, R5, R3, LSL #0x1"}
-    //         vTest "EORS test 28" "EORS R0, R2, R4, LSL #0xFF" <|| parseThenExe R0 {ld with OpCode = "EORS" ; Operands = "R0, R2, R4, LSL #0xFF"}
-    //         vTest "EORS test 29" "EORS R0, R6, R2, ASR #8" <|| parseThenExe R0 {ld with OpCode = "EORS" ; Operands = "R0, R6, R2, ASR #8"}            
-    //         vTest "EORS test 30" "EORS R0, R1, R9, RRX" <|| parseThenExe R0 {ld with OpCode = "EORS" ; Operands = "R0, R1, R9, RRX"}           
-    //         ]              
+            vTest "EORS test 21" "EORS R0, R7, R3, LSL #5" <|| parseThenExe R0 {ld with OpCode = "EORS" ; Operands = "R0, R7, R3, LSL #5"}
+            vTest "EORS test 22" "EORS R0, R8, R5, LSR R6" <|| parseThenExe R0 {ld with OpCode = "EORS" ; Operands = "R0, R8, R5, LSR R6"}
+            vTest "EORS test 23" "EORS R0, R2, R7, ROR #6" <|| parseThenExe R0 {ld with OpCode = "EORS" ; Operands = "R0, R2, R7, ROR #6"}
+            vTest "EORS test 24" "EORS R0, R3, R7, RRX" <|| parseThenExe R0 {ld with OpCode = "EORS" ; Operands = "R0, R3, R7, RRX"}
+            vTest "EORS test 25" "EORS R0, R1, R7, ASR #30*4" <|| parseThenExe R0 {ld with OpCode = "EORS" ; Operands = "R0, R1, R7, ASR #30*4"}
+            vTest "EORS test 26" "EORS R0, R2, R5, LSL #0b10101" <|| parseThenExe R0 {ld with OpCode = "EORS" ; Operands = "R0, R2, R5, LSL #0b10101"}
+            vTest "EORS test 27" "EORS R0, R5, R3, LSL #0x1" <|| parseThenExe R0 {ld with OpCode = "EORS" ; Operands = "R0, R5, R3, LSL #0x1"}
+            vTest "EORS test 28" "EORS R0, R2, R4, LSL #0xFF" <|| parseThenExe R0 {ld with OpCode = "EORS" ; Operands = "R0, R2, R4, LSL #0xFF"}
+            vTest "EORS test 29" "EORS R0, R6, R2, ASR #8" <|| parseThenExe R0 {ld with OpCode = "EORS" ; Operands = "R0, R6, R2, ASR #8"}            
+            vTest "EORS test 30" "EORS R0, R1, R9, RRX" <|| parseThenExe R0 {ld with OpCode = "EORS" ; Operands = "R0, R1, R9, RRX"}           
+            ]              
