@@ -1,5 +1,7 @@
 # fsharp-arm-emulator
-The goal of this project is to create a fully functional ARM Assembly Language Emulator in F#.
+The goal of this project is to create a fully functional ARM Assembly Language Emulator in F#. 
+
+This repository is for the back-end code, which performs instruction emulation. This is used in an electron-based GUI, which is defined [here](https://github.com/djb15/arm-emulator-gui).
 
 **For individual project statements, see the `docs` directory.**
 
