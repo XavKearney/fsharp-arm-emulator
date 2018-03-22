@@ -90,7 +90,7 @@ The `TopLevel` module brings all of the instructions together and enables execut
 - Forward & backward referencing of labels in instructions (2 pass parsing).
 - Module-specific error handling. Each module can optionally return a custom error type in an `Error` monad (this is currently just a string).
 - Errors returned with a corresponding line number, to enable syntax highlighting in the GUI.
-- Branches using `B`, `BL`, `MOV R15` or `MVN R15` behave as expected, causing a program loop.
+- Branches using `B`, `BL`, `MOV R15` or `MVN R15` behave as expected, causing a program loop. _NB: in the GUI code, tail recursion is not optimised by FABLE and therefore > 500 branches results in a stack overflow.
 - Infinite loop protection: an error is thrown if more than 100,000 branches are taken. (this could be changed to a setting)
 - Program counter is always 8 greater than the current instruction value.
 - Parsing lines is immune to arbitrary whitespace within the line.
