@@ -367,10 +367,9 @@ module TopLevel =
                     && d = Some R15 -> true
             | _ -> false
 
-
         let rec execLines cpu' insMap symtab' branchCount = 
             // check if the program has reached the end, or if branch count exceeds limit
-            match checkEnd cpu' insMap, branchCount > 1000u with
+            match checkEnd cpu' insMap, branchCount > 100000u with
             // if so, return 
             | true, _ -> Ok (cpu', symtab')
             // otherwise, execute the next instruction
