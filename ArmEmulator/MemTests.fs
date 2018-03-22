@@ -788,16 +788,21 @@ module MemTests
                         Operands= ops}
             ldFuncEQU label input
             |> parseLabelIns root
+        let baseDataPath =
+            let memory = [WA 0x100u,DataLoc 5u] |> Map.ofList
+            let registers = [(R0: RName), 2u] |> Map.ofList
+            let flags = { N= false; C=false; Z=false; V=false}
+            {Fl= flags; Regs= registers; MM = memory}
         let makeTest symTab inpRec field name output =
             match inpRec with
             | Ok v ->   
                     match field with 
                     | "EQU" ->  testCase name <| fun () ->
-                                    Expect.equal (updateSymbolTable symTab v v.EquDcdFill) output (sprintf "checkUpdateSymbolTable Tests, Test: %A" name)
+                                    Expect.equal (updateSymbolTable symTab v baseDataPath v.EquDcdFill) output (sprintf "checkUpdateSymbolTable Tests, Test: %A" name)
                     | "FILL" ->  testCase name <| fun () ->
-                                    Expect.equal (updateSymbolTable symTab v v.EquDcdFill) output (sprintf "checkUpdateSymbolTable Tests, Test: %A" name)
+                                    Expect.equal (updateSymbolTable symTab v baseDataPath v.EquDcdFill) output (sprintf "checkUpdateSymbolTable Tests, Test: %A" name)
                     | "DCD" ->  testCase name <| fun () ->
-                                    Expect.equal (updateSymbolTable symTab v v.EquDcdFill) output (sprintf "checkUpdateSymbolTable Tests, Test: %A" name)
+                                    Expect.equal (updateSymbolTable symTab v baseDataPath v.EquDcdFill) output (sprintf "checkUpdateSymbolTable Tests, Test: %A" name)
                     | _ ->      testCase name <| fun () ->
                                     Expect.equal 1 2 (sprintf "checkUpdateSymbolTable Tests, Test: %A, Unexpected field value: %A" name field)
             | Error m -> testCase name <| fun () ->
@@ -805,19 +810,19 @@ module MemTests
         Expecto.Tests.testList "checkUpdateSymbolTable Tests"
                 [   
                     //EQU Working tests
-                    makeTest stOneItem (makeLabelInstr "labelT" "EQU" "2") "EQU" "updateSymbolTable EQU 2 Base Test" (["testL",256u; "labelT",2u] |> Map.ofList |> Ok)
-                    makeTest stOneItem (makeLabelInstr "labelT" "EQU" "4") "EQU" "updateSymbolTable EQU 4 Base Test" (["testL",256u; "labelT",4u] |> Map.ofList |> Ok)
+                    makeTest stOneItem (makeLabelInstr "labelT" "EQU" "2") "EQU" "updateSymbolTable EQU 2 Base Test" (["testL",0x100u; "labelT",2u] |> Map.ofList |> Ok)
+                    makeTest stOneItem (makeLabelInstr "labelT" "EQU" "4") "EQU" "updateSymbolTable EQU 4 Base Test" (["testL",0x100u; "labelT",4u] |> Map.ofList |> Ok)
                     makeTest stOneItem (makeLabelInstr "labelT" "EQU" "2") "EQU" "updateSymbolTable EQU parseLabelIns generation Test" (["testL",256u; "labelT",2u] |> Map.ofList |> Ok)
                     makeTest stOneItem (makeLabelInstr "labelT2" "EQU" "5-4*3-1*1+2*2*2") "EQU" "updateSymbolTable EQU +*- Test" (["testL",256u; "labelT2",0u] |> Map.ofList |> Ok)
 
                     //FILL Working tests
-                    makeTest stOneItem (makeLabelInstr "labelT" "FILL" "4") "FILL" "updateSymbolTable FILL Base Case" (["testL",256u; "labelT",0u] |> Map.ofList |> Ok)
-                    makeTest stOneItem (makeLabelInstr "labelT" "FILL" "4*3") "FILL" "updateSymbolTable FILL Mult Case" (["testL",256u; "labelT",0u] |> Map.ofList |> Ok)
-                    makeTest stOneItem (makeLabelInstr "labelT" "FILL" "0") "FILL" "updateSymbolTable FILL Zero Case" (["testL",256u; "labelT",0u] |> Map.ofList |> Ok)
+                    makeTest stOneItem (makeLabelInstr "labelT" "FILL" "4") "FILL" "updateSymbolTable FILL Base Case" (["testL",0x100u; "labelT",0x104u] |> Map.ofList |> Ok)
+                    makeTest stOneItem (makeLabelInstr "labelT" "FILL" "4*3") "FILL" "updateSymbolTable FILL Mult Case" (["testL",0x100u; "labelT",0x104u] |> Map.ofList |> Ok)
+                    makeTest stOneItem (makeLabelInstr "labelT" "FILL" "0") "FILL" "updateSymbolTable FILL Zero Case" (["testL",0x100u; "labelT",0x104u] |> Map.ofList |> Ok)
 
                     //DCD Working tests
-                    makeTest stOneItem (makeLabelInstr "labelT" "DCD" "1") "DCD" "updateSymbolTable DCD Base Case" (["testL",256u; "labelT",1u] |> Map.ofList |> Ok)
-                    makeTest stOneItem (makeLabelInstr "labelT" "DCD" "1,3,5") "DCD" "updateSymbolTable DCD List Base Case" (["testL",256u; "labelT",1u] |> Map.ofList |> Ok)
+                    makeTest stOneItem (makeLabelInstr "labelT" "DCD" "1") "DCD" "updateSymbolTable DCD Base Case" (["testL",0x100u; "labelT",0x104u] |> Map.ofList |> Ok)
+                    makeTest stOneItem (makeLabelInstr "labelT" "DCD" "1,3,5") "DCD" "updateSymbolTable DCD List Base Case" (["testL",0x100u; "labelT",0x104u] |> Map.ofList |> Ok)
 
                 ]
 
@@ -882,7 +887,9 @@ module MemTests
             {Fl= flags; Regs= registers; MM = memory}
         let dataPathXK =
             let memory = Map.empty
-            let registers = [R0, 0u; R1, 0u; R2, 0u; R3, 0u; R4, 0u; R5, 0u; R6, 0u; R7, 0u; R8, 0u; R9, 0u; R10, 0u; R11, 0u; R12, 0u; R13, 0u; R14, 0u; R15, 0u] |> Map.ofList
+            let registers = [R0, 0u; R1, 0u; R2, 0u; R3, 0u; R4, 0u; 
+                            R5, 0u; R6, 0u; R7, 0u; R8, 0u; R9, 0u; R10, 0u;
+                             R11, 0u; R12, 0u; R13, 0u; R14, 0u; R15, 0u] |> Map.ofList
             let flags = { N= false; C=false; Z=false; V=false}
             {Fl= flags; Regs= registers; MM = memory}
 
@@ -896,10 +903,10 @@ module MemTests
         Expecto.Tests.testList "execDCDTest Tests"
                 [   
                     //DCD Working Tests
-                    makeTest "execDCD: DCD Base Case" stOneItem (makeLabelInstr "labelT" "DCD" "1") baseDataPath (Ok ({baseDataPath with MM = ([WA 0x100u,DataLoc 5u; WA 0x104u, DataLoc 1u] |> Map.ofList)}, ["testL",256u; "labelT",1u] |> Map.ofList))
-                    makeTest "execDCD: DCD List Base Case" stOneItem (makeLabelInstr "labelT" "DCD" "1, 3, 5") baseDataPath (Ok ({baseDataPath with MM = ([WA 0x100u,DataLoc 5u; WA 0x104u, DataLoc 1u; WA 0x108u, DataLoc 3u; WA 0x10Cu, DataLoc 5u] |> Map.ofList)}, ["testL",256u; "labelT",1u] |> Map.ofList))
-                    makeTest "execDCD: DCD Negative List" stOneItem (makeLabelInstr "labelT" "DCD" "1, -3, 5") baseDataPath (Ok ({baseDataPath with MM = ([WA 0x100u,DataLoc 5u; WA 0x104u, DataLoc 1u; WA 0x108u, DataLoc 4294967293u; WA 0x10Cu, DataLoc 5u] |> Map.ofList)}, ["testL",256u; "labelT",1u] |> Map.ofList))
-                    makeTest "execDCD: DCD Base Case XK" stXK (makeLabelInstr "labelT" "DCD" "1") dataPathXK (Ok ({dataPathXK with MM = ([WA 0x100u,DataLoc 1u] |> Map.ofList)}, ["test",0u; "labelT", 1u] |> Map.ofList))
+                    makeTest "execDCD: DCD Base Case" stOneItem (makeLabelInstr "labelT" "DCD" "1") baseDataPath (Ok ({baseDataPath with MM = ([WA 0x100u,DataLoc 5u; WA 0x104u, DataLoc 1u] |> Map.ofList)}, ["testL",256u; "labelT",0x104u] |> Map.ofList))
+                    makeTest "execDCD: DCD List Base Case" stOneItem (makeLabelInstr "labelT" "DCD" "1, 3, 5") baseDataPath (Ok ({baseDataPath with MM = ([WA 0x100u,DataLoc 5u; WA 0x104u, DataLoc 1u; WA 0x108u, DataLoc 3u; WA 0x10Cu, DataLoc 5u] |> Map.ofList)}, ["testL",256u; "labelT",0x104u] |> Map.ofList))
+                    makeTest "execDCD: DCD Negative List" stOneItem (makeLabelInstr "labelT" "DCD" "1, -3, 5") baseDataPath (Ok ({baseDataPath with MM = ([WA 0x100u,DataLoc 5u; WA 0x104u, DataLoc 1u; WA 0x108u, DataLoc 4294967293u; WA 0x10Cu, DataLoc 5u] |> Map.ofList)}, ["testL",256u; "labelT",0x104u] |> Map.ofList))
+                    makeTest "execDCD: DCD Base Case XK" stXK (makeLabelInstr "labelT" "DCD" "1") dataPathXK (Ok ({dataPathXK with MM = ([WA 0x100u,DataLoc 1u] |> Map.ofList)}, ["test",0u; "labelT", 0x100u] |> Map.ofList))
 
                 ]
 
@@ -966,8 +973,8 @@ module MemTests
         Expecto.Tests.testList "execFILLTest Tests"
                 [   
                     //FILL Working Tests
-                    makeTest "execFILL: FILL Base Case" stTwoItem (makeLabelInstr "labelT" "FILL" "4") baseDataPath (Ok ({baseDataPath with MM = ([WA 0x100u,DataLoc 5u; WA 0x104u, DataLoc 0u] |> Map.ofList)}, ["testL",256u; "testL2",260u; "labelT",0u] |> Map.ofList))
-                    makeTest "execFILL: FILL Changed base address" stTwoItem (makeLabelInstr "labelT" "FILL" "4") {baseDataPath with MM =([WA 0x0u,DataLoc 5u] |> Map.ofList)} (Ok ({baseDataPath with MM = ([WA 0x0u,DataLoc 5u; WA 0x100u, DataLoc 0u] |> Map.ofList)}, ["testL",256u; "testL2",260u; "labelT",0u] |> Map.ofList))
+                    makeTest "execFILL: FILL Base Case" stTwoItem (makeLabelInstr "labelT" "FILL" "4") baseDataPath (Ok ({baseDataPath with MM = ([WA 0x100u,DataLoc 5u; WA 0x104u, DataLoc 0u] |> Map.ofList)}, ["testL",256u; "testL2",260u; "labelT",0x104u] |> Map.ofList))
+                    makeTest "execFILL: FILL Changed base address" stTwoItem (makeLabelInstr "labelT" "FILL" "4") {baseDataPath with MM =([WA 0x0u,DataLoc 5u] |> Map.ofList)} (Ok ({baseDataPath with MM = ([WA 0x0u,DataLoc 5u; WA 0x100u, DataLoc 0u] |> Map.ofList)}, ["testL",256u; "testL2",260u; "labelT",0x100u] |> Map.ofList))
 
                 ]
 
