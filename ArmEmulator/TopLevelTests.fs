@@ -96,7 +96,25 @@ module TopLevelTests
             Ok {PInstr = IARITH (ArithI {InstrType = Some ADD; SuffixSet = true;
                              Target = R1; Op1 = R2; Op2 = Literal 93u;});
                 PLabel = None; PSize = 4u; PCond = Cne;}
+            
             "", Ok {PInstr = BLANKLINE; PLabel = None; PSize = 0u; PCond = Cal;}
+
+            "ANDS		R0, R7, R3, LSL #5",
+            Ok {PInstr = IBITARITH ({Instruction = BitArithmetic.AND;
+                              Suff = BitArithmetic.S;
+                              Dest = Some R0;
+                              Op1 = Ok (BitArithmetic.Register R7);
+                              Op2 = Ok (BitArithmetic.RegShiftReg (R3,BitArithmetic.Lsr,R5));})
+                PLabel = None; PSize = 4u; PCond = Cal;}
+
+            "ANDS R0, R7, R3, LSL #5",
+            Ok {PInstr = IBITARITH ({Instruction = BitArithmetic.AND;
+                              Suff = BitArithmetic.S;
+                              Dest = Some R0;
+                              Op1 = Ok (BitArithmetic.Register R7);
+                              Op2 = Ok (BitArithmetic.RegShiftReg (R3,BitArithmetic.Lsr,R5));})
+                PLabel = None; PSize = 4u; PCond = Cal;}
+
 
             // test invalid instructions
             "NOTANOPCODE R1, R2, #93", 

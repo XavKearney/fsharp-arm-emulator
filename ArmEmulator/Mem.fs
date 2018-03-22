@@ -75,16 +75,6 @@ module Mem
                 |> List.map (fun i -> m.Groups.[i])
                 |> Some
             else None
-    ///Match a Regex pattern multiple times
-    let (|Matches|_|) pattern input =
-        if isNull input then None
-        else
-            let m = Regex.Matches(input, pattern, RegexOptions.Compiled)
-            if m.Count > 0 then 
-                [0..m.Count-1]
-                |> List.map (fun i -> m.[i].Value)
-                |> Some
-            else None
 
     ///A record to return all the data from the regexs
     type FromOps = {Ra:Result<RName,String>; Rb: Result<RName,String>; IncrVal: int;
