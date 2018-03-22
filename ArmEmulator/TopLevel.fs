@@ -81,7 +81,7 @@ module TopLevel =
                 let upperMatch = (strMatch|>string).ToUpper()
                 let list1 =List.collect (fun a -> [a;upperMatch]) splitList
                 list1.[0..(List.length list1)-2]
-            let matcher strM = (sprintf @"[ |,]"+strM+"[ |,]") 
+            let matcher strM = (sprintf @"[\s+|,]+" + strM + @"[\s+|,]") 
             match str with
             | Match (matcher matchStr) [_; ex] -> 
                 ex.Value
