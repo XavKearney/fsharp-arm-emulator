@@ -185,13 +185,11 @@ module MultMemTests
                     None
             ]
 
-    let config = { FsCheckConfig.defaultConfig with maxTest = 10000 }
-
     /// property-based testing of parse function
     /// for randomly generated branch instructions
     [<Tests>]
     let testExecBranchInsr = 
-        testPropertyWithConfig config "Property Test execBranchInstr" <| 
+        testProperty "Property Test execBranchInstr" <| 
         fun flags memMap branchAddr linkAddr->
             // generate random values for registers R0-R15
             let regVals = genRandomUint32List (-0x7FFFFFFF, 0xFFFFFFFF) 16
@@ -238,7 +236,7 @@ module MultMemTests
                 Operands = operandStr;
             }
 
-        testPropertyWithConfig config "Property Test Parse-MultMem" <| 
+        testProperty "Property Test Parse-MultMem" <| 
         fun wa opcode target wb rLst ->
             // choose a random suffix string, including aliases
             let suffixStr = chooseFromList ["";"FD";"FA";"ED";"EA";"IA";"DB"]
@@ -315,7 +313,7 @@ module MultMemTests
             // return all necessary params
             |> fun s -> (s, dirOp, initialN, suffixStr)
 
-        testPropertyWithConfig config "Property Test ExecMultMem" <| 
+        testProperty "Property Test ExecMultMem" <| 
         fun opcode direction (target: RName) wb (rLst: RName list) (flags: CommonData.Flags)->
             // generate random values for registers R0-R14, set R12-R14 to 0
             let regVals = genRandomUint32List (-0x7FFFFFFF, 0xFFFFFFFF) 15

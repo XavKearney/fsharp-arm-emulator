@@ -7,8 +7,6 @@ module MemTests
     open Mem
 
 
-    let config = { FsCheckConfig.defaultConfig with maxTest = 10000 }
-
     /// choose an item from list at random
     let chooseFromList lst = 
         Gen.elements lst
@@ -156,7 +154,7 @@ module MemTests
                                     OpCode = opCodeStr + suffixStr;
                                     Operands = operandStrF;
                                 })
-        testPropertyWithConfig config "Property Test parseLabelIns" <| 
+        testProperty "Property Test parseLabelIns" <| 
         fun wa opcode label eQdCfL ->
             let isNumericList lst =
                 let mapFun a = fst(System.UInt32.TryParse(a))
@@ -502,7 +500,7 @@ module MemTests
                         OpCode = opCodeStr + suffixStr;
                         Operands = operandStrF;
                     })
-        testPropertyWithConfig config "Property Test parseMemIns" <| 
+        testProperty "Property Test parseMemIns" <| 
         fun wa opcode label symTab rA rB incVal prePost rC shft ->
             let isNumericList lst =
                 let mapFun a = fst(System.UInt32.TryParse(a))
@@ -630,7 +628,7 @@ module MemTests
                 Operands = operandStr;
             }
 
-        testPropertyWithConfig config "Property Test parseAdrIns" <| 
+        testProperty "Property Test parseAdrIns" <| 
         fun wa opcode rD secondOp ->
             // choose a random suffix string, including aliases
             let suffixStr = chooseFromList [""]
@@ -816,13 +814,13 @@ module MemTests
                     makeTest stOneItem (makeLabelInstr "labelT2" "EQU" "5-4*3-1*1+2*2*2") "EQU" "updateSymbolTable EQU +*- Test" (["testL",256u; "labelT2",0u] |> Map.ofList |> Ok)
 
                     //FILL Working tests
-                    makeTest stOneItem (makeLabelInstr "labelT" "FILL" "4") "FILL" "updateSymbolTable FILL Base Case" (["testL",0x100u; "labelT",0x104u] |> Map.ofList |> Ok)
-                    makeTest stOneItem (makeLabelInstr "labelT" "FILL" "4*3") "FILL" "updateSymbolTable FILL Mult Case" (["testL",0x100u; "labelT",0x104u] |> Map.ofList |> Ok)
-                    makeTest stOneItem (makeLabelInstr "labelT" "FILL" "0") "FILL" "updateSymbolTable FILL Zero Case" (["testL",0x100u; "labelT",0x104u] |> Map.ofList |> Ok)
+                    makeTest stOneItem (makeLabelInstr "labelT" "FILL" "4") "FILL" "updateSymbolTable FILL Base Case" (["testL",0x100u; "labelT",(minDataMemAddress+4u)] |> Map.ofList |> Ok)
+                    makeTest stOneItem (makeLabelInstr "labelT" "FILL" "4*3") "FILL" "updateSymbolTable FILL Mult Case" (["testL",0x100u; "labelT",(minDataMemAddress+4u)] |> Map.ofList |> Ok)
+                    makeTest stOneItem (makeLabelInstr "labelT" "FILL" "0") "FILL" "updateSymbolTable FILL Zero Case" (["testL",0x100u; "labelT",(minDataMemAddress+4u)] |> Map.ofList |> Ok)
 
                     //DCD Working tests
-                    makeTest stOneItem (makeLabelInstr "labelT" "DCD" "1") "DCD" "updateSymbolTable DCD Base Case" (["testL",0x100u; "labelT",0x104u] |> Map.ofList |> Ok)
-                    makeTest stOneItem (makeLabelInstr "labelT" "DCD" "1,3,5") "DCD" "updateSymbolTable DCD List Base Case" (["testL",0x100u; "labelT",0x104u] |> Map.ofList |> Ok)
+                    makeTest stOneItem (makeLabelInstr "labelT" "DCD" "1") "DCD" "updateSymbolTable DCD Base Case" (["testL",0x100u; "labelT",(minDataMemAddress+4u)] |> Map.ofList |> Ok)
+                    makeTest stOneItem (makeLabelInstr "labelT" "DCD" "1,3,5") "DCD" "updateSymbolTable DCD List Base Case" (["testL",0x100u; "labelT",(minDataMemAddress+4u)] |> Map.ofList |> Ok)
 
                 ]
 
@@ -854,12 +852,12 @@ module MemTests
         Expecto.Tests.testList "updateMemoryDataPathTest Tests"
                 [   
                     //DCD Working Tests
-                    makeTest "DCD Base Case" (makeLabelInstr "labelT" "DCD" "1") baseDataPath (Ok {baseDataPath with MM = ([WA 0x100u,DataLoc 5u; WA 0x104u, DataLoc 1u] |> Map.ofList)})
-                    makeTest "DCD List Base Case" (makeLabelInstr "labelT" "DCD" "1,3,5") baseDataPath (Ok {baseDataPath with MM = ([WA 0x100u,DataLoc 5u; WA 0x104u, DataLoc 1u; WA 0x108u, DataLoc 3u; WA 0x10Cu, DataLoc 5u] |> Map.ofList)})
+                    makeTest "DCD Base Case" (makeLabelInstr "labelT" "DCD" "1") baseDataPath (Ok {baseDataPath with MM = ([WA 0x100u,DataLoc 5u; WA (minDataMemAddress+4u), DataLoc 1u] |> Map.ofList)})
+                    makeTest "DCD List Base Case" (makeLabelInstr "labelT" "DCD" "1,3,5") baseDataPath (Ok {baseDataPath with MM = ([WA 0x100u,DataLoc 5u; WA (minDataMemAddress+4u), DataLoc 1u; WA (minDataMemAddress+8u), DataLoc 3u; WA (minDataMemAddress+0xCu), DataLoc 5u] |> Map.ofList)})
 
                     //Fill Working Tests
-                    makeTest "Fill Base Case" (makeLabelInstr "labelT" "FILL" "4") baseDataPath (Ok {baseDataPath with MM = ([WA 0x100u,DataLoc 5u; WA 0x104u, DataLoc 0u] |> Map.ofList)})
-                    makeTest "Fill Changed given address" (makeLabelInstr "labelT" "FILL" "4") {baseDataPath with MM =([WA 0x0u,DataLoc 4u] |> Map.ofList)} (Ok {baseDataPath with MM = ([WA 0x0u,DataLoc 4u; WA 0x100u, DataLoc 0u] |> Map.ofList)})
+                    makeTest "Fill Base Case" (makeLabelInstr "labelT" "FILL" "4") baseDataPath (Ok {baseDataPath with MM = ([WA 0x100u,DataLoc 5u; WA (minDataMemAddress+4u), DataLoc 0u] |> Map.ofList)})
+                    makeTest "Fill Changed given address" (makeLabelInstr "labelT" "FILL" "4") {baseDataPath with MM =([WA 0x0u,DataLoc 4u] |> Map.ofList)} (Ok {baseDataPath with MM = ([WA 0x0u,DataLoc 4u; WA (minDataMemAddress+4u), DataLoc 0u] |> Map.ofList)})
 
                     //EQU Working Tests
                     makeTest "EQU Base Case" (makeLabelInstr "labelT" "EQU" "2") baseDataPath (Ok baseDataPath)
@@ -903,10 +901,10 @@ module MemTests
         Expecto.Tests.testList "execDCDTest Tests"
                 [   
                     //DCD Working Tests
-                    makeTest "execDCD: DCD Base Case" stOneItem (makeLabelInstr "labelT" "DCD" "1") baseDataPath (Ok ({baseDataPath with MM = ([WA 0x100u,DataLoc 5u; WA 0x104u, DataLoc 1u] |> Map.ofList)}, ["testL",256u; "labelT",0x104u] |> Map.ofList))
-                    makeTest "execDCD: DCD List Base Case" stOneItem (makeLabelInstr "labelT" "DCD" "1, 3, 5") baseDataPath (Ok ({baseDataPath with MM = ([WA 0x100u,DataLoc 5u; WA 0x104u, DataLoc 1u; WA 0x108u, DataLoc 3u; WA 0x10Cu, DataLoc 5u] |> Map.ofList)}, ["testL",256u; "labelT",0x104u] |> Map.ofList))
-                    makeTest "execDCD: DCD Negative List" stOneItem (makeLabelInstr "labelT" "DCD" "1, -3, 5") baseDataPath (Ok ({baseDataPath with MM = ([WA 0x100u,DataLoc 5u; WA 0x104u, DataLoc 1u; WA 0x108u, DataLoc 4294967293u; WA 0x10Cu, DataLoc 5u] |> Map.ofList)}, ["testL",256u; "labelT",0x104u] |> Map.ofList))
-                    makeTest "execDCD: DCD Base Case XK" stXK (makeLabelInstr "labelT" "DCD" "1") dataPathXK (Ok ({dataPathXK with MM = ([WA 0x100u,DataLoc 1u] |> Map.ofList)}, ["test",0u; "labelT", 0x100u] |> Map.ofList))
+                    makeTest "execDCD: DCD Base Case" stOneItem (makeLabelInstr "labelT" "DCD" "1") baseDataPath (Ok ({baseDataPath with MM = ([WA 0x100u,DataLoc 5u; WA (minDataMemAddress+4u), DataLoc 1u] |> Map.ofList)}, ["testL",256u; "labelT",(minDataMemAddress+4u)] |> Map.ofList))
+                    makeTest "execDCD: DCD List Base Case" stOneItem (makeLabelInstr "labelT" "DCD" "1, 3, 5") baseDataPath (Ok ({baseDataPath with MM = ([WA 0x100u,DataLoc 5u; WA (minDataMemAddress+4u), DataLoc 1u; WA (minDataMemAddress+8u), DataLoc 3u; WA (minDataMemAddress+0xCu), DataLoc 5u] |> Map.ofList)}, ["testL",256u; "labelT",(minDataMemAddress+4u)] |> Map.ofList))
+                    makeTest "execDCD: DCD Negative List" stOneItem (makeLabelInstr "labelT" "DCD" "1, -3, 5") baseDataPath (Ok ({baseDataPath with MM = ([WA 0x100u,DataLoc 5u; WA (minDataMemAddress+4u), DataLoc 1u; WA (minDataMemAddress+8u), DataLoc 4294967293u; WA (minDataMemAddress+0xCu), DataLoc 5u] |> Map.ofList)}, ["testL",256u; "labelT",(minDataMemAddress+4u)] |> Map.ofList))
+                    makeTest "execDCD: DCD Base Case XK" stXK (makeLabelInstr "labelT" "DCD" "1") dataPathXK (Ok ({dataPathXK with MM = ([WA (minDataMemAddress+4u),DataLoc 1u] |> Map.ofList)}, ["test",0u; "labelT", (minDataMemAddress+4u)] |> Map.ofList))
 
                 ]
 
@@ -973,8 +971,8 @@ module MemTests
         Expecto.Tests.testList "execFILLTest Tests"
                 [   
                     //FILL Working Tests
-                    makeTest "execFILL: FILL Base Case" stTwoItem (makeLabelInstr "labelT" "FILL" "4") baseDataPath (Ok ({baseDataPath with MM = ([WA 0x100u,DataLoc 5u; WA 0x104u, DataLoc 0u] |> Map.ofList)}, ["testL",256u; "testL2",260u; "labelT",0x104u] |> Map.ofList))
-                    makeTest "execFILL: FILL Changed base address" stTwoItem (makeLabelInstr "labelT" "FILL" "4") {baseDataPath with MM =([WA 0x0u,DataLoc 5u] |> Map.ofList)} (Ok ({baseDataPath with MM = ([WA 0x0u,DataLoc 5u; WA 0x100u, DataLoc 0u] |> Map.ofList)}, ["testL",256u; "testL2",260u; "labelT",0x100u] |> Map.ofList))
+                    makeTest "execFILL: FILL Base Case" stTwoItem (makeLabelInstr "labelT" "FILL" "4") baseDataPath (Ok ({baseDataPath with MM = ([WA 0x100u,DataLoc 5u; WA (minDataMemAddress+4u), DataLoc 0u] |> Map.ofList)}, ["testL",256u; "testL2",260u; "labelT",(minDataMemAddress+4u)] |> Map.ofList))
+                    makeTest "execFILL: FILL Changed base address" stTwoItem (makeLabelInstr "labelT" "FILL" "4") {baseDataPath with MM =([WA 0x0u,DataLoc 5u] |> Map.ofList)} (Ok ({baseDataPath with MM = ([WA 0x0u,DataLoc 5u; WA (minDataMemAddress+4u), DataLoc 0u] |> Map.ofList)}, ["testL",256u; "testL2",260u; "labelT",(minDataMemAddress+4u)] |> Map.ofList))
 
                 ]
 

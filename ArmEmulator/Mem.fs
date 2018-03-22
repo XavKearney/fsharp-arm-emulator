@@ -30,6 +30,12 @@ module Mem
 
 
 
+//----------INTIALISATION-------------------------------------------------
+    //Actually the 0x1000u (0xFFCu + 4u). This is the 
+    // minimum value that data can be stored at in memory
+    // and the default address the first DCD/FILL 
+    // instruction will store the value to.
+    let minDataMemAddress = 0xFFFCu  
 
 
 //----------MEMORY INSTRUCTION DEFINITION AND PARSING-------------------------------------------------
@@ -630,10 +636,10 @@ module Mem
             | WA y -> y
         let checkBigEnough x =
             match x with
-            | v when v >= 0xFFCu -> x
-            | _ -> 0xFFCu
+            | v when v >= minDataMemAddress -> x
+            | _ -> minDataMemAddress
         match dP.MM with
-        | x when x = Map.empty -> 0xFFCu
+        | x when x = Map.empty -> minDataMemAddress
         | _ ->
             dP.MM
             |> Map.toSeq
@@ -701,7 +707,7 @@ module Mem
 
         let findAddrs (dP: DataPath<'INS>) :Result<uint32 list, string>=
             if ((dP.MM).IsEmpty) then
-                getAddrList [0xFCu] (Result.map (List.length) dataValList)
+                getAddrList [minDataMemAddress] (Result.map (List.length) dataValList)
             else 
                 getAddrList [findMaxAddr dP] (Result.map (List.length) dataValList)
 
