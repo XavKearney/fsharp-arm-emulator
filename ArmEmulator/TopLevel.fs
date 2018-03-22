@@ -281,7 +281,7 @@ module TopLevel =
         let execIfEqu = 
             function
             // need to check for EQU instructions
-            | Ok ({PInstr = IMEM (Mem.LabelO (Ok {InstructionType = x}))} as p,syms) when x = Mem.EQU ->
+            | Ok ({PInstr = IMEM (Mem.LabelO _)} as p,syms) ->
                 // create a dummy datapath
                 let d = 
                     match initDataPath None None None with
