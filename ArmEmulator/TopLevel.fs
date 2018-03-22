@@ -1,6 +1,6 @@
 namespace Emulator
-open MultMem
 module TopLevel = 
+    open MultMem
     open CommonLex
     open CommonData
 
