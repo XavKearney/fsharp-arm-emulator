@@ -302,12 +302,13 @@ module BitArithmetic
     /// required result and the carry the shift produces.
     /// i.e returns (evaluated shift number, carry)
     let doShift n shifter shiftVal =
-        let sVal = (int32 shiftVal) % 32  
-        match shifter with 
-        | Lsl -> n <<< sVal , (((n <<< sVal - 1) >>> 31) |> intToBool)
-        | Lsr -> n >>> sVal , (((n >>> (sVal - 1)) &&& 1u) |> intToBool)
-        | Asr -> uint32 (int32 n >>> sVal) , (((uint32 (int32 n >>> (sVal - 1))) &&& 1u) |> intToBool)
-        | Ror -> (n >>> sVal) ||| (n <<<(32- sVal)) , ((((n >>> (sVal - 1)) ||| (n <<<(31 - sVal))) &&& 1u) |> intToBool)
+        let sVal = int32 shiftVal
+        match shifter, sVal > 32 with
+        | _,true -> 0u,false 
+        | Lsl,false -> n <<< sVal , (((n <<< sVal - 1) >>> 31) |> intToBool)
+        | Lsr,false -> n >>> sVal , (((n >>> (sVal - 1)) &&& 1u) |> intToBool)
+        | Asr,false -> uint32 (int32 n >>> sVal) , (((uint32 (int32 n >>> (sVal - 1))) &&& 1u) |> intToBool)
+        | Ror,false -> (n >>> sVal) ||| (n <<<(32- sVal)) , ((((n >>> (sVal - 1)) ||| (n <<<(31 - sVal))) &&& 1u) |> intToBool)
 
     let doRRX n carry = 
         let newCarry = (n &&& 1u) |> intToBool        

@@ -969,3 +969,138 @@ module BitArithmeticTests
             vTest "EORS test 29" "EORS R0, R6, R2, ASR #8" <|| parseThenExe R0 {ld with OpCode = "EORS" ; Operands = "R0, R6, R2, ASR #8"}            
             vTest "EORS test 30" "EORS R0, R1, R9, RRX" <|| parseThenExe R0 {ld with OpCode = "EORS" ; Operands = "R0, R1, R9, RRX"}           
             ]              
+
+
+
+
+    [<Tests>]
+    let testsExeORRS = 
+     
+        testList "Execution ORRS tests"
+            [
+
+            // valid input tests (suffix not set)
+
+            // ORRS tests
+
+            vTest "ORRS test 1" "ORRS R0, R0, #0" <|| parseThenExe R0 {ld with OpCode = "ORRS" ; Operands = "R0, R0, #0"}
+            vTest "ORRS test 2" "ORRS R0, R1, #1" <|| parseThenExe R0 {ld with OpCode = "ORRS" ; Operands = "R0, R1, #1"}
+            vTest "ORRS test 3" "ORRS R0, R9, #97" <|| parseThenExe R0 {ld with OpCode = "ORRS" ; Operands = "R0, R9, #97"}
+            vTest "ORRS test 4" "ORRS R0, R7, #255" <|| parseThenExe R0 {ld with OpCode = "ORRS" ; Operands = "R0, R7, #255"}
+
+            vTest "ORRS test 5" "ORRS R0, R2, #256" <|| parseThenExe R0 {ld with OpCode = "ORRS" ; Operands = "R0, R2, #256"}
+            vTest "ORRS test 6" "ORRS R0, R7, #4080" <|| parseThenExe R0 {ld with OpCode = "ORRS" ; Operands = "R0, R7, #4080"}
+                // errored due to visUAL creating these literals by inverting
+            // vTest "ORRS test 7" "ORRS R0, R7, #-4081" <|| parseThenExe R0 {ld with OpCode = "ORRS" ; Operands = "R0, R7, #-4081"}
+            // vTest "ORRS test 8" "ORRS R0, R7, #-1" <|| parseThenExe R0 {ld with OpCode = "ORRS" ; Operands = "R0, R7, #-1"}
+            // vTest "ORRS test 9" "ORRS R0, R7, #-3" <|| parseThenExe R0 {ld with OpCode = "ORRS" ; Operands = "R0, R7, #-3"}
+            // vTest "ORRS test 10" "ORRS R0, R7, #-0x1" <|| parseThenExe R0 {ld with OpCode = "ORRS" ; Operands = "R0, R7, #-0x1"}
+
+            vTest "ORRS test 11" "ORRS R0, R7, #4*6+7" <|| parseThenExe R0 {ld with OpCode = "ORRS" ; Operands = "R0, R7, #4*6+7"}
+            vTest "ORRS test 12" "ORRS R0, R7, R0" <|| parseThenExe R0 {ld with OpCode = "ORRS" ; Operands = "R0, R7, R0"}
+            vTest "ORRS test 13" "ORRS R0, R7, R1" <|| parseThenExe R0 {ld with OpCode = "ORRS" ; Operands = "R0, R7, R1"}
+            vTest "ORRS test 14" "ORRS R0, R7, R7" <|| parseThenExe R0 {ld with OpCode = "ORRS" ; Operands = "R0, R7, R7"}
+            vTest "ORRS test 15" "ORRS R0, R7, #30*4" <|| parseThenExe R0 {ld with OpCode = "ORRS" ; Operands = "R0, R7, #30*4"}
+            vTest "ORRS test 16" "ORRS R0, R7, #0b10101" <|| parseThenExe R0 {ld with OpCode = "ORRS" ; Operands = "R0, R7, #0b10101"}
+                //  errored due to visUAL creating these literals by inverting
+            //vTest "ORRS test 17" "ORRS R0, R7, #-0b1" <|| parseThenExe R0 {ld with OpCode = "ORRS" ; Operands = "R0, R7, #-0b1"}
+            vTest "ORRS test 18" "ORRS R0, R7, #0xFF" <|| parseThenExe R0 {ld with OpCode = "ORRS" ; Operands = "R0, R7, #0xFF"}
+            vTest "ORRS test 19" "ORRS R0, R7, #0x0" <|| parseThenExe R0 {ld with OpCode = "ORRS" ; Operands = "R0, R7, #0x0"}            
+            vTest "ORRS test 20" "ORRS R0, R7, #0xA" <|| parseThenExe R0 {ld with OpCode = "ORRS" ; Operands = "R0, R7, #10"}
+
+            vTest "ORRS test 21" "ORRS R0, R7, R3, LSL #5" <|| parseThenExe R0 {ld with OpCode = "ORRS" ; Operands = "R0, R7, R3, LSL #5"}
+            vTest "ORRS test 22" "ORRS R0, R8, R5, LSR R6" <|| parseThenExe R0 {ld with OpCode = "ORRS" ; Operands = "R0, R8, R5, LSR R6"}
+            vTest "ORRS test 23" "ORRS R0, R2, R7, ROR #6" <|| parseThenExe R0 {ld with OpCode = "ORRS" ; Operands = "R0, R2, R7, ROR #6"}
+            vTest "ORRS test 24" "ORRS R0, R3, R7, RRX" <|| parseThenExe R0 {ld with OpCode = "ORRS" ; Operands = "R0, R3, R7, RRX"}
+            vTest "ORRS test 25" "ORRS R0, R1, R7, ASR #30*4" <|| parseThenExe R0 {ld with OpCode = "ORRS" ; Operands = "R0, R1, R7, ASR #30*4"}
+            vTest "ORRS test 26" "ORRS R0, R2, R5, LSL #0b10101" <|| parseThenExe R0 {ld with OpCode = "ORRS" ; Operands = "R0, R2, R5, LSL #0b10101"}
+            vTest "ORRS test 27" "ORRS R0, R5, R3, LSL #0x1" <|| parseThenExe R0 {ld with OpCode = "ORRS" ; Operands = "R0, R5, R3, LSL #0x1"}
+            vTest "ORRS test 28" "ORRS R0, R2, R4, LSL #0xFF" <|| parseThenExe R0 {ld with OpCode = "ORRS" ; Operands = "R0, R2, R4, LSL #0xFF"}
+            vTest "ORRS test 29" "ORRS R0, R6, R2, ASR #8" <|| parseThenExe R0 {ld with OpCode = "ORRS" ; Operands = "R0, R6, R2, ASR #8"}            
+            vTest "ORRS test 30" "ORRS R0, R1, R9, RRX" <|| parseThenExe R0 {ld with OpCode = "ORRS" ; Operands = "R0, R1, R9, RRX"}           
+            ]           
+
+
+    [<Tests>]
+    let testsExeBIC = 
+     
+        testList "Execution BIC tests"
+            [
+
+            // valid input tests (suffix not set)
+
+            // BIC tests
+
+            vTest "BIC test 1" "BIC R0, R0, #0" <|| parseThenExe R0 {ld with OpCode = "BIC" ; Operands = "R0, R0, #0"}
+            vTest "BIC test 2" "BIC R0, R1, #1" <|| parseThenExe R0 {ld with OpCode = "BIC" ; Operands = "R0, R1, #1"}
+            vTest "BIC test 3" "BIC R0, R9, #97" <|| parseThenExe R0 {ld with OpCode = "BIC" ; Operands = "R0, R9, #97"}
+            vTest "BIC test 4" "BIC R0, R7, #255" <|| parseThenExe R0 {ld with OpCode = "BIC" ; Operands = "R0, R7, #255"}
+
+            vTest "BIC test 5" "BIC R0, R2, #256" <|| parseThenExe R0 {ld with OpCode = "BIC" ; Operands = "R0, R2, #256"}
+            vTest "BIC test 6" "BIC R0, R7, #4080" <|| parseThenExe R0 {ld with OpCode = "BIC" ; Operands = "R0, R7, #4080"}
+            vTest "BIC test 7" "BIC R0, R7, #-4081" <|| parseThenExe R0 {ld with OpCode = "BIC" ; Operands = "R0, R7, #-4081"}
+            vTest "BIC test 8" "BIC R0, R7, #-1" <|| parseThenExe R0 {ld with OpCode = "BIC" ; Operands = "R0, R7, #-1"}
+            vTest "BIC test 9" "BIC R0, R7, #-3" <|| parseThenExe R0 {ld with OpCode = "BIC" ; Operands = "R0, R7, #-3"}
+            vTest "BIC test 10" "BIC R0, R7, #-0x1" <|| parseThenExe R0 {ld with OpCode = "BIC" ; Operands = "R0, R7, #-0x1"}
+
+            vTest "BIC test 11" "BIC R0, R7, #4*6+7" <|| parseThenExe R0 {ld with OpCode = "BIC" ; Operands = "R0, R7, #4*6+7"}
+            vTest "BIC test 12" "BIC R0, R7, R0" <|| parseThenExe R0 {ld with OpCode = "BIC" ; Operands = "R0, R7, R0"}
+            vTest "BIC test 13" "BIC R0, R7, R1" <|| parseThenExe R0 {ld with OpCode = "BIC" ; Operands = "R0, R7, R1"}
+            vTest "BIC test 14" "BIC R0, R7, R7" <|| parseThenExe R0 {ld with OpCode = "BIC" ; Operands = "R0, R7, R7"}
+            vTest "BIC test 15" "BIC R0, R7, #30*4" <|| parseThenExe R0 {ld with OpCode = "BIC" ; Operands = "R0, R7, #30*4"}
+            vTest "BIC test 16" "BIC R0, R7, #0b10101" <|| parseThenExe R0 {ld with OpCode = "BIC" ; Operands = "R0, R7, #0b10101"}
+            vTest "BIC test 17" "BIC R0, R7, #-0b1" <|| parseThenExe R0 {ld with OpCode = "BIC" ; Operands = "R0, R7, #-0b1"}
+            vTest "BIC test 18" "BIC R0, R7, #0xFF" <|| parseThenExe R0 {ld with OpCode = "BIC" ; Operands = "R0, R7, #0xFF"}
+            vTest "BIC test 19" "BIC R0, R7, #0x0" <|| parseThenExe R0 {ld with OpCode = "BIC" ; Operands = "R0, R7, #0x0"}            
+            vTest "BIC test 20" "BIC R0, R7, #0xA" <|| parseThenExe R0 {ld with OpCode = "BIC" ; Operands = "R0, R7, #10"}
+
+            vTest "BIC test 21" "BIC R0, R7, R3, LSL #5" <|| parseThenExe R0 {ld with OpCode = "BIC" ; Operands = "R0, R7, R3, LSL #5"}
+            vTest "BIC test 22" "BIC R0, R8, R5, LSR R6" <|| parseThenExe R0 {ld with OpCode = "BIC" ; Operands = "R0, R8, R5, LSR R6"}
+            vTest "BIC test 23" "BIC R0, R2, R7, ROR #6" <|| parseThenExe R0 {ld with OpCode = "BIC" ; Operands = "R0, R2, R7, ROR #6"}
+            vTest "BIC test 24" "BIC R0, R3, R7, RRX" <|| parseThenExe R0 {ld with OpCode = "BIC" ; Operands = "R0, R3, R7, RRX"}
+            vTest "BIC test 25" "BIC R0, R1, R7, ASR #30*4" <|| parseThenExe R0 {ld with OpCode = "BIC" ; Operands = "R0, R1, R7, ASR #30*4"}
+            vTest "BIC test 26" "BIC R0, R2, R5, LSL #0b10101" <|| parseThenExe R0 {ld with OpCode = "BIC" ; Operands = "R0, R2, R5, LSL #0b10101"}
+            vTest "BIC test 27" "BIC R0, R5, R3, LSL #0x1" <|| parseThenExe R0 {ld with OpCode = "BIC" ; Operands = "R0, R5, R3, LSL #0x1"}
+            vTest "BIC test 28" "BIC R0, R2, R4, LSL #0xFF" <|| parseThenExe R0 {ld with OpCode = "BIC" ; Operands = "R0, R2, R4, LSL #0xFF"}
+            vTest "BIC test 29" "BIC R0, R6, R2, ASR #8" <|| parseThenExe R0 {ld with OpCode = "BIC" ; Operands = "R0, R6, R2, ASR #8"}            
+            vTest "BIC test 30" "BIC R0, R1, R9, RRX" <|| parseThenExe R0 {ld with OpCode = "BIC" ; Operands = "R0, R1, R9, RRX"}           
+            ]    
+
+
+
+
+
+
+    [<Tests>]
+    let testsExeLSLS = 
+     
+        testList "Execution LSLS tests"
+            [
+
+            // valid input tests (suffix not set)
+
+            // LSLS tests
+
+            vTest "LSLS test 1" "LSLS R0, R0, #0" <|| parseThenExe R0 {ld with OpCode = "LSLS" ; Operands = "R0, R0, #0"}
+            vTest "LSLS test 2" "LSLS R0, R1, #1" <|| parseThenExe R0 {ld with OpCode = "LSLS" ; Operands = "R0, R1, #1"}
+            vTest "LSLS test 3" "LSLS R0, R9, #97" <|| parseThenExe R0 {ld with OpCode = "LSLS" ; Operands = "R0, R9, #97"}
+            vTest "LSLS test 4" "LSLS R0, R7, #255" <|| parseThenExe R0 {ld with OpCode = "LSLS" ; Operands = "R0, R7, #255"}
+                //  errored due to visUAL creating these literals by inverting
+            //vTest "LSLS test 5" "LSLS R0, R2, #256" <|| parseThenExe R0 {ld with OpCode = "LSLS" ; Operands = "R0, R2, #256"}
+            //vTest "LSLS test 6" "LSLS R0, R7, #4080" <|| parseThenExe R0 {ld with OpCode = "LSLS" ; Operands = "R0, R7, #4080"}
+            //vTest "LSLS test 7" "LSLS R0, R7, #-4081" <|| parseThenExe R0 {ld with OpCode = "LSLS" ; Operands = "R0, R7, #-4081"}
+            //vTest "LSLS test 8" "LSLS R0, R7, #-1" <|| parseThenExe R0 {ld with OpCode = "LSLS" ; Operands = "R0, R7, #-1"}
+            //vTest "LSLS test 9" "LSLS R0, R7, #-3" <|| parseThenExe R0 {ld with OpCode = "LSLS" ; Operands = "R0, R7, #-3"}
+            //vTest "LSLS test 10" "LSLS R0, R7, #-0x1" <|| parseThenExe R0 {ld with OpCode = "LSLS" ; Operands = "R0, R7, #-0x1"}
+
+            vTest "LSLS test 11" "LSLS R0, R7, #4*6+7" <|| parseThenExe R0 {ld with OpCode = "LSLS" ; Operands = "R0, R7, #4*6+7"}
+            vTest "LSLS test 12" "LSLS R0, R7, R0" <|| parseThenExe R0 {ld with OpCode = "LSLS" ; Operands = "R0, R7, R0"}
+            vTest "LSLS test 13" "LSLS R0, R7, R1" <|| parseThenExe R0 {ld with OpCode = "LSLS" ; Operands = "R0, R7, R1"}
+            vTest "LSLS test 14" "LSLS R0, R7, R7" <|| parseThenExe R0 {ld with OpCode = "LSLS" ; Operands = "R0, R7, R7"}
+            vTest "LSLS test 15" "LSLS R0, R7, #30*4" <|| parseThenExe R0 {ld with OpCode = "LSLS" ; Operands = "R0, R7, #30*4"}
+            vTest "LSLS test 16" "LSLS R0, R7, #0b10101" <|| parseThenExe R0 {ld with OpCode = "LSLS" ; Operands = "R0, R7, #0b10101"}
+            //vTest "LSLS test 17" "LSLS R0, R7, #-0b1" <|| parseThenExe R0 {ld with OpCode = "LSLS" ; Operands = "R0, R7, #-0b1"}
+            vTest "LSLS test 18" "LSLS R0, R7, #0xFF" <|| parseThenExe R0 {ld with OpCode = "LSLS" ; Operands = "R0, R7, #0xFF"}
+            vTest "LSLS test 19" "LSLS R0, R7, #0x0" <|| parseThenExe R0 {ld with OpCode = "LSLS" ; Operands = "R0, R7, #0x0"}            
+            vTest "LSLS test 20" "LSLS R0, R7, #0xA" <|| parseThenExe R0 {ld with OpCode = "LSLS" ; Operands = "R0, R7, #10"}
+            ]               
