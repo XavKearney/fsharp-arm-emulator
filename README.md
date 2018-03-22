@@ -107,6 +107,8 @@ The `TopLevel` module brings all of the instructions together and enables execut
 
 Please see the [app respository](https://github.com/djb15/arm-emulator-gui) for details of the GUI features.
 
+The `Main` module also defines a command line interface to the `TopLevel` code, which enables loading and execution from an arbitrary file location. The resultant CPU state is stored in a JSON file in another arbitrary file location. Registers and flags can also be initialised via the CLI.
+
 ## Use of Github
 Throughout the group stage of the project we adopted agile development practices. Weekly sprint goals were set in the first two weeks, with daily goals set in the last week. 
 
