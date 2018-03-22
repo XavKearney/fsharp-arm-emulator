@@ -50,6 +50,18 @@ module TopLevelTests
             Ok {PInstr = IARITH (ArithI {InstrType = Some ADD; SuffixSet = false;
                              Target = R0; Op1 = R0; Op2 = Literal 5u;});
                 PLabel = None; PSize = 4u; PCond = Cal;}
+            "add R0, R0, #5", 
+            Ok {PInstr = IARITH (ArithI {InstrType = Some ADD; SuffixSet = false;
+                             Target = R0; Op1 = R0; Op2 = Literal 5u;});
+                PLabel = None; PSize = 4u; PCond = Cal;}
+            "ADD r0, r0, #5", 
+            Ok {PInstr = IARITH (ArithI {InstrType = Some ADD; SuffixSet = false;
+                             Target = R0; Op1 = R0; Op2 = Literal 5u;});
+                PLabel = None; PSize = 4u; PCond = Cal;}
+            "add r0, r0, #5", 
+            Ok {PInstr = IARITH (ArithI {InstrType = Some ADD; SuffixSet = false;
+                             Target = R0; Op1 = R0; Op2 = Literal 5u;});
+                PLabel = None; PSize = 4u; PCond = Cal;}
             "ADR R0, 4", 
                 Ok {PInstr = IMEM (AdrO (Ok {InstructionType = ADRm;
                                                  DestReg = R0;
@@ -84,7 +96,32 @@ module TopLevelTests
             Ok {PInstr = IARITH (ArithI {InstrType = Some ADD; SuffixSet = true;
                              Target = R1; Op1 = R2; Op2 = Literal 93u;});
                 PLabel = None; PSize = 4u; PCond = Cne;}
+            
             "", Ok {PInstr = BLANKLINE; PLabel = None; PSize = 0u; PCond = Cal;}
+
+            "ANDS		R0, R7, R3, LSL #5",
+            Ok {PInstr = IBITARITH ({Instruction = BitArithmetic.AND;
+                              Suff = BitArithmetic.S;
+                              Dest = Some R0;
+                              Op1 = Ok (BitArithmetic.Register R7);
+                              Op2 = Ok (BitArithmetic.RegShiftLit (R3,BitArithmetic.Lsl,5u));})
+                PLabel = None; PSize = 4u; PCond = Cal;}
+
+            "ANDS R0, R7, R3, LSL #5",
+            Ok {PInstr = IBITARITH ({Instruction = BitArithmetic.AND;
+                              Suff = BitArithmetic.S;
+                              Dest = Some R0;
+                              Op1 = Ok (BitArithmetic.Register R7);
+                              Op2 = Ok (BitArithmetic.RegShiftLit (R3,BitArithmetic.Lsl,5u));})
+                PLabel = None; PSize = 4u; PCond = Cal;}
+
+            "ANDS r0, r7, r3, LsL #5",
+            Ok {PInstr = IBITARITH ({Instruction = BitArithmetic.AND;
+                              Suff = BitArithmetic.S;
+                              Dest = Some R0;
+                              Op1 = Ok (BitArithmetic.Register R7);
+                              Op2 = Ok (BitArithmetic.RegShiftLit (R3,BitArithmetic.Lsl,5u));})
+                PLabel = None; PSize = 4u; PCond = Cal;}
 
             // test invalid instructions
             "NOTANOPCODE R1, R2, #93", 
@@ -504,13 +541,13 @@ module TopLevelTests
                                         Op2 = Ok (BitArithmetic.Literal 3u);}))
                         |> Map.add (WA 8u) 
                             (Code (IMEM (MemO (Ok {InstructionType = STR;
-                                        DestSourceReg = R0;
-                                        AddressReg = R0;
-                                        BytesNotWords = false;
-                                        IncrementValue = 0;
-                                        PreOrPostIndRb = Neither;
-                                        ExtraAddressReg = None;
-                                        ShiftExtraRegBy = None;}))))
+                                      DestSourceReg = R0;
+                                      AddressReg = R0;
+                                      BytesNotWords = false;
+                                      IncrementValue = 0;
+                                      PreOrPostIndRb = Neither;
+                                      ExtraAddressReg = None;
+                                      ShiftExtraRegBy = None;}))))
                         |> Map.add (WA 12u) 
                             (Code (IMEM (MemO (Ok {InstructionType = LDR;
                                        DestSourceReg = R4;

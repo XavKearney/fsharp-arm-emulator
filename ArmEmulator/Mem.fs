@@ -75,16 +75,6 @@ module Mem
                 |> List.map (fun i -> m.Groups.[i])
                 |> Some
             else None
-    ///Match a Regex pattern multiple times
-    let (|Matches|_|) pattern input =
-        if isNull input then None
-        else
-            let m = Regex.Matches(input, pattern, RegexOptions.Compiled)
-            if m.Count > 0 then 
-                [0..m.Count-1]
-                |> List.map (fun i -> m.[i].Value)
-                |> Some
-            else None
 
     ///A record to return all the data from the regexs
     type FromOps = {Ra:Result<RName,String>; Rb: Result<RName,String>; IncrVal: int;
@@ -668,7 +658,7 @@ module Mem
             let fillNf = 
                 match inputRecord.EquDcdFill with
                 | Fl x -> 
-                   x|>int
+                   (x/4u)|>int
                 | _ -> 0
             match inputRecord.InstructionType with
             | DCD ->    
@@ -701,10 +691,15 @@ module Mem
             let waToUint32 (k,_) =
                 match k with
                 | WA y -> y
+            let checkBigEnough x =
+                match x with
+                | v when v >= 0xFCu -> x
+                | _ -> 0xFCu
             dP.MM
             |> Map.toSeq
             |> Seq.map waToUint32
-            |> Seq.max 
+            |> Seq.max
+            |> checkBigEnough
 
         let findAddrs (dP: DataPath<'INS>) :Result<uint32 list, string>=
             if ((dP.MM).IsEmpty) then

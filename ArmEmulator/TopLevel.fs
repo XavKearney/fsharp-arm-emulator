@@ -3,6 +3,8 @@ module TopLevel =
     open MultMem
     open CommonLex
     open CommonData
+    open System.Text.RegularExpressions
+
 
     /// allows different modules to return different instruction types
     type Instr =
@@ -45,15 +47,79 @@ module TopLevel =
         | MultMem.IMatch pa -> pConv IMULTMEM ERRIMULTMEM pa
         | _ -> None
 
+
+    ///Match the pattern using a cached compiled Regex
+    let (|Match|_|) pattern input =
+        if isNull input then None
+        else
+            let m = Regex.Match(input, pattern, RegexOptions.Compiled)
+            if m.Success then Some [for x in m.Groups -> x]
+            else None
+
+    ///Sets all registers to uppercase, ie r0 -> R0
+    let uppercaseRegister str =
+        let addUpper (strMatch: char) (splitList: string list) =
+            let upperMatch = (strMatch|>string).ToUpper()
+            let list1 =List.collect (fun a -> [a;upperMatch]) splitList
+            list1.[0..(List.length list1)-2]
+        match str with
+        | Match @"[\[| |,](r1[0-5]|r[0-9])[ |,|\]]" [_; ex] -> 
+            ex.Value
+            |> fun y -> (Seq.toList y).[0]
+            |> fun x -> str.Split(x)
+            |> Seq.toList
+            |> addUpper (Seq.toList ex.Value).[0]
+            |> List.reduce (+)
+        | _ -> str
+
+    let opsToUpper operands =
+        let uppercaseRegister matchStr str =
+            let addUpper (strMatch: char) (splitList: string list) =
+                let upperMatch = (strMatch|>string).ToUpper()
+                let list1 =List.collect (fun a -> [a;upperMatch]) splitList
+                list1.[0..(List.length list1)-2]
+            let matcher strM = (sprintf @"[ |,]"+strM+"[ |,]") 
+            match str with
+            | Match (matcher matchStr) [_; ex] -> 
+                ex.Value
+                |> fun y -> (Seq.toList y).[0]
+                |> fun x -> str.Split(x)
+                |> Seq.toList
+                |> addUpper (Seq.toList ex.Value).[0]
+                |> List.reduce (+)
+            | _ -> str
+        let testLstLst:(Printf.StringFormat<string> list * string) list = 
+            [([@"lsl"; @"Lsl"; @"lSl"; @"lsL"; @"LSl"; @"lSL"; @"LsL";], "LSL");
+            ([@"lsr"; @"Lsr"; @"lSr"; @"lsR"; @"LSr"; @"lSR"; @"LsR";],"LSR");
+            ([@"ror"; @"Ror"; @"rOr"; @"roR"; @"ROr"; @"rOR"; @"RoR";],"ROR");
+            ([@"rrx"; @"Rrx"; @"rRx"; @"rrX"; @"RRx"; @"rRX"; @"RrX";],"RRX");
+            ([@"asr"; @"Asr"; @"aSr"; @"asR"; @"ASr"; @"aSR"; @"AsR";],"ASR")]
+        let testMap replacer operands testLst = 
+            let uppercaseReplace matcher (replacer: string) (txt:string) = 
+                txt
+                |> fun t -> System.Text.RegularExpressions.Regex.Replace(t, (sprintf matcher), replacer);
+            let trans = List.map (fun a -> uppercaseReplace a replacer operands) testLst
+            match (List.filter (fun a -> a <> operands) trans).Length with 
+            | 0 -> trans.[0]
+            | _ -> (List.filter (fun a -> a <> operands) trans).[0]
+        let upRegs = uppercaseRegister "(r1[0-5]|r[0-9])" operands
+        let trans = List.map (fun (a,b) -> testMap b upRegs a) testLstLst
+        match (List.filter (fun a -> a <> upRegs) trans).Length with 
+        | 0 -> trans.[0]
+        | _ -> (List.filter (fun a -> a <> upRegs) trans).[0]
+
+
     /// attempts to parse an individual line string
     /// given a symbol table and word load address
     /// returns either an error from any of the modules
     /// or on success, a parsed instruction
     let parseLine (symtab: SymbolTable) (loadAddr: WAddr) (asmLine:string) =
         /// put parameters into a LineData record
-        let makeLineData opcode operands = {
-            OpCode=opcode
-            Operands=String.concat " " operands
+        let makeLineData (opcode: string) operands = {
+            OpCode= opcode.ToUpper()
+            Operands=
+                String.concat " " operands
+                |> opsToUpper
             Label=None
             LoadAddr = loadAddr
             SymTab = Some symtab
