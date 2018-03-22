@@ -19,6 +19,9 @@ module BitArithmeticTests
 
     let testSymTab = [("testLab", 37u); ("otherLab", 94u)] |> Map.ofList
 
+    /// template for line data
+    let ld = {Label = None ; LoadAddr = WA 0u ; OpCode = "" ; Operands = "" ; SymTab = Some testSymTab }    
+
     /// takes a function f, test name
     /// and list of (input, output) tuples
     /// create an Expecto testList
@@ -32,14 +35,7 @@ module BitArithmeticTests
         |> testList (sprintf "%s Test List" name)     
 
 
-
-
-
-
-
-
-    // testing input constants:
-
+    /// Takes a function and compares the outputs against a test function
     let makeUnitTestListLit f fTest name inLst=
         let makeTest inp inpTest =
             let testName = (sprintf "%s: %A" name inp)
@@ -50,7 +46,7 @@ module BitArithmeticTests
 
 
 
-    /// function from tick 3 feedback
+    /// modified function from tick 3 feedback
     /// used to test against toLit
     let checkLiteral (lit:uint32) =
         let valid0 =
@@ -87,7 +83,6 @@ module BitArithmeticTests
                 "#1", Ok 1u 
                 "#1+0", Ok 1u
                 "#2147483647", Ok 2147483647u
-                //"#9148140018481", Error " " // test very large numbers
 
 
                 // negatives
@@ -117,10 +112,6 @@ module BitArithmeticTests
 
 
 // test parser
-
-
-
-    let ld = {Label = None ; LoadAddr = WA 0u ; OpCode = "" ; Operands = "" ; SymTab = Some testSymTab }
 
     /// unit tests for parser
     [<Tests>]
@@ -314,9 +305,9 @@ module BitArithmeticTests
 
 
     [<Tests>]
-    // parsing mov functions (no second opperand)
+    // Random testing of parsing mov functions
     let testMOVsRandomised = 
-        testPropertyWithConfig config  "Property Test Parse of MOVs" <| 
+        testProperty  "Property Test Parse of MOVs" <| 
         fun wa suff dest op1 ->
             let root = getRandomItem [MOV ; MVN]
             let rootStr r = 
@@ -375,9 +366,9 @@ module BitArithmeticTests
 
 
     [<Tests>]
-    // parsing bit arithmetic functions
+    // Random testing  of parsing AND, ORR, EOR, BIC
     let testBitArithRandomised = 
-        testPropertyWithConfig config  "Property Test Parse of bit arithmetic instructions" <| 
+        testProperty  "Property Test Parse of bit arithmetic instructions" <| 
         fun wa suff op2 ->
             let root = getRandomItem [AND ; ORR ; EOR ; BIC]
             let destReg = getRandomItem [R1 ; R2 ; R3 ; R4 ; R5 ; R6 ; R7 ; R8 ; R9 ; R10 ; R11 ; R12; R14]
@@ -485,9 +476,9 @@ module BitArithmeticTests
 
 
     [<Tests>]
-    // parsing shift functions tests
+    // parsing shift instruction random tests
     let testShiftsRandomised = 
-        testPropertyWithConfig config  "Property Test Parse of shift instructions" <| 
+        testProperty  "Property Test Parse of shift instructions" <| 
         fun wa suff lit ->
             let root = getRandomItem [LSL ; LSR ; ASR ; ROR]
             let destReg = getRandomItem [R1 ; R2 ; R3 ; R4 ; R5 ; R6 ; R7 ; R8 ; R9 ; R10 ; R11 ; R12; R14]
@@ -548,9 +539,9 @@ module BitArithmeticTests
 
 
     [<Tests>]
-    // parsing mov functions (no second opperand)
+    // parsing mov instructions random tests
     let testTSTandTEQRandomised = 
-        testPropertyWithConfig config  "Property Test Parse of TST and TEQ" <| 
+        testProperty  "Property Test Parse of TST and TEQ" <| 
         fun wa suff op1 ->
             let dest = getRandomItem [R1 ; R2 ; R3 ; R4 ; R5 ; R6 ; R7 ; R8 ; R9 ; R10 ; R11 ; R12; R14]
             let root = getRandomItem [TST ; TEQ]
@@ -647,47 +638,7 @@ module BitArithmeticTests
             Expect.equal res expected "property test parse of TEQ and TST"
 
 
-
-    [<Tests>]
-    let tests = 
-        testList "Minimal Visual Unit Tests"
-            [
-            // MOV tests with decimals
-            vTest "MOV test 1" "MOV R0, #1" "0000" [R 0, 1]
-            vTest "MOV test 2" "MOVS R1, #0" "0100" [R 1, 0]
-            vTest "MOV test 3" "MOV R2, #137" "0000" [R 2, 137]
-            vTest "MOV test 4" "MOV R3, #4080" "0000" [R 3, 4080]
-            // MOV tests with hex numbers
-            vTest "MOV test 5" "MOV R4, #0x0" "0000" [R 4, 0]
-            vTest "MOV tes 6" "MOV R5, #0xA" "0000" [R 5, 10]
-            vTest "MOV test 7" "MOV R6, #0x2300" "0000" [R 6, 8960]
-            // MOV tests with hex binary
-            vTest "MOV test 8" "MOV R4, #0b0" "0000" [R 4, 0]
-            vTest "MOV test 9" "MOV R0, #0b1010" "0000" [R 0, 10]
-            vTest "MOV test 10" "MOV R0, #0b10001100000000" "0000" [R 0, 8960]
-
-            // AND tests with decimals
-            vTest "AND test 1" "AND R2, R1, R0" "0000" [R 0, 0]
-            vTest "AND test 2" "AND R3, R2, R0" "0000" [R 0, 0]
-            vTest "AND test 3" "AND R2, R2, R0" "0000" [R 2, 0]
-            vTest "AND test 4" "AND R3, R3, R3" "0000" [R 3, 30] 
-
-            vTest "EORS test 1" "EORS R0, R0, #0" "0100" [R 0, 0]
-            ]
-
-
-
-
-
-
-
-
-// testing execute function (exeInstr)  
-
-
-
-
-
+    // testing visUAL
     let flags = {N=false; C=false; Z=false; V=false}
     let regMap = 
         [R0,0u ; R1,10u ; R2,20u ; R3,30u ; R4,40u ; R5,50u ; R6,60u
