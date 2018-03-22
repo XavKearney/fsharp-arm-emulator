@@ -21,7 +21,7 @@ NB: To test using the `VisualTest` framework, you must first populate the `visua
 ## Structure
 This project is both a self-contained emulator for ARM code, and also used as the back-end emulation for an electron app, whose repository is [here](https://github.com/djb15/arm-emulator-gui). As such, this project contains two `.fsproj` files:
 1. `ArmEmulator.fsproj` - this is the main project file to be used in this repository. It includes all modules and all tests.
-2. `EmulatorInterface.fsproj` - this is a dummy project file used by the electron app, which excludes all tests and the `Main.fs` file.
+2. `EmulatorInterface.fsproj` - this is a dummy project file used by the electron app, which excludes all tests and the `Main.fs` file. It uses the `TargetFramework` `netstandard2.0` instead of `netcoreapp2.0` to enable use with [FABLE](http://fable.io/).
 
 The project is split into independent modules, each with their own file of tests. The modules, in the order that the project includes them, along with their respective purposes and level of testing are:
 
