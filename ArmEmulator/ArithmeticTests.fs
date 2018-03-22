@@ -103,8 +103,6 @@ module ArithmeticTests
                 ("R0, R0, RRX #100", Error ("RRX always has a shift of 1"));
             ]
 
-    let config = { FsCheckConfig.defaultConfig with maxTest = 10000 }
-
     /// Make instruction string for arithmetic from random input values
     let makeArithInstrString opcode suffix target op1 op2 = 
         let opcodeStr = 
@@ -156,7 +154,7 @@ module ArithmeticTests
                 Operands = operandStr
             }
 
-        testPropertyWithConfig config "Test Arith Parse" <| 
+        testProperty "Test Arith Parse" <| 
         fun wa opcode suffix target op1 op2 ->
             let ls = makeTestLineData wa opcode suffix target op1 op2
 
@@ -251,7 +249,7 @@ module ArithmeticTests
                 Operands = operandStr
             }
 
-        testPropertyWithConfig config "Test Comp Parse" <| 
+        testProperty "Test Comp Parse" <| 
         fun wa opcode op1 op2 ->
             let ls = makeTestLineData wa opcode op1 op2
 
@@ -296,7 +294,7 @@ module ArithmeticTests
             opcodeStr + suffixStr + " " + operandStr
 
 
-        testPropertyWithConfig config "Test Arithmetic Execution" <|
+        testProperty "Test Arithmetic Execution" <|
         fun opcode suffix target op1 op2 (flags: CommonData.Flags) ->
             let instrStr = makeTestExecStr opcode suffix target op1 op2
             
@@ -479,7 +477,7 @@ module ArithmeticTests
             opcodeStr + " " + operandStr
 
 
-        testPropertyWithConfig config "Test Comparison Execution" <|
+        testProperty "Test Comparison Execution" <|
         fun opcode op1 op2 (flags: CommonData.Flags) ->
             let instrStr = makeTestExecStr opcode op1 op2
             

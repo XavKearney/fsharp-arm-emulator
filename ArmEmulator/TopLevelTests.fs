@@ -200,11 +200,11 @@ module TopLevelTests
             (parseLine (symtab) (WA 0u) "ADR R0, 4"), 
                 Ok ({cpuData with Regs = cpuData.Regs.Add (R0, 4u)}, symtab)
             (parseLine (symtab) (WA 0u) "test DCD 1"), 
-                Ok ({cpuData with MM = cpuData.MM.Add (WA 0x100u, DataLoc 1u)}, symtab.Add ("test", 0x100u))
+                Ok ({cpuData with MM = cpuData.MM.Add (WA (minDataMemAddress+4u), DataLoc 1u)}, symtab.Add ("test", (minDataMemAddress+4u)))
             (parseLine (symtab) (WA 0u) "test EQU 44"), 
                 Ok (cpuData, symtab.Add ("test", 44u))
             (parseLine (symtab) (WA 0u) "test FILL 4"), 
-                Ok ({cpuData with MM = cpuData.MM.Add (WA 0x100u, DataLoc 0u)}, symtab.Add ("test", 0x100u))
+                Ok ({cpuData with MM = cpuData.MM.Add (WA (minDataMemAddress+4u), DataLoc 0u)}, symtab.Add ("test", (minDataMemAddress+4u)))
 
             // test MultMem instructions
             (parseLine (symtab) (WA 0u) "STM R0, {R1}"), 
@@ -355,13 +355,13 @@ module TopLevelTests
             ["ADR R0, testL2"; "testL DCD 135";"testL2 DCD 137"], 
                 Ok ({cpuData with 
                         Regs = cpuData.Regs
-                            |> Map.add R0 0x104u
+                            |> Map.add R0 (minDataMemAddress+8u)
                             |> Map.add R15 16u
                         MM = cpuData.MM
                             |> Map.add (WA 0u) 
                                 (Code (IMEM (AdrO (Ok {InstructionType = ADRm;
                                       DestReg = R0;
-                                      SecondOp = 260u;}))))
+                                      SecondOp = (minDataMemAddress+8u);}))))
                             |> Map.add (WA 4u) 
                                 (Code (IMEM (LabelO (Ok {InstructionType = DCD;
                                         Name = Some "testL";
@@ -370,11 +370,11 @@ module TopLevelTests
                                 (Code (IMEM (LabelO (Ok {InstructionType = DCD;
                                         Name = Some "testL2";
                                         EquDcdFill = Vl ["137"];}))))
-                            |> Map.add (WA 0x100u) (DataLoc 135u)
-                            |> Map.add (WA 0x104u) (DataLoc 137u)
+                            |> Map.add (WA (minDataMemAddress+4u)) (DataLoc 135u)
+                            |> Map.add (WA (minDataMemAddress+8u)) (DataLoc 137u)
                     }, symtab
-                        |> Map.add "testL"  0x100u
-                        |> Map.add "testL2" 0x104u)      
+                        |> Map.add "testL"  (minDataMemAddress+4u)
+                        |> Map.add "testL2" (minDataMemAddress+8u))      
       
             ["ADD R0, R0, #1"; "ENDEQ"; "ADD R0,R0,#1";], 
                 Ok ({cpuData with 

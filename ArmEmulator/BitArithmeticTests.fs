@@ -9,9 +9,6 @@ module BitArithmeticTests
     open VisualTest
 
 
-
-    let config = { FsCheckConfig.defaultConfig with maxTest = 10000 }
-
     let genRandomUint32List (min,max) count =
         let rnd = System.Random()
         List.init count (fun _ -> rnd.Next (min, max))
@@ -309,7 +306,7 @@ module BitArithmeticTests
     [<Tests>]
     // tests property that ROR by integer multiple of 32 is equal to its selft
     let RORtest = 
-        testPropertyWithConfig config  "Property Test for ROR instruction" <| 
+        testProperty  "Property Test for ROR instruction" <| 
         fun n ->
             let rndMultof32 = 32 * System.Random().Next(10)
             let rorBy32 = doShift n Ror (uint32 rndMultof32)
