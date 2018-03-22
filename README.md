@@ -90,7 +90,9 @@ For more detailed information on individual modules and instructions, see the in
 
 ### Top Level
 
-The `TopLevel` module brings all of the instructions together and enables execution of a complete program in the form of a list of strings. The features of this module include:
+The `TopLevel` module brings all of the instructions together and enables execution of a complete program in the form of a list of strings. It provides a simple interface for the GUI, which only has to provide the source file as a list of strings, as well as the current CPU & symbol state (which can easily be initialised using `initDataPath`).
+
+The features of this module include:
 
 - Forward & backward referencing of labels in instructions (2 pass parsing).
 - Module-specific error handling. Each module can optionally return a custom error type in an `Error` monad (this is currently just a string).
