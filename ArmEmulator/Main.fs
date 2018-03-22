@@ -5,7 +5,6 @@ open VisualTest
 open System.IO
 open Emulator.TopLevel
 open CommonData
-open VisualTest
 
 //Number of tests to run for each set of randomised tests
 // and randomised tests against visual
