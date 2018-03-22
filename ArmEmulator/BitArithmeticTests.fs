@@ -316,7 +316,7 @@ module BitArithmeticTests
     [<Tests>]
     // parsing mov functions (no second opperand)
     let testMOVsRandomised = 
-        testPropertyWithConfig config  "Property Test Parse of MOVs" <| 
+        testProperty "Property Test Parse of MOVs" <| 
         fun wa suff dest op1 ->
             let root = getRandomItem [MOV ; MVN]
             let rootStr r = 
@@ -377,7 +377,7 @@ module BitArithmeticTests
     [<Tests>]
     // parsing bit arithmetic functions
     let testBitArithRandomised = 
-        testPropertyWithConfig config  "Property Test Parse of bit arithmetic instructions" <| 
+        testProperty "Property Test Parse of bit arithmetic instructions" <| 
         fun wa suff op2 ->
             let root = getRandomItem [AND ; ORR ; EOR ; BIC]
             let destReg = getRandomItem [R1 ; R2 ; R3 ; R4 ; R5 ; R6 ; R7 ; R8 ; R9 ; R10 ; R11 ; R12; R14]
@@ -487,7 +487,7 @@ module BitArithmeticTests
     [<Tests>]
     // parsing shift functions tests
     let testShiftsRandomised = 
-        testPropertyWithConfig config  "Property Test Parse of shift instructions" <| 
+        testProperty "Property Test Parse of shift instructions" <| 
         fun wa suff lit ->
             let root = getRandomItem [LSL ; LSR ; ASR ; ROR]
             let destReg = getRandomItem [R1 ; R2 ; R3 ; R4 ; R5 ; R6 ; R7 ; R8 ; R9 ; R10 ; R11 ; R12; R14]
@@ -550,7 +550,7 @@ module BitArithmeticTests
     [<Tests>]
     // parsing mov functions (no second opperand)
     let testTSTandTEQRandomised = 
-        testPropertyWithConfig config  "Property Test Parse of TST and TEQ" <| 
+        testProperty "Property Test Parse of TST and TEQ" <| 
         fun wa suff op1 ->
             let dest = getRandomItem [R1 ; R2 ; R3 ; R4 ; R5 ; R6 ; R7 ; R8 ; R9 ; R10 ; R11 ; R12; R14]
             let root = getRandomItem [TST ; TEQ]
