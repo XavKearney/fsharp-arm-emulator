@@ -624,10 +624,27 @@ module Mem
         | Ok y -> Ok y
         | _ -> Error "makeType: should never happen"
 
+    let findMaxAddr (dP: DataPath<'INS>) = 
+        let waToUint32 (k,_) =
+            match k with
+            | WA y -> y
+        let checkBigEnough x =
+            match x with
+            | v when v >= 0xFCu -> x
+            | _ -> 0xFCu
+        match dP.MM with
+        | x when x = Map.empty -> 0xFCu
+        | _ ->
+            dP.MM
+            |> Map.toSeq
+            |> Seq.map waToUint32
+            |> Seq.max
+            |> checkBigEnough
+
 
     ///Updates the symbol table
     ///Used for execDCD, execEQU and execFILL
-    let updateSymbolTable (symbolTab: SymbolTable) (inputRecord: LabelInstr) (field: EquDcdFillSpecific) = 
+    let updateSymbolTable (symbolTab: SymbolTable) (inputRecord: LabelInstr) (dP: DataPath<'INS>) (field: EquDcdFillSpecific) = 
         let getLabel rec1 = 
             match rec1.Name with
             | Some z -> Ok z
@@ -639,14 +656,9 @@ module Mem
                 | Eq y -> Ok y
                 | _ -> Error (sprintf "updateSymbolTable-getValue: InstructionType = EQU but EquDcdFillSpecific != Eq _")
             | FILL -> 
-                match field with
-                | Fl _ ->
-                    Ok 0u
-                | _ -> Error (sprintf "updateSymbolTable-getValue: InstructionType = FILL but EquDcdFillSpecific != Fl _")
+                Ok ((findMaxAddr dP)+4u)
             | DCD  ->
-                match field with
-                | Vl y -> (makeType y)
-                | _ -> Error (sprintf "updateSymbolTable-getValue: InstructionType = DCD but EquDcdFillSpecific != Vl _")
+                Ok ((findMaxAddr dP)+4u)
         let addToSymTab x y = symbolTab.Add(x,y)
         resultDotBindTwoInp addToSymTab (getLabel inputRecord) (getValue field inputRecord)
 
@@ -687,20 +699,6 @@ module Mem
             | Ok x -> Ok (getAddrList' lst x)
             | Error m -> Error m
 
-        let findMaxAddr (dP: DataPath<'INS>) = 
-            let waToUint32 (k,_) =
-                match k with
-                | WA y -> y
-            let checkBigEnough x =
-                match x with
-                | v when v >= 0xFCu -> x
-                | _ -> 0xFCu
-            dP.MM
-            |> Map.toSeq
-            |> Seq.map waToUint32
-            |> Seq.max
-            |> checkBigEnough
-
         let findAddrs (dP: DataPath<'INS>) :Result<uint32 list, string>=
             if ((dP.MM).IsEmpty) then
                 getAddrList [0xFCu] (Result.map (List.length) dataValList)
@@ -730,7 +728,7 @@ module Mem
     /// Symbol tables and DataPaths
     let execDCD (symbolTab: SymbolTable) (dP: DataPath<'INS>) (inputRecord: LabelInstr) = 
         inputRecord.EquDcdFill
-        |> updateSymbolTable symbolTab inputRecord
+        |> updateSymbolTable symbolTab inputRecord dP
         |> fun b -> Ok ((updateMemoryDataPath inputRecord dP), b)
         |> abstractResults
 
@@ -741,14 +739,14 @@ module Mem
     ///Updates SymbolTable only
     let execEQU (symbolTab: SymbolTable) (dP: DataPath<'INS>) (inputRecord: LabelInstr) = 
         inputRecord.EquDcdFill
-        |> updateSymbolTable symbolTab inputRecord
+        |> updateSymbolTable symbolTab inputRecord dP
         |> fun b -> Ok (Ok dP, b)
         |> abstractResults 
     
     ///Executes a Fill instruction, updates Symbol Table and DataPath
     let execFILL (symbolTab: SymbolTable) (dP: DataPath<'INS>) (inputRecord: LabelInstr) = 
         inputRecord.EquDcdFill
-        |> updateSymbolTable symbolTab inputRecord 
+        |> updateSymbolTable symbolTab inputRecord dP
         |> fun b -> Ok (updateMemoryDataPath inputRecord dP, b)
         |> abstractResults 
 
