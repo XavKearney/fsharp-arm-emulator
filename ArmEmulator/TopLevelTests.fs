@@ -38,7 +38,7 @@ module TopLevelTests
         let makeTest inp outp =
             let testName = (sprintf "%s: %A" name inp)
             testCase testName <| fun () ->
-                Expect.equal (f inp <||| threeParams) outp testName
+                Expect.equal (f inp <||| threeParams <| true) outp testName
         List.map (fun (i, o) -> makeTest i o) inOutLst
         |> testList (sprintf "%s Test List" name) 
 
@@ -350,7 +350,31 @@ module TopLevelTests
                                             Target = R0;
                                             Op1 = R0;
                                             Op2 = Literal 1u;})))
-                    }, symtab)      
+                    }, symtab)   
+
+            ["ADR R0, testL2"; "testL DCD 135";"testL2 DCD 137"], 
+                Ok ({cpuData with 
+                        Regs = cpuData.Regs
+                            |> Map.add R0 0x104u
+                            |> Map.add R15 16u
+                        MM = cpuData.MM
+                            |> Map.add (WA 0u) 
+                                (Code (IMEM (AdrO (Ok {InstructionType = ADRm;
+                                      DestReg = R0;
+                                      SecondOp = 260u;}))))
+                            |> Map.add (WA 4u) 
+                                (Code (IMEM (LabelO (Ok {InstructionType = DCD;
+                                        Name = Some "testL";
+                                        EquDcdFill = Vl ["135"];}))))
+                            |> Map.add (WA 8u) 
+                                (Code (IMEM (LabelO (Ok {InstructionType = DCD;
+                                        Name = Some "testL2";
+                                        EquDcdFill = Vl ["137"];}))))
+                            |> Map.add (WA 0x100u) (DataLoc 135u)
+                            |> Map.add (WA 0x104u) (DataLoc 137u)
+                    }, symtab
+                        |> Map.add "testL"  0x100u
+                        |> Map.add "testL2" 0x104u)      
       
             ["ADD R0, R0, #1"; "ENDEQ"; "ADD R0,R0,#1";], 
                 Ok ({cpuData with 
