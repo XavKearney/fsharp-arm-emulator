@@ -56,13 +56,13 @@ The complete set of ARM instructions supported by this project are:
 | `Arithmetic` | `CMN`  |   |
 | `BitArithmetic`  | `MOV`  |   |
 | `BitArithmetic`  | `MVN`  |   |
-| `BitArithmetic`  | `AND`  |   |
-| `BitArithmetic`  | `ORR`  |   |
-| `BitArithmetic`  | `EOR`  |   |
+| `BitArithmetic`  | `AND`  | Flag setting conforms to ARM spec, not VisUAL. |
+| `BitArithmetic`  | `ORR`  |  |
+| `BitArithmetic`  | `EOR`  | Flag setting conforms to ARM spec, not VisUAL. |
 | `BitArithmetic`  | `BIC`  |   |
-| `BitArithmetic`  | `LSL`  |   |
-| `BitArithmetic`  | `LSR`  |   |
-| `BitArithmetic`  | `ASR`  |   |
+| `BitArithmetic`  | `LSL`  | Shift value is modulo 32. |
+| `BitArithmetic`  | `LSR`  | Shift value is modulo 32. |
+| `BitArithmetic`  | `ASR`  | Shift value is modulo 32. |
 | `BitArithmetic`  | `ROR`  |   |
 | `BitArithmetic`  | `RRX`  |   |
 | `BitArithmetic`  | `TST`  |   |
