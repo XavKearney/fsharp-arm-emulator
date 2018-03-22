@@ -5,6 +5,7 @@ open VisualTest
 open System.IO
 open Emulator.TopLevel
 open CommonData
+open VisualTest
 
 /// reads the lines of a file into a string
 let readLines (filePath:string) = seq {
@@ -32,7 +33,10 @@ let cpuToJson cpu =
         | lst -> 
             lst
             |> List.map (
-                fun (WA a, (DataLoc v | Code v)) -> sprintf "'%A': %A, " a v)
+                fun (WA a, x) ->
+                    match x with
+                    | DataLoc v -> sprintf "'%A': %A, " a v
+                    | Code _ -> sprintf "'%A': '<someCode>'" a)
             |> List.reduce (+)
             |> fun x -> x.Replace("u","")
             |> sprintf "'mem': {%s}"
@@ -52,7 +56,7 @@ let runFile filePath flags regs =
     readLines filePath
     |> List.ofSeq
     |> List.filter (fun x -> x <> "")
-    |> fun lines -> lines, cpu, Some(Map.empty)
+    |> fun lines -> lines, cpu, Map.empty
     |||> parseThenExecLines
     |> function
         | Ok (cpu, _) -> 

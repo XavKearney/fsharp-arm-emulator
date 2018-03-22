@@ -336,7 +336,7 @@ module BitArithmetic
     /// takes the current CPU data (register values, flags ect), the output from parser 
     /// if no error and the symbol table. Results in updating registers and/or flags based on 
     /// instruction
-    let exeInstr cpuData symTable parseOut =
+    let exeInstr cpuData parseOut =
 
         let instr = parseOut.PInstr.Instruction 
         let operands = parseOut.PInstr
