@@ -113,6 +113,8 @@ Please see the [app respository](https://github.com/djb15/arm-emulator-gui) for 
 
 The `Main` module also defines a command line interface to the `TopLevel` code, which enables loading and execution from an arbitrary file location. The resultant CPU state is stored in a JSON file in another arbitrary file location. Registers and flags can also be initialised via the CLI.
 
+The `TopLevelTests` module defines a series of unit tests which test: parsing of individual lines, execution of individual lines, parsing of multiple lines in order, and execution of multiple lines in order. Every supported instruction is tested, and advanced features such as forward referencing, branches and label instructions are also included in testing.
+
 ## Use of Github
 Throughout the group stage of the project we adopted agile development practices. Weekly sprint goals were set in the first two weeks, with daily goals set in the last week. 
 
