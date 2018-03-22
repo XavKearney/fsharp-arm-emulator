@@ -100,7 +100,7 @@ The `TopLevel` module brings all of the instructions together and enables execut
 - Program counter is always 8 greater than the current instruction value.
 - Parsing lines is immune to arbitrary whitespace within the line.
 - All condition codes are supported - an instruction's execution is dependent on current flag contents.
-- Arbitrary initialise of registers, flags and memory contents.
+- Arbitrary initialisation of registers, flags and memory contents (allows GUI to maintain CPU state)
 - Code is stored in memory.
 - Code is protected from being overwritten by instructions (returns an error). _NB: if an instruction was somehow overwritten, execution would continue as if it was not_
 - `EQU` instructions execute correctly; they are not stored in memory.
