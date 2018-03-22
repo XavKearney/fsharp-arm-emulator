@@ -630,10 +630,10 @@ module Mem
             | WA y -> y
         let checkBigEnough x =
             match x with
-            | v when v >= 0xFCu -> x
-            | _ -> 0xFCu
+            | v when v >= 0xFFCu -> x
+            | _ -> 0xFFCu
         match dP.MM with
-        | x when x = Map.empty -> 0xFCu
+        | x when x = Map.empty -> 0xFFCu
         | _ ->
             dP.MM
             |> Map.toSeq
