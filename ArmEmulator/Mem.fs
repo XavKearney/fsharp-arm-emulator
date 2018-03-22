@@ -541,7 +541,7 @@ module Mem
         let abstractTupleResult v = 
             match v with
             | (Ok z, u, v) -> Ok (z,u,v)
-            | (_, _, _) -> Error "execLDR-interpretingRecord: Error accesing memory location"
+            | (_, _, _) -> Error "execLDR-interpretingRecord: Error accessing memory location"
         let changedToBytes (inputRecord: MemInstr) (a: Result<(uint32 * uint32 * uint32),string>) =
             resultDotBindTwoInp makeBytes (Ok inputRecord.BytesNotWords) a 
         incrementRbValue inputRecord dP
