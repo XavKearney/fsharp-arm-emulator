@@ -67,7 +67,7 @@ The complete set of ARM instructions supported by this project are:
 | `BitArithmetic`  | `RRX`  |   |
 | `BitArithmetic`  | `TST`  |   |
 | `BitArithmetic`  | `TEQ`  |   |
-| `Mem`  | `LDR`  |   |
+| `Mem`  | `LDR`  | Does not support the `LDR RX, =someLabel` syntax.  |
 | `Mem`  | `STR`  |   |
 | `Mem`  | `ADR`  |   |
 | `Mem`  | `FILL`  |   |
