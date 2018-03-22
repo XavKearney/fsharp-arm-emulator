@@ -729,7 +729,7 @@ module BitArithmeticTests
             function
             | Some (Ok exeData) -> exeData 
             | _ -> failwithf "output from parse is an error: Should not happen"
-        parse >> checkOk >> exeInstr CPUDATA testSymTab >> convExe destReg
+        parse >> checkOk >> exeInstr CPUDATA  >> convExe destReg
 
 
     
