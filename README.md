@@ -42,8 +42,8 @@ The project is split into independent modules, each with their own file of tests
 
 Unit tests have been written for all modules with significant complexity. Property-based testing has been employed in all cases where randomised generation of parameters is feasible (e.g. in `TopLevel`, randomly generating a random source file is not feasible).
 
-Proof of the tests passing:
-![Proof of tests passing](http://i.xav.ai/eR8FdJ.png)
+Proof of the tests passing (configured to run 10,000 iterations for all property-based tests):
+![Proof of tests passing](http://i.xav.ai/Ng09oL.png)
 
 ## Features
 ### Instructions
