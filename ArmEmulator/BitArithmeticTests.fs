@@ -6,7 +6,6 @@ module BitArithmeticTests
     open VisualTest.VTest
     open Expecto
     open VisualTest.VCommon
-    open VisualTest
 
 
     let genRandomUint32List (min,max) count =
