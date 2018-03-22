@@ -118,7 +118,7 @@ module TopLevel =
         let makeLineData (opcode: string) operands = {
             OpCode= opcode.ToUpper()
             Operands=
-                String.concat "" operands
+                String.concat " " operands
                 |> opsToUpper
             Label=None
             LoadAddr = loadAddr
