@@ -305,7 +305,7 @@ module BitArithmeticTests
 
 
     [<Tests>]
-    // Random testing of parsing mov functions
+    // Random testing of parsing MOV and MVN
     let testMOVsRandomised = 
         testProperty  "Property Test Parse of MOVs" <| 
         fun wa suff dest op1 ->
@@ -539,7 +539,7 @@ module BitArithmeticTests
 
 
     [<Tests>]
-    // parsing mov instructions random tests
+    // parsing TST and TEQ instructions random tests
     let testTSTandTEQRandomised = 
         testProperty  "Property Test Parse of TST and TEQ" <| 
         fun wa suff op1 ->
@@ -831,6 +831,7 @@ module BitArithmeticTests
             vTest "ANDS test 2" "ANDS R0, R1, #1" <|| parseThenExe R0 {ld with OpCode = "ANDS" ; Operands = "R0, R1, #1"}
             vTest "ANDS test 3" "ANDS R0, R9, #97" <|| parseThenExe R0 {ld with OpCode = "ANDS" ; Operands = "R0, R9, #97"}
             vTest "ANDS test 4" "ANDS R0, R7, #255" <|| parseThenExe R0 {ld with OpCode = "ANDS" ; Operands = "R0, R7, #255"}
+            
                 // visual error? Not sure why carry is set with these instructions
             // vTest "ANDS test 5" "ANDS R0, R2, #256" <|| parseThenExe R0 {ld with OpCode = "ANDS" ; Operands = "R0, R2, #256"}
             // vTest "ANDS test 6" "ANDS R0, R7, #4080" <|| parseThenExe R0 {ld with OpCode = "ANDS" ; Operands = "R0, R7, #4080"}
