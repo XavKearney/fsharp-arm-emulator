@@ -200,7 +200,7 @@ module TopLevelTests
             (parseLine (symtab) (WA 0u) "ADR R0, 4"), 
                 Ok ({cpuData with Regs = cpuData.Regs.Add (R0, 4u)}, symtab)
             (parseLine (symtab) (WA 0u) "test DCD 1"), 
-                Ok ({cpuData with MM = cpuData.MM.Add (WA 0x100u, DataLoc 1u)}, symtab.Add ("test", 1u))
+                Ok ({cpuData with MM = cpuData.MM.Add (WA 0x100u, DataLoc 1u)}, symtab.Add ("test", 0x100u))
             (parseLine (symtab) (WA 0u) "test EQU 44"), 
                 Ok (cpuData, symtab.Add ("test", 44u))
             (parseLine (symtab) (WA 0u) "test FILL 4"), 
