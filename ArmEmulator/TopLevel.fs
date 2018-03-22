@@ -53,7 +53,10 @@ module TopLevel =
         if isNull input then None
         else
             let m = Regex.Match(input, pattern, RegexOptions.Compiled)
-            if m.Success then Some [for x in m.Groups -> x]
+            if m.Success then
+                [0..m.Groups.Count-1]
+                |> List.map (fun i -> m.Groups.[i])
+                |> Some
             else None
 
     ///Sets all registers to uppercase, ie r0 -> R0
