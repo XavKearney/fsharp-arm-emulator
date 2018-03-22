@@ -40,6 +40,9 @@ The project is split into independent modules, each with their own file of tests
 
 Unit tests have been written for all modules with significant complexity. Property-based testing has been employed in all cases where randomised generation of parameters is feasible (e.g. in `TopLevel`, randomly generating a random source file is not feasible).
 
+Proof of the tests passing:
+![Proof of tests passing](http://i.xav.ai/eR8FdJ.png)
+
 ## Features
 ### Instructions
 The complete set of ARM instructions supported by this project are:
@@ -72,7 +75,7 @@ The complete set of ARM instructions supported by this project are:
 | `Mem`  | `ADR`  |   |
 | `Mem`  | `FILL`  |   |
 | `Mem`  | `DCD`  |   |
-| `Mem`  | `EQU`  |   |
+| `Mem`  | `EQU`  | Does not support >1 forward reference. |
 | `MultMem`  | `LDM`  |   |
 | `MultMem`  | `STM`  |   |
 | `MultMem`  | `B`  |   |
@@ -83,9 +86,13 @@ Unless otherwise stated, the syntax for each instruction is the same as for [Vis
 
 All instructions can be paired with any of the ARM condition codes, which can also be found in the InfoCenter.
 
+For more detailed information on individual modules and instructions, see the individual documentation in the `docs` folder.
+
 ### Top Level
 
-The `TopLevel` module brings all of the instructions together and enables execution of a complete program in the form of a list of strings. The features of this module include:
+The `TopLevel` module brings all of the instructions together and enables execution of a complete program in the form of a list of strings. It provides a simple interface for the GUI, which only has to provide the source file as a list of strings, as well as the current CPU & symbol state (which can easily be initialised using `initDataPath`).
+
+The features of this module include:
 
 - Forward & backward referencing of labels in instructions (2 pass parsing).
 - Module-specific error handling. Each module can optionally return a custom error type in an `Error` monad (this is currently just a string).
@@ -95,9 +102,20 @@ The `TopLevel` module brings all of the instructions together and enables execut
 - Program counter is always 8 greater than the current instruction value.
 - Parsing lines is immune to arbitrary whitespace within the line.
 - All condition codes are supported - an instruction's execution is dependent on current flag contents.
-- Arbitrary initialise of registers, flags and memory contents.
+- Arbitrary initialisation of registers, flags and memory contents (allows GUI to maintain CPU state)
 - Code is stored in memory.
 - Code is protected from being overwritten by instructions (returns an error). _NB: if an instruction was somehow overwritten, execution would continue as if it was not_
 - `EQU` instructions execute correctly; they are not stored in memory.
 
 Please see the [app respository](https://github.com/djb15/arm-emulator-gui) for details of the GUI features.
+
+The `Main` module also defines a command line interface to the `TopLevel` code, which enables loading and execution from an arbitrary file location. The resultant CPU state is stored in a JSON file in another arbitrary file location. Registers and flags can also be initialised via the CLI.
+
+## Use of Github
+Throughout the group stage of the project we adopted agile development practices. Weekly sprint goals were set in the first two weeks, with daily goals set in the last week. 
+
+Each team member was allocated tasks. Individual tasks were completed on branches, and pull requests were submitted once a branch was deemed complete by the author. Branches were not allowed to be merged without an approved review from another team member. All tests were required to pass before merging a pull request into master.
+
+This module was referenced as a submodule in the electron app (GUI) repository, meaning any changes here could automatically be included in the app with a simple `git pull --recurse-submodules`.
+
+_NB: Originally, Travis CI was set up to automatically run tests on branches/commits but, as it runs on Linux, it wasn't compatible with the VisualTesting framework and so CI was disabled._
