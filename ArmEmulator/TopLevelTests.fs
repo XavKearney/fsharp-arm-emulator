@@ -194,7 +194,7 @@ module TopLevelTests
 
             // test Mem instructions
             (parseLine (symtab) (WA 0u) "LDR R0, [R1]"), 
-                Error (ERRLINE (ERRIMEM "execLDR-interpretingRecord: Error accesing memory location", 0u))
+                Error (ERRLINE (ERRIMEM "execLDR-interpretingRecord: Error accessing memory location", 0u))
             (parseLine (symtab) (WA 0u) "STR R0, [R1]"), 
                 Ok ({cpuData with MM = cpuData.MM.Add (WA 0u, DataLoc 0u)}, symtab)
             (parseLine (symtab) (WA 0u) "ADR R0, 4"), 
