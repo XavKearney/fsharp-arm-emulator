@@ -258,11 +258,11 @@ module BitArithmetic
         | LSL | LSR | ASR | ROR when ops.Length = 3 -> 
             Ok {baseInstr with Dest = checkReg (toReg ops.[0])
                                       Op1 = checkValid (toFlexOp [|ops.[1]|])
-                                      Op2 = checkValid (toFlexOp ops.[2..])}
+                                      Op2 = toFlexOp ops.[2..] |> checkValid |> checkLit}
 
         | RRX when ops.Length = 2 -> 
             Ok {baseInstr with Dest = checkReg (toReg ops.[0])
-                                      Op1 = toFlexOp [|ops.[1]|]}
+                                      Op1 = toFlexOp [|ops.[1]; root|]}
 
         | _ -> Error "Not valid input operands; wrong number of opperands"
 
@@ -394,8 +394,16 @@ module BitArithmetic
             | RRX -> doRRX op1 (System.Convert.ToUInt32(flags.C))
 
         match instr, operands.Dest, operands.Op1, operands.Op2 with    
-        | (MOV | MVN | RRX), Some dest, Ok op1, Error ""  -> 
+        | (MOV | MVN), Some dest, Ok op1, Error ""  -> 
             let flexVal = flexEval op1 
+            let flexCarry = calcFlexCarry flexVal
+            let totVal,totCarry = doOpCode flexVal 0u flexCarry
+            match suffix with
+            | S -> Ok {cpuData with Regs = updateRegs dest totVal ;  Fl = updateFlags totVal totCarry}
+            | NA -> Ok {cpuData with Regs = updateRegs dest totVal} 
+   
+        | RRX, Some dest, Ok (RegRRX targetReg), Error ""  -> 
+            let flexVal = flexEval (RegRRX targetReg)
             let flexCarry = calcFlexCarry flexVal
             let totVal,totCarry = doOpCode flexVal 0u flexCarry
             match suffix with
@@ -409,7 +417,7 @@ module BitArithmetic
             Ok {cpuData with Fl = updateFlags totVal totCarry}
 
 
-        | (AND | ORR | EOR | BIC | LSL | LSR | ASR | ROR), Some dest, Ok (Register reg), Ok op2 ->
+        | (AND | ORR | EOR | BIC), Some dest, Ok (Register reg), Ok op2 ->
             let flexVal = flexEval op2 
             let flexCarry = calcFlexCarry flexVal
             let totVal,totCarry = doOpCode cpuData.Regs.[reg] flexVal flexCarry
@@ -417,6 +425,21 @@ module BitArithmetic
             | S -> Ok {cpuData with Regs = updateRegs dest totVal ;  Fl = updateFlags totVal totCarry}
             | NA -> Ok {cpuData with Regs = updateRegs dest totVal}
 
+        | ( LSL | LSR | ASR | ROR), Some dest, Ok (Register reg), Ok (Literal lit) ->
+            let flexVal = flexEval (Literal lit)
+            let flexCarry = calcFlexCarry flexVal
+            let totVal,totCarry = doOpCode cpuData.Regs.[reg] flexVal flexCarry
+            match suffix with
+            | S -> Ok {cpuData with Regs = updateRegs dest totVal ;  Fl = updateFlags totVal totCarry}
+            | NA -> Ok {cpuData with Regs = updateRegs dest totVal}
+
+        | ( LSL | LSR | ASR | ROR), Some dest, Ok (Register reg1), Ok (Register reg2) ->
+            let flexVal = flexEval (Register reg2)
+            let flexCarry = calcFlexCarry flexVal
+            let totVal,totCarry = doOpCode cpuData.Regs.[reg1] flexVal flexCarry
+            match suffix with
+            | S -> Ok {cpuData with Regs = updateRegs dest totVal ;  Fl = updateFlags totVal totCarry}
+            | NA -> Ok {cpuData with Regs = updateRegs dest totVal}        
 
         | _ -> Error "Execution error"
 

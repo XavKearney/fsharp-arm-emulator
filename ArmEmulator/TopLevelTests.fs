@@ -178,7 +178,7 @@ module TopLevelTests
                 Ok ({cpuData with Regs = cpuData.Regs.Add (R0, 0u)}, symtab)
             (parseLine (symtab) (WA 0u) "LSL R0, R0, #3"), 
                 Ok (cpuData, symtab)
-            (parseLine (symtab) (WA 0u) "LSR R0, R0, #-1"), 
+            (parseLine (symtab) (WA 0u) "LSR R0, R0, #0xAE"), 
                 Ok (cpuData, symtab)
             (parseLine (symtab) (WA 0u) "ASR R0, R0, #0xFF"), 
                 Ok (cpuData, symtab)
