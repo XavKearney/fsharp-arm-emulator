@@ -143,8 +143,8 @@ module BitArithmeticTests
                               PCond = Cal})
 
                 // tests suffix
-                {ld with OpCode = "MOVS" ; Operands = "R0, #12"},
-                    Some (Ok {PInstr = {Instruction = MOV
+                {ld with OpCode = "MVNS" ; Operands = "R0, #12"},
+                    Some (Ok {PInstr = {Instruction = MVN
                                         Suff = S
                                         Dest = Some R0
                                         Op1 = Ok (Literal 12u)
@@ -186,6 +186,57 @@ module BitArithmeticTests
                               PSize = 4u
                               PCond = Cal})                              
 
+
+                {ld with OpCode = "ORRS" ; Operands = "R0, R1, R7, RRX"},
+                    Some (Ok {PInstr = {Instruction = ORR
+                                        Suff = S
+                                        Dest = Some R0
+                                        Op1 = Ok (Register R1)
+                                        Op2 = Ok (RegRRX R7)}
+                              PLabel = None
+                              PSize = 4u
+                              PCond = Cal})      
+
+                {ld with OpCode = "LSLS" ; Operands = "R0, R1, R7"},
+                    Some (Ok {PInstr = {Instruction = LSL
+                                        Suff = S
+                                        Dest = Some R0
+                                        Op1 = Ok (Register R1)
+                                        Op2 = Ok (Register R7)}
+                              PLabel = None
+                              PSize = 4u
+                              PCond = Cal})   
+
+                {ld with OpCode = "LSR" ; Operands = "R0, R1, #13"},
+                    Some (Ok {PInstr = {Instruction = LSR
+                                        Suff = NA
+                                        Dest = Some R0
+                                        Op1 = Ok (Register R1)
+                                        Op2 = Ok (Literal 13u)}
+                              PLabel = None
+                              PSize = 4u
+                              PCond = Cal})   
+
+                {ld with OpCode = "ASR" ; Operands = "R0, R1, #4"},
+                    Some (Ok {PInstr = {Instruction = ASR
+                                        Suff = NA
+                                        Dest = Some R0
+                                        Op1 = Ok (Register R1)
+                                        Op2 = Ok (Literal 4u)}
+                              PLabel = None
+                              PSize = 4u
+                              PCond = Cal})   
+
+                {ld with OpCode = "ROR" ; Operands = "R0, R1, #13"},
+                    Some (Ok {PInstr = {Instruction = ROR
+                                        Suff = NA
+                                        Dest = Some R0
+                                        Op1 = Ok (Register R1)
+                                        Op2 = Ok (Literal 13u)}
+                              PLabel = None
+                              PSize = 4u
+                              PCond = Cal}) 
+
                 // test EOR with flexible opperator RRX
                 {ld with OpCode = "EORS" ; Operands = "R0, R1, R7, RRX"},
                     Some (Ok {PInstr = {Instruction = EOR
@@ -195,9 +246,7 @@ module BitArithmeticTests
                                         Op2 = Ok (RegRRX R7)}
                               PLabel = None
                               PSize = 4u
-                              PCond = Cal})                              
-
-
+                              PCond = Cal})  
 
                 // testing invalid inputs
 
