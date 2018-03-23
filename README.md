@@ -1,5 +1,7 @@
 # fsharp-arm-emulator
-The goal of this project is to create a fully functional ARM Assembly Language Emulator in F#.
+The goal of this project is to create a fully functional ARM Assembly Language Emulator in F#. 
+
+This repository is for the back-end code, which performs instruction emulation. This is used in an electron-based GUI, which is defined [here](https://github.com/djb15/arm-emulator-gui).
 
 **For individual project statements, see the `docs` directory.**
 
@@ -21,7 +23,7 @@ NB: To test using the `VisualTest` framework, you must first populate the `visua
 ## Structure
 This project is both a self-contained emulator for ARM code, and also used as the back-end emulation for an electron app, whose repository is [here](https://github.com/djb15/arm-emulator-gui). As such, this project contains two `.fsproj` files:
 1. `ArmEmulator.fsproj` - this is the main project file to be used in this repository. It includes all modules and all tests.
-2. `EmulatorInterface.fsproj` - this is a dummy project file used by the electron app, which excludes all tests and the `Main.fs` file.
+2. `EmulatorInterface.fsproj` - this is a dummy project file used by the electron app, which excludes all tests and the `Main.fs` file. It uses the `TargetFramework` `netstandard2.0` instead of `netcoreapp2.0` to enable use with [FABLE](http://fable.io/).
 
 The project is split into independent modules, each with their own file of tests. The modules, in the order that the project includes them, along with their respective purposes and level of testing are:
 
@@ -40,8 +42,8 @@ The project is split into independent modules, each with their own file of tests
 
 Unit tests have been written for all modules with significant complexity. Property-based testing has been employed in all cases where randomised generation of parameters is feasible (e.g. in `TopLevel`, randomly generating a random source file is not feasible).
 
-Proof of the tests passing:
-![Proof of tests passing](http://i.xav.ai/eR8FdJ.png)
+Proof of the tests passing (configured to run 10,000 iterations for all property-based tests):
+![Proof of tests passing](http://i.xav.ai/Ng09oL.png)
 
 ## Features
 ### Instructions
@@ -110,6 +112,8 @@ The features of this module include:
 Please see the [app respository](https://github.com/djb15/arm-emulator-gui) for details of the GUI features.
 
 The `Main` module also defines a command line interface to the `TopLevel` code, which enables loading and execution from an arbitrary file location. The resultant CPU state is stored in a JSON file in another arbitrary file location. Registers and flags can also be initialised via the CLI.
+
+The `TopLevelTests` module defines a series of unit tests which test: parsing of individual lines, execution of individual lines, parsing of multiple lines in order, and execution of multiple lines in order. Every supported instruction is tested, and advanced features such as forward referencing, branches and label instructions are also included in testing.
 
 ## Use of Github
 Throughout the group stage of the project we adopted agile development practices. Weekly sprint goals were set in the first two weeks, with daily goals set in the last week. 

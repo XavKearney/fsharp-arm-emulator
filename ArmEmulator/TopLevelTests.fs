@@ -42,6 +42,7 @@ module TopLevelTests
         List.map (fun (i, o) -> makeTest i o) inOutLst
         |> testList (sprintf "%s Test List" name) 
 
+    /// tests parsing of individual lines 
     [<Tests>]
     let testParseLine = 
         makeUnitTestList (parseLine (Map.empty) (WA 0u)) "Unit Test parseLine" [
@@ -67,8 +68,6 @@ module TopLevelTests
                                                  DestReg = R0;
                                                  SecondOp = 4u;}));
                     PLabel = None;PSize = 4u;PCond = Cal;}
-                
-            // TODO: add all instructions here
 
             "LDM R0, {R1,R2,R3}", 
             Ok {PInstr = IMULTMEM (MemI {InsType = Some(LDM); Direction = Some(FD);
@@ -129,7 +128,7 @@ module TopLevelTests
             "blah", Error (ERRTOPLEVEL "Invalid instruction: blah")
         ]
 
-    // tests the function execParsedLine with unit tests
+    // execution of individual parsed lines for every supported instruction
     [<Tests>]
     let testExecParsedLine = 
         let removeResult x = 
@@ -219,7 +218,7 @@ module TopLevelTests
          ]
 
          
-    /// tests the function parseThenExecLines with unit tests
+    /// tests parsing and execution of multiple lines
     [<Tests>]
     let testParseThenExecLines = 
         let cpuData = 
