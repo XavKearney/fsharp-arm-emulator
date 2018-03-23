@@ -262,7 +262,7 @@ module BitArithmetic
 
         | RRX when ops.Length = 2 -> 
             Ok {baseInstr with Dest = checkReg (toReg ops.[0])
-                                      Op1 = toFlexOp [|ops.[1]|]}
+                                      Op1 = toFlexOp [|ops.[1]; root|]}
 
         | _ -> Error "Not valid input operands; wrong number of opperands"
 
