@@ -38,10 +38,11 @@ module TopLevelTests
         let makeTest inp outp =
             let testName = (sprintf "%s: %A" name inp)
             testCase testName <| fun () ->
-                Expect.equal (f inp <||| threeParams) outp testName
+                Expect.equal (f inp <||| threeParams <| true) outp testName
         List.map (fun (i, o) -> makeTest i o) inOutLst
         |> testList (sprintf "%s Test List" name) 
 
+    /// tests parsing of individual lines 
     [<Tests>]
     let testParseLine = 
         makeUnitTestList (parseLine (Map.empty) (WA 0u)) "Unit Test parseLine" [
@@ -67,8 +68,6 @@ module TopLevelTests
                                                  DestReg = R0;
                                                  SecondOp = 4u;}));
                     PLabel = None;PSize = 4u;PCond = Cal;}
-                
-            // TODO: add all instructions here
 
             "LDM R0, {R1,R2,R3}", 
             Ok {PInstr = IMULTMEM (MemI {InsType = Some(LDM); Direction = Some(FD);
@@ -129,7 +128,7 @@ module TopLevelTests
             "blah", Error (ERRTOPLEVEL "Invalid instruction: blah")
         ]
 
-    // tests the function execParsedLine with unit tests
+    // execution of individual parsed lines for every supported instruction
     [<Tests>]
     let testExecParsedLine = 
         let removeResult x = 
@@ -179,7 +178,7 @@ module TopLevelTests
                 Ok ({cpuData with Regs = cpuData.Regs.Add (R0, 0u)}, symtab)
             (parseLine (symtab) (WA 0u) "LSL R0, R0, #3"), 
                 Ok (cpuData, symtab)
-            (parseLine (symtab) (WA 0u) "LSR R0, R0, #-1"), 
+            (parseLine (symtab) (WA 0u) "LSR R0, R0, #0xAE"), 
                 Ok (cpuData, symtab)
             (parseLine (symtab) (WA 0u) "ASR R0, R0, #0xFF"), 
                 Ok (cpuData, symtab)
@@ -200,11 +199,11 @@ module TopLevelTests
             (parseLine (symtab) (WA 0u) "ADR R0, 4"), 
                 Ok ({cpuData with Regs = cpuData.Regs.Add (R0, 4u)}, symtab)
             (parseLine (symtab) (WA 0u) "test DCD 1"), 
-                Ok ({cpuData with MM = cpuData.MM.Add (WA 0x100u, DataLoc 1u)}, symtab.Add ("test", 0x100u))
+                Ok ({cpuData with MM = cpuData.MM.Add (WA (minDataMemAddress+4u), DataLoc 1u)}, symtab.Add ("test", (minDataMemAddress+4u)))
             (parseLine (symtab) (WA 0u) "test EQU 44"), 
                 Ok (cpuData, symtab.Add ("test", 44u))
             (parseLine (symtab) (WA 0u) "test FILL 4"), 
-                Ok ({cpuData with MM = cpuData.MM.Add (WA 0x100u, DataLoc 0u)}, symtab.Add ("test", 0x100u))
+                Ok ({cpuData with MM = cpuData.MM.Add (WA (minDataMemAddress+4u), DataLoc 0u)}, symtab.Add ("test", (minDataMemAddress+4u)))
 
             // test MultMem instructions
             (parseLine (symtab) (WA 0u) "STM R0, {R1}"), 
@@ -219,7 +218,7 @@ module TopLevelTests
          ]
 
          
-    /// tests the function parseThenExecLines with unit tests
+    /// tests parsing and execution of multiple lines
     [<Tests>]
     let testParseThenExecLines = 
         let cpuData = 
@@ -350,7 +349,31 @@ module TopLevelTests
                                             Target = R0;
                                             Op1 = R0;
                                             Op2 = Literal 1u;})))
-                    }, symtab)      
+                    }, symtab)   
+
+            ["ADR R0, testL2"; "testL DCD 135";"testL2 DCD 137"], 
+                Ok ({cpuData with 
+                        Regs = cpuData.Regs
+                            |> Map.add R0 (minDataMemAddress+8u)
+                            |> Map.add R15 16u
+                        MM = cpuData.MM
+                            |> Map.add (WA 0u) 
+                                (Code (IMEM (AdrO (Ok {InstructionType = ADRm;
+                                      DestReg = R0;
+                                      SecondOp = (minDataMemAddress+8u);}))))
+                            |> Map.add (WA 4u) 
+                                (Code (IMEM (LabelO (Ok {InstructionType = DCD;
+                                        Name = Some "testL";
+                                        EquDcdFill = Vl ["135"];}))))
+                            |> Map.add (WA 8u) 
+                                (Code (IMEM (LabelO (Ok {InstructionType = DCD;
+                                        Name = Some "testL2";
+                                        EquDcdFill = Vl ["137"];}))))
+                            |> Map.add (WA (minDataMemAddress+4u)) (DataLoc 135u)
+                            |> Map.add (WA (minDataMemAddress+8u)) (DataLoc 137u)
+                    }, symtab
+                        |> Map.add "testL"  (minDataMemAddress+4u)
+                        |> Map.add "testL2" (minDataMemAddress+8u))      
       
             ["ADD R0, R0, #1"; "ENDEQ"; "ADD R0,R0,#1";], 
                 Ok ({cpuData with 

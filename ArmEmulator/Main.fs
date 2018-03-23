@@ -5,7 +5,12 @@ open VisualTest
 open System.IO
 open Emulator.TopLevel
 open CommonData
-open VisualTest
+
+//Number of tests to run for each set of randomised tests
+// and randomised tests against visual
+
+let customConfig = { defaultConfig with fsCheckMaxTests = 10000 }
+
 
 /// reads the lines of a file into a string
 let readLines (filePath:string) = seq {
@@ -96,7 +101,7 @@ let emulate infile outfile flags regs =
 
 let runTests argv = 
     Visual.initCaches VTest.defaultParas |> ignore
-    Tests.runTestsInAssembly defaultConfig argv |> ignore
+    Tests.runTestsInAssembly customConfig argv |> ignore
     Visual.finaliseCaches VTest.defaultParas |> ignore
 
 

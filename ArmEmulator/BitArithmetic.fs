@@ -7,6 +7,7 @@ module BitArithmetic
     open CommonLex
     open CommonData
     open ParseExpr
+    open System
 
 
 
@@ -132,6 +133,20 @@ module BitArithmetic
 
 
 
+    /// checkLit checks a valid literal is used for ORR and EOR
+    let checkLit flexResult =
+        let valid lit = 
+            let rotMask n = (0xFFu >>> n) ||| (0xFFu <<< 32 - n)
+            [0..2..30] 
+            |> List.map rotMask 
+            |> List.exists (fun mask -> (mask &&& lit) = lit)
+            |> function  
+                    | true -> flexResult
+                    | false -> Error "Litteral can't be created by rotating an 8 bit number in a 32 bit word "  
+        match flexResult with 
+        | Ok (Literal lit) -> valid lit
+        | Ok (RegShiftLit (_,_,lit)) -> valid lit
+        | _ -> flexResult
 
 
 
@@ -230,19 +245,24 @@ module BitArithmetic
             Ok {baseInstr with Dest = checkReg (toReg ops.[0]) 
                                       Op1 = checkValid (toFlexOp ops.[1..])}                                  
 
-        | AND | ORR | EOR | BIC when (ops.Length = 3) || (ops.Length = 4) ->
+        | AND | BIC when (ops.Length = 3) || (ops.Length = 4) ->
             Ok {baseInstr with Dest = checkReg (toReg ops.[0])
                                       Op1 = checkValid (toFlexOp [|ops.[1]|]) 
                                       Op2 = checkValid (toFlexOp ops.[2..])}
 
+        | ORR | EOR when (ops.Length = 3) || (ops.Length = 4) ->
+            Ok {baseInstr with Dest = checkReg (toReg ops.[0])
+                                      Op1 = checkValid (toFlexOp [|ops.[1]|])
+                                      Op2 = (toFlexOp ops.[2..]) |> checkValid |> checkLit}
+
         | LSL | LSR | ASR | ROR when ops.Length = 3 -> 
             Ok {baseInstr with Dest = checkReg (toReg ops.[0])
                                       Op1 = checkValid (toFlexOp [|ops.[1]|])
-                                      Op2 = checkValid (toFlexOp ops.[2..])}
+                                      Op2 = toFlexOp ops.[2..] |> checkValid |> checkLit}
 
         | RRX when ops.Length = 2 -> 
             Ok {baseInstr with Dest = checkReg (toReg ops.[0])
-                                      Op1 = toFlexOp [|ops.[1]|]}
+                                      Op1 = toFlexOp [|ops.[1]; root|]}
 
         | _ -> Error "Not valid input operands; wrong number of opperands"
 
@@ -301,13 +321,12 @@ module BitArithmetic
     /// required result and the carry the shift produces.
     /// i.e returns (evaluated shift number, carry)
     let doShift n shifter shiftVal =
-        let sVal = (int32 shiftVal) % 32  
+        let sVal = int32 shiftVal
         match shifter with 
         | Lsl -> n <<< sVal , (((n <<< sVal - 1) >>> 31) |> intToBool)
         | Lsr -> n >>> sVal , (((n >>> (sVal - 1)) &&& 1u) |> intToBool)
         | Asr -> uint32 (int32 n >>> sVal) , (((uint32 (int32 n >>> (sVal - 1))) &&& 1u) |> intToBool)
         | Ror -> (n >>> sVal) ||| (n <<<(32- sVal)) , ((((n >>> (sVal - 1)) ||| (n <<<(31 - sVal))) &&& 1u) |> intToBool)
-
     let doRRX n carry = 
         let newCarry = (n &&& 1u) |> intToBool        
         (n >>> 1) + (carry <<< 31),newCarry      
@@ -331,20 +350,29 @@ module BitArithmetic
         /// evaluates flexible operator
         /// returns (evaluated operand as a uint32 , carry from flexible operator calculation) 
         let flexEval op =
-            let carry = cpuData.Fl.C 
-            match op with
-            | Literal lit -> lit,false
 
-            | Register reg -> cpuData.Regs.[reg],false  
+            match op with
+            | Literal lit -> lit
+
+            | Register reg -> cpuData.Regs.[reg]
 
             | RegShiftLit (regTarget,shift,lit) ->
-                doShift cpuData.Regs.[regTarget] shift lit
+                doShift cpuData.Regs.[regTarget] shift lit |> fst
 
             | RegShiftReg (regTarget,shift,reg) ->
-                doShift cpuData.Regs.[regTarget] shift cpuData.Regs.[reg]
+                doShift cpuData.Regs.[regTarget] shift cpuData.Regs.[reg] |>  fst
 
             | RegRRX reg -> 
-                doRRX cpuData.Regs.[reg] (System.Convert.ToUInt32(carry)) 
+                doRRX cpuData.Regs.[reg] (System.Convert.ToUInt32(flags.C)) |>  fst 
+
+        let calcFlexCarry flexVal =
+            match  int flexVal > 255 with 
+            | true -> 
+                match flexVal >>> 31 with
+                | 1u -> true
+                | 0u -> false
+                | _ -> failwithf "Bit 31 of evaluated op2 is not 0 or 1: Should not happen"
+            | false -> flags.C     
 
         /// preforms the instruction on the given data
         /// op1 and op2 are both uint32 
@@ -366,26 +394,52 @@ module BitArithmetic
             | RRX -> doRRX op1 (System.Convert.ToUInt32(flags.C))
 
         match instr, operands.Dest, operands.Op1, operands.Op2 with    
-        | (MOV | MVN | RRX), Some dest, Ok op1, Error ""  -> 
-            let flexVal,flexCarry = flexEval op1 
+        | (MOV | MVN), Some dest, Ok op1, Error ""  -> 
+            let flexVal = flexEval op1 
+            let flexCarry = calcFlexCarry flexVal
+            let totVal,totCarry = doOpCode flexVal 0u flexCarry
+            match suffix with
+            | S -> Ok {cpuData with Regs = updateRegs dest totVal ;  Fl = updateFlags totVal totCarry}
+            | NA -> Ok {cpuData with Regs = updateRegs dest totVal} 
+   
+        | RRX, Some dest, Ok (RegRRX targetReg), Error ""  -> 
+            let flexVal = flexEval (RegRRX targetReg)
+            let flexCarry = calcFlexCarry flexVal
             let totVal,totCarry = doOpCode flexVal 0u flexCarry
             match suffix with
             | S -> Ok {cpuData with Regs = updateRegs dest totVal ;  Fl = updateFlags totVal totCarry}
             | NA -> Ok {cpuData with Regs = updateRegs dest totVal}
 
         | (TST | TEQ), Some dest, Ok op1, Error ""  -> 
-            let flexVal,flexCarry = flexEval op1 
+            let flexVal = flexEval op1 
+            let flexCarry = calcFlexCarry flexVal
             let totVal,totCarry = doOpCode cpuData.Regs.[dest] flexVal flexCarry
             Ok {cpuData with Fl = updateFlags totVal totCarry}
 
 
-        | (AND | ORR | EOR | BIC | LSL | LSR | ASR | ROR), Some dest, Ok (Register reg), Ok op2 ->
-            let flexVal,flexCarry = flexEval op2 
+        | (AND | ORR | EOR | BIC), Some dest, Ok (Register reg), Ok op2 ->
+            let flexVal = flexEval op2 
+            let flexCarry = calcFlexCarry flexVal
             let totVal,totCarry = doOpCode cpuData.Regs.[reg] flexVal flexCarry
             match suffix with
             | S -> Ok {cpuData with Regs = updateRegs dest totVal ;  Fl = updateFlags totVal totCarry}
             | NA -> Ok {cpuData with Regs = updateRegs dest totVal}
 
+        | ( LSL | LSR | ASR | ROR), Some dest, Ok (Register reg), Ok (Literal lit) ->
+            let flexVal = flexEval (Literal lit)
+            let flexCarry = calcFlexCarry flexVal
+            let totVal,totCarry = doOpCode cpuData.Regs.[reg] flexVal flexCarry
+            match suffix with
+            | S -> Ok {cpuData with Regs = updateRegs dest totVal ;  Fl = updateFlags totVal totCarry}
+            | NA -> Ok {cpuData with Regs = updateRegs dest totVal}
+
+        | ( LSL | LSR | ASR | ROR), Some dest, Ok (Register reg1), Ok (Register reg2) ->
+            let flexVal = flexEval (Register reg2)
+            let flexCarry = calcFlexCarry flexVal
+            let totVal,totCarry = doOpCode cpuData.Regs.[reg1] flexVal flexCarry
+            match suffix with
+            | S -> Ok {cpuData with Regs = updateRegs dest totVal ;  Fl = updateFlags totVal totCarry}
+            | NA -> Ok {cpuData with Regs = updateRegs dest totVal}        
 
         | _ -> Error "Execution error"
 

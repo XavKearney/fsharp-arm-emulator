@@ -81,7 +81,7 @@ module TopLevel =
                 let upperMatch = (strMatch|>string).ToUpper()
                 let list1 =List.collect (fun a -> [a;upperMatch]) splitList
                 list1.[0..(List.length list1)-2]
-            let matcher strM = (sprintf @"[ |,]"+strM+"[ |,]") 
+            let matcher strM = (sprintf @"[\s+|,]+" + strM + @"[\s+|,]") 
             match str with
             | Match (matcher matchStr) [_; ex] -> 
                 ex.Value
@@ -240,7 +240,7 @@ module TopLevel =
 
     // function to execute any parsed instruction from any module
     // returns the modified datapath plus symbol table (or an error)
-    let execParsedLine ins d (symtab: SymbolTable) lineNum =
+    let execParsedLine ins d (symtab: SymbolTable) lineNum allowLabelIns=
         /// executes a given instruction with the correct execution function f
         let exec' p f ins' err = 
             { PInstr = ins'; PLabel = p.PLabel; PCond = p.PCond; PSize = p.PSize }
@@ -251,22 +251,25 @@ module TopLevel =
         // check if instruction should be executed
         match checkCond d.Fl ins.PCond with
         | true ->
-            match ins with
+            match allowLabelIns, ins with
+            // don't execute label instructions - they are executed during parse
+            | false, {PInstr = IMEM (Mem.LabelO _)} ->
+                Ok (d, symtab)
             // Mem instructions modify both symbol table and datapath
-            | {PInstr=IMEM ins';} as p -> 
+            | _, ({PInstr=IMEM ins';} as p) -> 
                 exec' p (Mem.execInstr d symtab) ins' ERRIMEM
             // the rest of the modules just modify datapath
-            | {PInstr=IMULTMEM ins';} as p -> 
+            | _, ({PInstr=IMULTMEM ins';} as p) -> 
                 exec' p (MultMem.execInstr d) ins' ERRIMULTMEM
                 |> includeSyms
-            | {PInstr=IARITH ins';} as p -> 
+            | _, ({PInstr=IARITH ins';} as p) -> 
                 exec' p (Arithmetic.execArithmeticInstr d) ins' ERRIARITH
                 |> includeSyms
-            | {PInstr=IBITARITH ins';} as p -> 
+            | _, ({PInstr=IBITARITH ins';} as p) -> 
                 exec' p (BitArithmetic.exeInstr d) ins' ERRIARITH
                 |> includeSyms
             // if the line is blank, just return with no changes
-            | {PInstr=BLANKLINE;} -> 
+            | _, {PInstr=BLANKLINE;} -> 
                 Ok (d, symtab)
         // if the condition code says don't execute, return with no changes
         | false -> Ok (d, symtab)
@@ -276,42 +279,37 @@ module TopLevel =
     /// parses each line using parseLine function
     /// returns a list of Ok parsed instructions, or errors
     /// plus the completed symbol table, if given
-    let parseLines lines symtab = 
+    let parseLines lines cpu symtab = 
         // execute an instruction if it corresponds to an EQU instruction
-        let execIfEqu = 
+        let execIfLabelIns d = 
             function
             // need to check for EQU instructions
-            | Ok ({PInstr = IMEM (Mem.LabelO (Ok {InstructionType = x}))} as p,syms) when x = Mem.EQU ->
-                // create a dummy datapath
-                let d = 
-                    match initDataPath None None None with
-                    | Ok d -> d
-                    | Error _ -> failwithf "Should never happen."
+            | Ok ({PInstr = IMEM (Mem.LabelO _)} as p,syms) ->
                 // execute the EQU instruction (datapath is not changed)
-                execParsedLine p d syms 0u
+                execParsedLine p d syms 0u true
                 // use the updated symbol table and continue
-                |> Result.map (snd)
-                |> Result.map (fun s-> p,s)
-            | i -> i
+                |> Result.map (fun (d', s)-> p,d',s)
+            | Ok(p, syms) -> Ok (p,d,syms)
+            | Error s -> Error s
         // parses each line one by one, updating the symbol table as it goes
-        let rec parseLines' lines parsedLines loadaddr (symtab': SymbolTable) = 
+        let rec parseLines' lines parsedLines d loadaddr (symtab': SymbolTable) = 
             let addLabel p =
                 match p.PLabel, symtab' with
                 | Some lab, syms -> p, (syms.Add lab)
                 | _ -> p, symtab'
             match lines with
             // no more lines to parse, return (need to reverse list order)
-            | [] -> List.rev parsedLines, symtab' 
+            | [] -> List.rev parsedLines, d, symtab' 
             // otherwise, parse line and update symbol table
             | line :: rest ->
                 parseLine symtab' (WA loadaddr) line
                 |> Result.map addLabel
-                |> execIfEqu
+                |> execIfLabelIns d
                 |> function
-                    | Ok (p, syms) -> parseLines' rest (Ok p :: parsedLines) (loadaddr + p.PSize) syms
+                    | Ok (p, d', syms) -> parseLines' rest (Ok p :: parsedLines) d' (loadaddr + p.PSize) syms
                     // not sure how to increment size if error
-                    | Error s -> parseLines' rest (Error s :: parsedLines) (loadaddr + 4u) symtab'
-        parseLines' lines [] 0u symtab
+                    | Error s -> parseLines' rest (Error s :: parsedLines) d (loadaddr + 4u) symtab'
+        parseLines' lines [] cpu 0u symtab
 
 
 
@@ -369,10 +367,9 @@ module TopLevel =
                     && d = Some R15 -> true
             | _ -> false
 
-
         let rec execLines cpu' insMap symtab' branchCount = 
             // check if the program has reached the end, or if branch count exceeds limit
-            match checkEnd cpu' insMap, branchCount > 1000u with
+            match checkEnd cpu' insMap, branchCount > 100000u with
             // if so, return 
             | true, _ -> Ok (cpu', symtab')
             // otherwise, execute the next instruction
@@ -384,8 +381,8 @@ module TopLevel =
                 // get the instruction at that PC value in memory
                 |> fun a -> insMap.[WA a]
                 |> fun (p, lineNum) -> 
-                    // execute the instruction
-                    execParsedLine p cpu' symtab' lineNum
+                    // execute the instruction (false for disallow label instructions)
+                    execParsedLine p cpu' symtab' lineNum false
                     |> Result.bind (
                         fun (newCpu, newSymTab) -> 
                             let branch = checkBranch p
@@ -418,10 +415,9 @@ module TopLevel =
     /// then executes the instructions with the symbol table (if given)
     let parseThenExecLines lines cpuData symtab = 
         // first pass of parsing
-        parseLines lines symtab
+        parseLines lines cpuData symtab
         // second pass of parsing
-        |> snd
-        |> parseLines lines
+        |> fun (_,_,s) -> parseLines lines cpuData s
         // execute
         |> function
-            | parsedLines, syms -> execParsedLines parsedLines cpuData syms
+            | parsedLines, d, syms -> execParsedLines parsedLines d syms
